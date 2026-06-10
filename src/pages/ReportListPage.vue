@@ -31,7 +31,7 @@ onMounted(load)
           <h3 class="font-semibold capitalize">{{ r.report_type.replace('_', ' ') }}</h3>
           <StatusBadge :status="r.status" />
         </div>
-        <p class="text-xs text-mid mt-1">{{ r.client_preferred_name || 'client #' + r.client_id }}</p>
+        <p class="text-xs text-mid mt-1">{{ r.client_display_name }}</p>
         <p class="text-xs text-mid mt-2">{{ r.period_start || '—' }} → {{ r.period_end || '—' }}</p>
       </router-link>
     </div>

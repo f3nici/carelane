@@ -1,10 +1,21 @@
 import { sqlite } from '../db/connection.js'
+import { clientDisplayName } from './clientService.js'
 import { ApiError } from '../middleware/errorHandler.js'
 
 const COLUMNS = ['client_id', 'title', 'status', 'start_date', 'end_date', 'supports_summary',
   'hourly_rate', 'total_budget', 'questionnaire_json', 'body_markdown']
 
 const now = () => new Date().toISOString()
+
+/**
+ * Add `client_display_name` to a list row and drop the raw joined name columns.
+ */
+function toListRow (row) {
+  row.client_display_name = clientDisplayName(row)
+  delete row.client_first_name
+  delete row.client_last_name
+  return row
+}
 
 /**
  * List service agreements with optional client / status filters.
@@ -18,11 +29,12 @@ export function listAgreements (pg, filters = {}) {
   if (filters.status) { where.push('a.status = ?'); params.push(filters.status) }
   const whereSql = 'WHERE ' + where.join(' AND ')
   const total = sqlite.prepare(`SELECT COUNT(*) AS c FROM service_agreements a ${whereSql}`).get(...params).c
-  const rows = sqlite.prepare(`SELECT a.*, c.preferred_name AS client_preferred_name
+  const rows = sqlite.prepare(`SELECT a.*, c.preferred_name AS client_preferred_name,
+      c.first_name AS client_first_name, c.last_name AS client_last_name
     FROM service_agreements a JOIN clients c ON c.id = a.client_id
     ${whereSql} ORDER BY a.updated_at DESC LIMIT ? OFFSET ?`)
     .all(...params, pg.perPage, pg.offset)
-  return { rows, total }
+  return { rows: rows.map(toListRow), total }
 }
 
 /**

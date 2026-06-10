@@ -54,7 +54,7 @@ const tiles = [
       <h3 class="font-semibold mb-3 text-danger">Flagged incidents</h3>
       <ul class="space-y-2">
         <li v-for="s in incidents" :key="s.id" class="text-sm">
-          <router-link :to="`/shifts/${s.id}`" class="text-accent hover:underline">{{ s.shift_date }} — {{ s.client_preferred_name || 'client #' + s.client_id }}</router-link>
+          <router-link :to="`/shifts/${s.id}`" class="text-accent hover:underline">{{ s.shift_date }} — {{ s.client_display_name }}</router-link>
         </li>
       </ul>
     </div>
@@ -65,7 +65,7 @@ const tiles = [
         <p v-if="!planReviews.length" class="text-sm text-mid">Nothing due in the next 60 days.</p>
         <ul class="space-y-2">
           <li v-for="c in planReviews" :key="c.id" class="text-sm flex justify-between">
-            <router-link :to="`/clients/${c.id}`" class="text-accent hover:underline">{{ c.preferred_name || 'Client #' + c.id }}</router-link>
+            <router-link :to="`/clients/${c.id}`" class="text-accent hover:underline">{{ c.client_display_name }}</router-link>
             <span class="text-mid">{{ c.plan_end }}</span>
           </li>
         </ul>
@@ -75,7 +75,7 @@ const tiles = [
         <p v-if="!recentShifts.length" class="text-sm text-mid">No shift notes yet.</p>
         <ul class="space-y-2">
           <li v-for="s in recentShifts" :key="s.id" class="text-sm flex items-center justify-between gap-2">
-            <router-link :to="`/shifts/${s.id}`" class="text-accent hover:underline truncate">{{ s.shift_date }} — {{ s.client_preferred_name || 'client #' + s.client_id }}</router-link>
+            <router-link :to="`/shifts/${s.id}`" class="text-accent hover:underline truncate">{{ s.shift_date }} — {{ s.client_display_name }}</router-link>
             <StatusBadge :status="s.finalised ? 'finalised' : 'draft'" />
           </li>
         </ul>

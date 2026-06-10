@@ -42,7 +42,7 @@ onMounted(load)
         <tbody>
           <tr v-for="s in shifts" :key="s.id" class="border-b border-white/5 hover:bg-white/5">
             <td class="p-3"><router-link :to="`/shifts/${s.id}`" class="text-accent hover:underline">{{ s.shift_date }}</router-link></td>
-            <td class="p-3">{{ s.client_preferred_name || 'client #' + s.client_id }}</td>
+            <td class="p-3">{{ s.client_display_name }}</td>
             <td class="p-3">{{ s.duration_hours || '—' }}</td>
             <td class="p-3 text-xs text-mid">{{ s.billing_code || '—' }}</td>
             <td class="p-3">
