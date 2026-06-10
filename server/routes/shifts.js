@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import multer from 'multer'
-import { validate } from '../middleware/validate.js'
+import { validate, validatePartial } from '../middleware/validate.js'
 import { shiftSchema, shiftDraftSchema } from '../utils/validators.js'
 import * as shiftService from '../services/shiftService.js'
 import * as clientService from '../services/clientService.js'
@@ -53,7 +53,7 @@ router.get('/:id', (req, res) => {
   res.json(ok(shiftService.getShift(Number(req.params.id))))
 })
 
-router.put('/:id', validate(shiftSchema.partial()), (req, res) => {
+router.put('/:id', validatePartial(shiftSchema), (req, res) => {
   const before = shiftService.getShift(Number(req.params.id))
   const shift = shiftService.updateShift(Number(req.params.id), req.body)
   const action = !before.finalised && shift.finalised ? 'finalised' : 'updated'

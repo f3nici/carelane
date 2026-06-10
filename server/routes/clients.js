@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { validate } from '../middleware/validate.js'
+import { validate, validatePartial } from '../middleware/validate.js'
 import { clientSchema, clientBillingCodesSchema } from '../utils/validators.js'
 import * as clientService from '../services/clientService.js'
 import * as agreementService from '../services/agreementService.js'
@@ -42,7 +42,7 @@ router.get('/:id', (req, res) => {
   res.json(ok(clientService.getClient(Number(req.params.id))))
 })
 
-router.put('/:id', validate(clientSchema.partial()), (req, res) => {
+router.put('/:id', validatePartial(clientSchema), (req, res) => {
   const client = clientService.updateClient(Number(req.params.id), req.body)
   logActivity('client', client.id, req.session.userId, 'updated', { fields: Object.keys(req.body).length })
   res.json(ok(client))

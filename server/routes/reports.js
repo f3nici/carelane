@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import fs from 'node:fs'
-import { validate } from '../middleware/validate.js'
+import { validate, validatePartial } from '../middleware/validate.js'
 import { reportSchema, reportDraftSchema } from '../utils/validators.js'
 import * as reportService from '../services/reportService.js'
 import * as shiftService from '../services/shiftService.js'
@@ -36,7 +36,7 @@ router.get('/:id', (req, res) => {
   res.json(ok(reportService.getReport(Number(req.params.id))))
 })
 
-router.put('/:id', validate(reportSchema.partial()), (req, res) => {
+router.put('/:id', validatePartial(reportSchema), (req, res) => {
   const before = reportService.getReport(Number(req.params.id))
   const report = reportService.updateReport(Number(req.params.id), req.body)
   const action = before.status === 'draft' && report.status === 'final' ? 'finalised' : 'updated'

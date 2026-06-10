@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import fs from 'node:fs'
-import { validate } from '../middleware/validate.js'
+import { validate, validatePartial } from '../middleware/validate.js'
 import { agreementSchema } from '../utils/validators.js'
 import * as agreementService from '../services/agreementService.js'
 import * as clientService from '../services/clientService.js'
@@ -34,7 +34,7 @@ router.get('/:id', (req, res) => {
   res.json(ok(agreementService.getAgreement(Number(req.params.id))))
 })
 
-router.put('/:id', validate(agreementSchema.partial()), (req, res) => {
+router.put('/:id', validatePartial(agreementSchema), (req, res) => {
   const agreement = agreementService.updateAgreement(Number(req.params.id), req.body)
   logActivity('agreement', agreement.id, req.session.userId, 'updated')
   res.json(ok(agreement))

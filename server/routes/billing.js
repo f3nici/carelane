@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import multer from 'multer'
-import { validate } from '../middleware/validate.js'
+import { validate, validatePartial } from '../middleware/validate.js'
 import { billingCodeSchema, billingImportCommitSchema } from '../utils/validators.js'
 import * as billingService from '../services/billingService.js'
 import { parsePriceGuideDocx, parsePriceGuidePdfText } from '../utils/docxParser.js'
@@ -31,7 +31,7 @@ router.post('/', validate(billingCodeSchema), (req, res) => {
   res.status(201).json(ok(code))
 })
 
-router.put('/:id', validate(billingCodeSchema.partial()), (req, res) => {
+router.put('/:id', validatePartial(billingCodeSchema), (req, res) => {
   const code = billingService.updateBillingCode(Number(req.params.id), req.body)
   logActivity('billing_code', code.id, req.session.userId, 'updated', { code: code.code })
   res.json(ok(code))
