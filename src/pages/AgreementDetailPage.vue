@@ -101,6 +101,30 @@ async function sign () {
 function downloadPdf () {
   window.open(`/api/v1/agreements/${id.value}/pdf?refresh=true`, '_blank')
 }
+
+const uploadingCopy = ref(false)
+
+/**
+ * Upload the signed copy of this agreement to the participant's completed
+ * documents, so it can be stored and re-downloaded later.
+ */
+async function uploadSignedCopy (event) {
+  const file = event.target.files?.[0]
+  if (!file) return
+  uploadingCopy.value = true
+  try {
+    const fd = new FormData()
+    fd.append('file', file)
+    fd.append('title', `${title.value || 'Service agreement'} (signed)`)
+    fd.append('source_type', 'agreement')
+    fd.append('source_id', String(id.value))
+    await api.upload(`/clients/${clientId.value}/documents`, fd)
+    toast.push('Signed copy saved to the participant’s documents', 'success')
+  } catch { /* toast via interceptor */ } finally {
+    uploadingCopy.value = false
+    event.target.value = ''
+  }
+}
 </script>
 
 <template>
@@ -110,6 +134,10 @@ function downloadPdf () {
       <div class="flex items-center gap-2">
         <StatusBadge v-if="id" :status="status" />
         <button v-if="id && body" class="btn-ghost" @click="downloadPdf">PDF</button>
+        <label v-if="signed" class="btn-ghost cursor-pointer" :class="{ 'opacity-50 cursor-not-allowed': uploadingCopy }">
+          {{ uploadingCopy ? 'Uploading…' : 'Upload signed copy' }}
+          <input type="file" class="hidden" accept="application/pdf,image/jpeg,image/png,image/webp" :disabled="uploadingCopy" @change="uploadSignedCopy" />
+        </label>
         <button v-if="id && body && !signed" class="btn-accent" @click="confirmSign = true">Mark signed</button>
       </div>
     </div>

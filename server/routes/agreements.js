@@ -5,7 +5,7 @@ import { agreementSchema } from '../utils/validators.js'
 import * as agreementService from '../services/agreementService.js'
 import * as clientService from '../services/clientService.js'
 import { draftAgreement } from '../services/aiService.js'
-import { renderPdf, pdfPath } from '../utils/pdfRenderer.js'
+import { renderPdf, pdfPath, safeFilename } from '../utils/pdfRenderer.js'
 import { logActivity } from '../services/activityService.js'
 import { parsePagination, paginationMeta, ok } from '../utils/pagination.js'
 import { ApiError } from '../middleware/errorHandler.js'
@@ -91,12 +91,12 @@ router.get('/:id/pdf', async (req, res, next) => {
     const previous = agreement.pdf_filename
     const filename = await renderPdf({
       title: agreement.title,
-      subtitle: `Service agreement · ${agreement.start_date || ''} to ${agreement.end_date || ''}${agreement.signed_by_client ? ` · signed ${agreement.signed_date}` : ' · DRAFT'}`,
+      subtitle: `Service agreement · ${agreement.start_date || ''} to ${agreement.end_date || ''}${agreement.signed_by_client ? ` · signed ${agreement.signed_date}` : ''}`,
       body: agreement.body_markdown
     })
     agreementService.setAgreementPdf(agreement.id, filename)
     if (previous && previous !== filename) { try { fs.rmSync(pdfPath(previous)) } catch { /* already gone */ } }
-    res.download(pdfPath(filename), `agreement-${agreement.id}.pdf`)
+    res.download(pdfPath(filename), safeFilename(agreement.title, `agreement-${agreement.id}`))
   } catch (err) { next(err) }
 })
 

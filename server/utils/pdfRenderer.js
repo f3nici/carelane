@@ -284,3 +284,21 @@ function writeRich (pdf, tokens, { fontSize, color, indent = 0, prefix = null, b
 export function pdfPath (filename) {
   return path.join(PDF_DIR(), filename)
 }
+
+/**
+ * Build a human-friendly, filesystem-safe download filename from a document
+ * title (used for the Content-Disposition name so clients receive a file named
+ * after the document rather than an internal id). Always ends in `.pdf`.
+ * @param {string} title
+ * @param {string} [fallback] used when the title is empty after cleaning
+ * @returns {string}
+ */
+export function safeFilename (title, fallback = 'document') {
+  const base = String(title || '')
+    .replace(/[/\\?%*:|"<>]/g, '') // drop path/HTTP-unsafe characters
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 120)
+    .trim()
+  return `${base || fallback}.pdf`
+}

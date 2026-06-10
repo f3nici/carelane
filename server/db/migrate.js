@@ -154,6 +154,21 @@ CREATE TABLE IF NOT EXISTS reports (
   deleted_at TEXT
 );
 
+CREATE TABLE IF NOT EXISTS client_documents (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  client_id INTEGER NOT NULL REFERENCES clients(id),
+  title TEXT NOT NULL,
+  source_type TEXT NOT NULL DEFAULT 'upload',
+  source_id INTEGER,
+  filename TEXT NOT NULL,
+  original_name TEXT,
+  mime_type TEXT,
+  size_bytes INTEGER,
+  created_at TEXT,
+  deleted_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_client_documents_client ON client_documents (client_id);
+
 CREATE TABLE IF NOT EXISTS documents (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   title TEXT NOT NULL,

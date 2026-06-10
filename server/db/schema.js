@@ -147,6 +147,20 @@ export const reports = sqliteTable('reports', {
   deletedAt: text('deleted_at')
 })
 
+export const clientDocuments = sqliteTable('client_documents', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  clientId: integer('client_id').notNull().references(() => clients.id),
+  title: text('title').notNull(),
+  sourceType: text('source_type').notNull().default('upload'), // agreement | report | upload
+  sourceId: integer('source_id'),
+  filename: text('filename').notNull(),
+  originalName: text('original_name'),
+  mimeType: text('mime_type'),
+  sizeBytes: integer('size_bytes'),
+  createdAt: text('created_at'),
+  deletedAt: text('deleted_at')
+})
+
 export const documents = sqliteTable('documents', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   title: text('title').notNull(),
