@@ -11,17 +11,36 @@ const codes = ref([])
 const meta = ref({})
 const page = ref(1)
 const q = ref('')
+const showExpired = ref(false)
+const sortKey = ref('code')
+const sortDir = ref('asc')
 const showImport = ref(false)
 const editing = ref(null)
 let debounce = null
 
 async function load () {
-  const res = await api.get('/billing-codes', { page: page.value, per_page: 50, q: q.value || undefined })
+  const res = await api.get('/billing-codes', {
+    page: page.value,
+    per_page: 50,
+    q: q.value || undefined,
+    active: showExpired.value ? undefined : 'true',
+    sort: sortKey.value,
+    dir: sortDir.value
+  })
   codes.value = res.data
   meta.value = res.meta
 }
 
+/** Toggle direction when re-clicking the active column, else sort ascending. */
+function sortBy (key) {
+  if (sortKey.value === key) sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+  else { sortKey.value = key; sortDir.value = 'asc' }
+  page.value = 1
+  load()
+}
+
 watch(q, () => { clearTimeout(debounce); debounce = setTimeout(() => { page.value = 1; load() }, 300) })
+watch(showExpired, () => { page.value = 1; load() })
 watch(page, load)
 onMounted(load)
 
@@ -86,13 +105,22 @@ async function deactivate (id) {
       </div>
     </div>
 
-    <input v-model="q" class="input max-w-md" placeholder="Search code, name or category…" />
+    <div class="flex flex-wrap items-center gap-3">
+      <input v-model="q" class="input max-w-md" placeholder="Search code, name or category…" />
+      <label class="flex items-center gap-2 text-sm"><input v-model="showExpired" type="checkbox" class="accent-primary" /> Show expired codes</label>
+    </div>
 
     <div class="card !p-0 overflow-x-auto">
       <table class="w-full text-sm">
         <thead>
           <tr class="text-left text-xs text-mid border-b border-white/10">
-            <th class="p-3">Code</th><th class="p-3">Name</th><th class="p-3">Unit</th><th class="p-3">Cap (std)</th><th class="p-3">Guide</th><th class="p-3">Status</th><th class="p-3"></th>
+            <th class="p-3 cursor-pointer select-none hover:text-white" @click="sortBy('code')">Code<span v-if="sortKey === 'code'"> {{ sortDir === 'asc' ? '▲' : '▼' }}</span></th>
+            <th class="p-3 cursor-pointer select-none hover:text-white" @click="sortBy('name')">Name<span v-if="sortKey === 'name'"> {{ sortDir === 'asc' ? '▲' : '▼' }}</span></th>
+            <th class="p-3 cursor-pointer select-none hover:text-white" @click="sortBy('unit')">Unit<span v-if="sortKey === 'unit'"> {{ sortDir === 'asc' ? '▲' : '▼' }}</span></th>
+            <th class="p-3 cursor-pointer select-none hover:text-white" @click="sortBy('price_cap_standard')">Cap (std)<span v-if="sortKey === 'price_cap_standard'"> {{ sortDir === 'asc' ? '▲' : '▼' }}</span></th>
+            <th class="p-3 cursor-pointer select-none hover:text-white" @click="sortBy('price_guide_version')">Guide<span v-if="sortKey === 'price_guide_version'"> {{ sortDir === 'asc' ? '▲' : '▼' }}</span></th>
+            <th class="p-3 cursor-pointer select-none hover:text-white" @click="sortBy('active')">Status<span v-if="sortKey === 'active'"> {{ sortDir === 'asc' ? '▲' : '▼' }}</span></th>
+            <th class="p-3"></th>
           </tr>
         </thead>
         <tbody>

@@ -3,10 +3,20 @@ import { ApiError } from '../middleware/errorHandler.js'
 
 const now = () => new Date().toISOString()
 
+/** Columns clients may sort by, mapped to safe SQL expressions (whitelist). */
+const SORTABLE = {
+  code: 'code',
+  name: 'name',
+  unit: 'unit',
+  price_cap_standard: 'price_cap_standard',
+  price_guide_version: 'price_guide_version',
+  active: 'active'
+}
+
 /**
- * List billing codes with search + active filter.
+ * List billing codes with search, active filter and sorting.
  * @param {{page:number, perPage:number, offset:number}} pg
- * @param {{q?:string, active?:string}} filters
+ * @param {{q?:string, active?:string, sort?:string, dir?:string}} filters
  */
 export function listBillingCodes (pg, filters = {}) {
   const where = ['1=1']
@@ -18,8 +28,12 @@ export function listBillingCodes (pg, filters = {}) {
     params.push(q, q, q)
   }
   const whereSql = 'WHERE ' + where.join(' AND ')
+  const sortCol = SORTABLE[filters.sort] || 'code'
+  const dir = String(filters.dir).toLowerCase() === 'desc' ? 'DESC' : 'ASC'
+  // Tie-break on code for a stable order across pages.
+  const orderSql = sortCol === 'code' ? `${sortCol} ${dir}` : `${sortCol} ${dir}, code ASC`
   const total = sqlite.prepare(`SELECT COUNT(*) AS c FROM billing_codes ${whereSql}`).get(...params).c
-  const rows = sqlite.prepare(`SELECT * FROM billing_codes ${whereSql} ORDER BY code LIMIT ? OFFSET ?`)
+  const rows = sqlite.prepare(`SELECT * FROM billing_codes ${whereSql} ORDER BY ${orderSql} LIMIT ? OFFSET ?`)
     .all(...params, pg.perPage, pg.offset)
   return { rows, total }
 }
