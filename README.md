@@ -148,6 +148,18 @@ Key design points:
 See [`CLAUDE.md`](CLAUDE.md) for the full development guide, hard rules and code
 style conventions.
 
+## Roadmap
+
+Planned work, not yet implemented:
+
+- **Square API invoicing** — integrate the Square API to automatically generate
+  invoices from billable shifts and send them to participants. When an invoice
+  is sent, the corresponding shift is automatically marked as billed, closing
+  the loop between shift notes and payment.
+- **Agreement & report templates** — reusable templates for service agreements
+  and reports that Claude reads from and follows when drafting, so generated
+  documents match a consistent, operator-defined structure and wording.
+
 ## Data & privacy
 
 This application stores sensitive health information. Operators are responsible
