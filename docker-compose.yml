@@ -1,0 +1,22 @@
+services:
+  carelane:
+    image: ghcr.io/f3nici/carelane:latest
+    build: .
+    container_name: carelane
+    ports:
+      - '3778:3778'
+    environment:
+      PORT: 3778
+      NODE_ENV: production
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env}
+      ENCRYPTION_SECRET: ${ENCRYPTION_SECRET:?set ENCRYPTION_SECRET in .env}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      DEFAULT_USERNAME: ${DEFAULT_USERNAME:-admin}
+      DEFAULT_PASSWORD: ${DEFAULT_PASSWORD:-changeme}
+      BACKUP_ENABLED: ${BACKUP_ENABLED:-true}
+      BACKUP_RETENTION: ${BACKUP_RETENTION:-14}
+      BACKUP_TIME: ${BACKUP_TIME:-02:00}
+    volumes:
+      - ./data:/app/data
+      - ./uploads:/app/uploads
+    restart: unless-stopped
