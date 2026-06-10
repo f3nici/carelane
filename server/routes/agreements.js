@@ -86,15 +86,16 @@ router.get('/:id/pdf', async (req, res, next) => {
   try {
     const agreement = agreementService.getAgreement(Number(req.params.id))
     if (!agreement.body_markdown) throw new ApiError(409, 'NO_BODY', 'Agreement has no body to render')
-    let filename = agreement.pdf_filename
-    if (!filename || !fs.existsSync(pdfPath(filename)) || req.query.refresh === 'true') {
-      filename = await renderPdf({
-        title: agreement.title,
-        subtitle: `Service agreement · ${agreement.start_date || ''} to ${agreement.end_date || ''}${agreement.signed_by_client ? ` · signed ${agreement.signed_date}` : ' · DRAFT'}`,
-        body: agreement.body_markdown
-      })
-      agreementService.setAgreementPdf(agreement.id, filename)
-    }
+    // Always re-render so edits and branding changes (e.g. a new logo) are
+    // reflected; the previous file is removed to avoid orphaned PDFs.
+    const previous = agreement.pdf_filename
+    const filename = await renderPdf({
+      title: agreement.title,
+      subtitle: `Service agreement · ${agreement.start_date || ''} to ${agreement.end_date || ''}${agreement.signed_by_client ? ` · signed ${agreement.signed_date}` : ' · DRAFT'}`,
+      body: agreement.body_markdown
+    })
+    agreementService.setAgreementPdf(agreement.id, filename)
+    if (previous && previous !== filename) { try { fs.rmSync(pdfPath(previous)) } catch { /* already gone */ } }
     res.download(pdfPath(filename), `agreement-${agreement.id}.pdf`)
   } catch (err) { next(err) }
 })

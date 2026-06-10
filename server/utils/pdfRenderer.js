@@ -95,7 +95,9 @@ async function loadLogo (logoFilename) {
  * @param {string} markdown
  */
 function renderMarkdown (pdf, markdown) {
-  const tokens = marked.lexer(markdown || '')
+  // breaks: true so a single newline becomes a hard line break, matching how
+  // authors lay out agreements/reports line-by-line rather than collapsing them.
+  const tokens = marked.lexer(markdown || '', { gfm: true, breaks: true })
   for (const token of tokens) renderBlock(pdf, token, 0)
 }
 
@@ -218,51 +220,60 @@ function inlineSegments (tokens, state = { bold: false, italic: false }) {
     else if (t.type === 'em') out.push(...inlineSegments(t.tokens, { ...state, italic: true }))
     else if (t.type === 'del') out.push(...inlineSegments(t.tokens, state))
     else if (t.type === 'codespan') out.push({ text: t.text, ...state, code: true })
-    else if (t.type === 'br') out.push({ text: '\n', ...state, code: false })
+    else if (t.type === 'br') out.push({ br: true })
     else if (t.type === 'link') out.push(...(t.tokens ? inlineSegments(t.tokens, state) : [{ text: t.text, ...state, code: false }]))
     else if (t.tokens) out.push(...inlineSegments(t.tokens, state))
-    else out.push({ text: t.text ?? t.raw ?? '', ...state, code: false })
+    // Collapse any stray newlines into spaces — real line breaks arrive as `br`
+    // tokens; a newline left inside a `continued` run makes pdfkit overlap text.
+    else out.push({ text: (t.text ?? t.raw ?? '').replace(/\s*\n\s*/g, ' '), ...state, code: false })
   }
   return out
 }
 
 /**
  * Write a run of inline tokens with bold/italic/code styling, optionally
- * prefixed (used for list bullets) and indented.
+ * prefixed (used for list bullets) and indented. Hard breaks split the run
+ * into separate lines so pdfkit never has a newline inside a continued run.
  * @param {PDFDocument} pdf
  * @param {object[]} tokens inline tokens
  * @param {{fontSize:number, color:string, indent?:number, prefix?:string|null, baseFont?:string}} opts
  */
 function writeRich (pdf, tokens, { fontSize, color, indent = 0, prefix = null, baseFont = null } = {}) {
-  const segments = inlineSegments(tokens).filter((s) => s.text !== '')
+  // Split the inline run into visual lines on hard breaks.
+  const lines = [[]]
+  for (const seg of inlineSegments(tokens)) {
+    if (seg.br) { lines.push([]); continue }
+    if (seg.text !== '') lines[lines.length - 1].push(seg)
+  }
   pdf.fontSize(fontSize)
-  let started = false
 
-  if (prefix) {
-    const opts = { continued: true }
-    if (indent) opts.indent = indent
-    pdf.font(FONT.normal).fillColor(color).text(prefix, opts)
-    started = true
-  }
-
-  if (segments.length === 0) {
-    if (!started) pdf.font(baseFont || FONT.normal).fillColor(color).text('')
-    else pdf.text('')
-    return
-  }
-
-  segments.forEach((seg, i) => {
-    const last = i === segments.length - 1
-    const font = seg.code ? FONT.mono
-      : seg.bold && seg.italic ? FONT.boldItalic
-        : seg.bold ? FONT.bold
-          : seg.italic ? FONT.italic
-            : (baseFont || FONT.normal)
-    pdf.font(font).fillColor(seg.code ? CODE_COLOR : color)
-    const opts = { continued: !last }
-    if (indent && !started) opts.indent = indent
-    pdf.text(seg.text, opts)
-    started = true
+  lines.forEach((line, li) => {
+    let started = false
+    if (li === 0 && prefix) {
+      const opts = { continued: true }
+      if (indent) opts.indent = indent
+      pdf.font(FONT.normal).fillColor(color).text(prefix, opts)
+      started = true
+    }
+    if (line.length === 0) {
+      // Empty line (blank paragraph or a leading/trailing break).
+      if (started) pdf.text('')
+      else pdf.font(baseFont || FONT.normal).fillColor(color).text(li === 0 ? '' : ' ')
+      return
+    }
+    line.forEach((seg, i) => {
+      const last = i === line.length - 1
+      const font = seg.code ? FONT.mono
+        : seg.bold && seg.italic ? FONT.boldItalic
+          : seg.bold ? FONT.bold
+            : seg.italic ? FONT.italic
+              : (baseFont || FONT.normal)
+      pdf.font(font).fillColor(seg.code ? CODE_COLOR : color)
+      const opts = { continued: !last }
+      if (indent && !started) opts.indent = indent
+      pdf.text(seg.text, opts)
+      started = true
+    })
   })
 }
 

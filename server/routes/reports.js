@@ -106,15 +106,16 @@ router.get('/:id/pdf', async (req, res, next) => {
   try {
     const report = reportService.getReport(Number(req.params.id))
     if (!report.body_markdown) throw new ApiError(409, 'NO_BODY', 'Report has no body to render')
-    let filename = report.pdf_filename
-    if (!filename || !fs.existsSync(pdfPath(filename)) || req.query.refresh === 'true') {
-      filename = await renderPdf({
-        title: `${report.report_type.replace('_', ' ')} report`,
-        subtitle: `Period ${report.period_start || ''} to ${report.period_end || ''}${report.status === 'draft' ? ' · DRAFT' : ''}`,
-        body: report.body_markdown
-      })
-      reportService.setReportPdf(report.id, filename)
-    }
+    // Always re-render so edits and branding changes (e.g. a new logo) are
+    // reflected; the previous file is removed to avoid orphaned PDFs.
+    const previous = report.pdf_filename
+    const filename = await renderPdf({
+      title: `${report.report_type.replace('_', ' ')} report`,
+      subtitle: `Period ${report.period_start || ''} to ${report.period_end || ''}${report.status === 'draft' ? ' · DRAFT' : ''}`,
+      body: report.body_markdown
+    })
+    reportService.setReportPdf(report.id, filename)
+    if (previous && previous !== filename) { try { fs.rmSync(pdfPath(previous)) } catch { /* already gone */ } }
     res.download(pdfPath(filename), `report-${report.id}.pdf`)
   } catch (err) { next(err) }
 })
