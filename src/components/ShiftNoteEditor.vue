@@ -30,6 +30,7 @@ function submit (finalise = false) {
     if (payload[k] === '') payload[k] = null
   }
   payload.duration_hours = payload.duration_hours ? Number(payload.duration_hours) : null
+  payload.billing_code_id = payload.billing_code_id ? Number(payload.billing_code_id) : null
   payload.client_id = Number(payload.client_id)
   if (finalise) payload.finalised = 1
   emit('submit', payload)
@@ -56,7 +57,7 @@ defineExpose({ form })
         <div><label class="label">Duration (hours)</label><input v-model="form.duration_hours" type="number" step="0.25" min="0" class="input" :disabled="locked" placeholder="auto from times" /></div>
         <div class="lg:col-span-3">
           <label class="label">Support item delivered</label>
-          <BillingCodePicker v-model="form.billing_code_id" :disabled="locked" />
+          <BillingCodePicker v-model="form.billing_code_id" :client-id="form.client_id" :disabled="locked" />
         </div>
       </div>
     </div>
