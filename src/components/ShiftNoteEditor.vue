@@ -8,7 +8,7 @@ const props = defineProps({
   busy: { type: Boolean, default: false },
   locked: { type: Boolean, default: false }
 })
-const emit = defineEmits(['submit'])
+const emit = defineEmits(['submit', 'reopen'])
 
 const form = reactive({
   client_id: null, shift_date: new Date().toISOString().slice(0, 10), start_time: '', end_time: '',
@@ -93,8 +93,13 @@ defineExpose({ form })
     </div>
 
     <div class="flex gap-2">
-      <button type="submit" class="btn-primary" :disabled="busy">{{ busy ? 'Saving…' : 'Save draft' }}</button>
-      <button v-if="!locked" type="button" class="btn-accent" :disabled="busy || !form.body" title="Finalising locks the note and attributes it to you" @click="submit(true)">Save & finalise</button>
+      <template v-if="locked">
+        <button type="button" class="btn-primary" :disabled="busy" title="Reopens the note for editing; you'll need to finalise it again afterwards" @click="emit('reopen')">{{ busy ? 'Reopening…' : 'Send back to draft' }}</button>
+      </template>
+      <template v-else>
+        <button type="submit" class="btn-primary" :disabled="busy">{{ busy ? 'Saving…' : 'Save draft' }}</button>
+        <button type="button" class="btn-accent" :disabled="busy || !form.body" title="Finalising locks the note and attributes it to you" @click="submit(true)">Save & finalise</button>
+      </template>
     </div>
   </form>
 </template>

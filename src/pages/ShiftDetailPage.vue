@@ -44,6 +44,18 @@ async function save (payload) {
   }
 }
 
+async function reopen () {
+  if (!id.value) return
+  busy.value = true
+  try {
+    const res = await api.put(`/shifts/${id.value}`, { finalised: 0 })
+    shift.value = res.data
+    toast.push('Shift note reopened — edit and finalise again', 'success')
+  } catch { /* toast via interceptor */ } finally {
+    busy.value = false
+  }
+}
+
 async function draft () {
   if (!id.value) {
     toast.push('Save the shift first, then generate the draft', 'warning')
@@ -80,7 +92,7 @@ async function draft () {
       @draft="draft"
     />
 
-    <ShiftNoteEditor ref="editor" :model-value="shift" :clients="clients" :busy="busy" :locked="!!shift.finalised" @submit="save" />
+    <ShiftNoteEditor ref="editor" :model-value="shift" :clients="clients" :busy="busy" :locked="!!shift.finalised" @submit="save" @reopen="reopen" />
 
     <div v-if="id" class="card">
       <div class="flex items-center justify-between mb-3">

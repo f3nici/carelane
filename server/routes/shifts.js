@@ -56,7 +56,9 @@ router.get('/:id', (req, res) => {
 router.put('/:id', validatePartial(shiftSchema), (req, res) => {
   const before = shiftService.getShift(Number(req.params.id))
   const shift = shiftService.updateShift(Number(req.params.id), req.body)
-  const action = !before.finalised && shift.finalised ? 'finalised' : 'updated'
+  let action = 'updated'
+  if (!before.finalised && shift.finalised) action = 'finalised'
+  else if (before.finalised && !shift.finalised) action = 'reopened'
   logActivity('shift', shift.id, req.session.userId, action, { incident: !!shift.incident_flag })
   res.json(ok(shift))
 })
