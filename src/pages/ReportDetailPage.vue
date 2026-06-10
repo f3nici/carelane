@@ -78,6 +78,30 @@ async function draft () {
 function downloadPdf () {
   window.open(`/api/v1/reports/${id.value}/pdf?refresh=true`, '_blank')
 }
+
+const uploadingCopy = ref(false)
+
+/**
+ * Upload the finalised copy of this report to the participant's completed
+ * documents, so it can be stored and re-downloaded later.
+ */
+async function uploadFinalCopy (event) {
+  const file = event.target.files?.[0]
+  if (!file) return
+  uploadingCopy.value = true
+  try {
+    const fd = new FormData()
+    fd.append('file', file)
+    fd.append('title', `${(setup.value.report_type || 'progress').replace('_', ' ')} report (final)`)
+    fd.append('source_type', 'report')
+    fd.append('source_id', String(id.value))
+    await api.upload(`/clients/${setup.value.client_id}/documents`, fd)
+    toast.push('Final copy saved to the participant’s documents', 'success')
+  } catch { /* toast via interceptor */ } finally {
+    uploadingCopy.value = false
+    event.target.value = ''
+  }
+}
 </script>
 
 <template>
@@ -87,6 +111,10 @@ function downloadPdf () {
       <div class="flex items-center gap-2">
         <StatusBadge v-if="id" :status="report.status || 'draft'" />
         <button v-if="id && body" class="btn-ghost" @click="downloadPdf">PDF</button>
+        <label v-if="isFinal" class="btn-ghost cursor-pointer" :class="{ 'opacity-50 cursor-not-allowed': uploadingCopy }">
+          {{ uploadingCopy ? 'Uploading…' : 'Upload final copy' }}
+          <input type="file" class="hidden" accept="application/pdf,image/jpeg,image/png,image/webp" :disabled="uploadingCopy" @change="uploadFinalCopy" />
+        </label>
         <button v-if="id && body && !isFinal" class="btn-accent" @click="confirmFinalise = true">Finalise</button>
       </div>
     </div>

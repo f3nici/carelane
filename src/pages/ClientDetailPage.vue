@@ -17,22 +17,62 @@ const agreements = ref([])
 const shifts = ref([])
 const billingCodes = ref([])
 const allCodes = ref([])
+const documents = ref([])
 const confirmDelete = ref(false)
+const tab = ref('overview')
+const uploading = ref(false)
 
 onMounted(async () => {
-  const [c, a, s, b, all] = await Promise.all([
+  const [c, a, s, b, all, docs] = await Promise.all([
     api.get(`/clients/${id}`),
     api.get(`/clients/${id}/agreements`, { per_page: 10 }),
     api.get(`/clients/${id}/shifts`, { per_page: 10 }),
     api.get(`/clients/${id}/billing-codes`),
-    api.get('/billing-codes', { active: 'true', per_page: 100 })
+    api.get('/billing-codes', { active: 'true', per_page: 100 }),
+    api.get(`/clients/${id}/documents`)
   ])
   client.value = c.data
   agreements.value = a.data
   shifts.value = s.data
   billingCodes.value = b.data
   allCodes.value = all.data
+  documents.value = docs.data
 })
+
+async function uploadDocument (event) {
+  const file = event.target.files?.[0]
+  if (!file) return
+  uploading.value = true
+  try {
+    const fd = new FormData()
+    fd.append('file', file)
+    fd.append('title', file.name.replace(/\.[^.]+$/, ''))
+    const res = await api.upload(`/clients/${id}/documents`, fd)
+    documents.value = [res.data, ...documents.value]
+    toast.push('Document saved', 'success')
+  } catch { /* toast via interceptor */ } finally {
+    uploading.value = false
+    event.target.value = ''
+  }
+}
+
+function downloadDocument (doc) {
+  window.open(`/api/v1/clients/${id}/documents/${doc.id}/file`, '_blank')
+}
+
+async function removeDocument (doc) {
+  await api.del(`/clients/${id}/documents/${doc.id}`)
+  documents.value = documents.value.filter(d => d.id !== doc.id)
+  toast.push('Document archived', 'success')
+}
+
+/** Human-readable file size. */
+function formatSize (bytes) {
+  if (!bytes) return ''
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
 
 async function addCode (event) {
   const codeId = Number(event.target.value)
@@ -80,6 +120,20 @@ async function exportData () {
       </div>
     </div>
 
+    <div class="flex gap-1 border-b border-white/10">
+      <button
+        class="px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors"
+        :class="tab === 'overview' ? 'border-accent text-white' : 'border-transparent text-mid hover:text-white'"
+        @click="tab = 'overview'"
+      >Overview</button>
+      <button
+        class="px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors"
+        :class="tab === 'documents' ? 'border-accent text-white' : 'border-transparent text-mid hover:text-white'"
+        @click="tab = 'documents'"
+      >Completed documents<span v-if="documents.length" class="ml-1 text-mid">({{ documents.length }})</span></button>
+    </div>
+
+    <div v-show="tab === 'overview'" class="space-y-6">
     <div class="grid md:grid-cols-3 gap-4">
       <div class="card">
         <h3 class="font-semibold mb-3">Plan</h3>
@@ -150,6 +204,31 @@ async function exportData () {
           </li>
         </ul>
       </div>
+    </div>
+    </div>
+
+    <div v-show="tab === 'documents'" class="card">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-semibold">Completed documents</h3>
+        <label class="btn-primary cursor-pointer" :class="{ 'opacity-50 cursor-not-allowed': uploading }">
+          {{ uploading ? 'Uploading…' : '+ Upload document' }}
+          <input type="file" class="hidden" accept="application/pdf,image/jpeg,image/png,image/webp" :disabled="uploading" @change="uploadDocument" />
+        </label>
+      </div>
+      <p class="text-xs text-mid mb-4">Store signed agreements, finalised reports and other completed paperwork here. Files are kept securely and only ever served to you.</p>
+      <p v-if="!documents.length" class="text-sm text-mid">No completed documents yet.</p>
+      <ul v-else class="divide-y divide-white/10">
+        <li v-for="d in documents" :key="d.id" class="py-3 flex items-center justify-between gap-3">
+          <div class="min-w-0">
+            <p class="text-sm truncate">{{ d.title }}</p>
+            <p class="text-xs text-mid">{{ d.source_type }} · {{ (d.created_at || '').slice(0, 10) }}<span v-if="formatSize(d.size_bytes)"> · {{ formatSize(d.size_bytes) }}</span></p>
+          </div>
+          <div class="flex gap-3 shrink-0">
+            <button class="text-accent text-xs hover:underline" @click="downloadDocument(d)">download</button>
+            <button class="text-danger text-xs hover:underline" @click="removeDocument(d)">remove</button>
+          </div>
+        </li>
+      </ul>
     </div>
 
     <ConfirmDialog

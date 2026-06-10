@@ -1,13 +1,35 @@
 import { Router } from 'express'
+import fs from 'node:fs'
+import path from 'node:path'
+import crypto from 'node:crypto'
+import multer from 'multer'
 import { validate, validatePartial } from '../middleware/validate.js'
 import { clientSchema, clientBillingCodesSchema } from '../utils/validators.js'
 import * as clientService from '../services/clientService.js'
 import * as agreementService from '../services/agreementService.js'
 import * as shiftService from '../services/shiftService.js'
+import * as clientDocumentService from '../services/clientDocumentService.js'
+import { CLIENT_DOC_DIR } from '../services/clientDocumentService.js'
 import { logActivity } from '../services/activityService.js'
 import { parsePagination, paginationMeta, ok } from '../utils/pagination.js'
+import { ApiError } from '../middleware/errorHandler.js'
+import config from '../config.js'
 
 const router = Router()
+
+const ALLOWED_DOC_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
+const docUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      fs.mkdirSync(CLIENT_DOC_DIR, { recursive: true })
+      cb(null, CLIENT_DOC_DIR)
+    },
+    // non-guessable filename: completed documents hold PII and are served only behind auth
+    filename: (req, file, cb) => cb(null, crypto.randomBytes(16).toString('hex') + path.extname(file.originalname).toLowerCase())
+  }),
+  limits: { fileSize: Math.max(config.maxUploadSize, 25 * 1024 * 1024) },
+  fileFilter: (req, file, cb) => cb(null, ALLOWED_DOC_TYPES.includes(file.mimetype))
+})
 
 /**
  * @openapi
@@ -81,6 +103,35 @@ router.put('/:id/billing-codes', validate(clientBillingCodesSchema), (req, res) 
   const codes = clientService.setClientBillingCodes(Number(req.params.id), req.body.codes)
   logActivity('client', Number(req.params.id), req.session.userId, 'updated', { billing_codes: codes.length })
   res.json(ok(codes))
+})
+
+/**
+ * @openapi
+ * /clients/{id}/documents:
+ *   get: { tags: [Clients], summary: List a client's completed documents }
+ *   post: { tags: [Clients], summary: Upload a completed document (signed agreement / finalised report; served auth-gated) }
+ */
+router.get('/:id/documents', (req, res) => {
+  res.json(ok(clientDocumentService.listClientDocuments(Number(req.params.id))))
+})
+
+router.post('/:id/documents', docUpload.single('file'), (req, res, next) => {
+  if (!req.file) return next(new ApiError(400, 'UPLOAD_ERROR', 'Upload a PDF or image file'))
+  const doc = clientDocumentService.createClientDocument(Number(req.params.id), req.file, req.body)
+  logActivity('client', Number(req.params.id), req.session.userId, 'updated', { document_added: doc.source_type })
+  res.status(201).json(ok(doc))
+})
+
+/** Auth-gated file serving — completed documents are never exposed as a public static path. */
+router.get('/:id/documents/:docId/file', (req, res) => {
+  const doc = clientDocumentService.getClientDocument(Number(req.params.id), Number(req.params.docId))
+  res.download(path.resolve(CLIENT_DOC_DIR, doc.filename), doc.original_name || doc.filename)
+})
+
+router.delete('/:id/documents/:docId', (req, res) => {
+  clientDocumentService.deleteClientDocument(Number(req.params.id), Number(req.params.docId))
+  logActivity('client', Number(req.params.id), req.session.userId, 'updated', { document_archived: true })
+  res.json(ok({ deleted: true }))
 })
 
 export default router

@@ -6,7 +6,7 @@ import * as reportService from '../services/reportService.js'
 import * as shiftService from '../services/shiftService.js'
 import * as clientService from '../services/clientService.js'
 import { condenseShift, draftReport } from '../services/aiService.js'
-import { renderPdf, pdfPath } from '../utils/pdfRenderer.js'
+import { renderPdf, pdfPath, safeFilename } from '../utils/pdfRenderer.js'
 import { logActivity } from '../services/activityService.js'
 import { parsePagination, paginationMeta, ok } from '../utils/pagination.js'
 import { ApiError } from '../middleware/errorHandler.js'
@@ -109,14 +109,15 @@ router.get('/:id/pdf', async (req, res, next) => {
     // Always re-render so edits and branding changes (e.g. a new logo) are
     // reflected; the previous file is removed to avoid orphaned PDFs.
     const previous = report.pdf_filename
+    const docTitle = `${report.report_type.replace('_', ' ')} report`
     const filename = await renderPdf({
-      title: `${report.report_type.replace('_', ' ')} report`,
-      subtitle: `Period ${report.period_start || ''} to ${report.period_end || ''}${report.status === 'draft' ? ' · DRAFT' : ''}`,
+      title: docTitle,
+      subtitle: `Period ${report.period_start || ''} to ${report.period_end || ''}`,
       body: report.body_markdown
     })
     reportService.setReportPdf(report.id, filename)
     if (previous && previous !== filename) { try { fs.rmSync(pdfPath(previous)) } catch { /* already gone */ } }
-    res.download(pdfPath(filename), `report-${report.id}.pdf`)
+    res.download(pdfPath(filename), safeFilename(docTitle, `report-${report.id}`))
   } catch (err) { next(err) }
 })
 
