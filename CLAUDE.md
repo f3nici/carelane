@@ -16,6 +16,9 @@ npm run build      # build frontend to dist/ (Express serves it in prod)
 npm start          # production server
 npm run migrate    # apply idempotent SQL migrations
 npm run seed       # admin user + default settings + starter billing codes
+npm run restore    # interactive restore from a backup snapshot (stop server first)
+npm test           # Vitest unit + route integration tests
+npm run lint       # ESLint (enforces no-semi / single-quote / 2-space style)
 ```
 Default login: `DEFAULT_USERNAME`/`DEFAULT_PASSWORD` env (admin/changeme).
 API docs at `/api/docs`, health at `/healthz`.
@@ -45,8 +48,14 @@ API docs at `/api/docs`, health at `/healthz`.
   (`finalised`/`signed_by_client`/`status=final`) enforced in services.
 - Production refuses to start without real `SESSION_SECRET`/`ENCRYPTION_SECRET`.
 - `ENCRYPTION_SECRET` cannot be rotated casually — existing ciphertext becomes
-  unreadable. Document/backup it.
+  unreadable. Document/backup it. A startup **encryption canary** (sealed in
+  `settings.enc_canary`) refuses to boot if the secret no longer matches.
 - Incident-flagged shift notes cannot be deleted.
+- `/auth/login` is brute-force throttled (per ip+username) and supports optional
+  TOTP 2FA; the TOTP secret + recovery-code hashes are encrypted at rest like
+  any other PII (in `twoFactorService`, never in routes).
+- Backups can be restored only via the offline `npm run restore` CLI (never over
+  the API); a stale-backup warning logs on startup.
 
 ## Style
 ES modules, no semicolons, single quotes, 2-space indent. Vue Composition API

@@ -24,6 +24,9 @@ const config = {
   backupPath: env.BACKUP_PATH || './data/backups',
   backupRetention: parseInt(env.BACKUP_RETENTION || '14', 10),
   backupTime: env.BACKUP_TIME || '02:00',
+  backupStaleHours: parseInt(env.BACKUP_STALE_HOURS || '48', 10),
+  loginMaxAttempts: parseInt(env.LOGIN_MAX_ATTEMPTS || '5', 10),
+  loginWindowMinutes: parseInt(env.LOGIN_WINDOW_MINUTES || '15', 10),
   publicApiEnabled: (env.PUBLIC_API_ENABLED || 'false') === 'true',
   corsOrigins: (env.CORS_ORIGINS || 'http://localhost:5173').split(',').map(s => s.trim())
 }

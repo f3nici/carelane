@@ -24,6 +24,7 @@ const routes = [
       { path: 'reports/:id', name: 'report-detail', component: () => import('../pages/ReportDetailPage.vue') },
       { path: 'billing-codes', name: 'billing-codes', component: () => import('../pages/BillingCodesPage.vue') },
       { path: 'knowledge', name: 'knowledge', component: () => import('../pages/KnowledgePage.vue') },
+      { path: 'audit', name: 'audit', component: () => import('../pages/AuditLogPage.vue') },
       { path: 'settings', name: 'settings', component: () => import('../pages/SettingsPage.vue') }
     ]
   }

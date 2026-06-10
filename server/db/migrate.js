@@ -1,6 +1,20 @@
 import { sqlite } from './connection.js'
 
 /**
+ * Add a column to a table only if it does not already exist. SQLite has no
+ * `ADD COLUMN IF NOT EXISTS`, so we inspect the table info first. Keeps the
+ * migration idempotent and safe to run on every boot.
+ * @param {string} table
+ * @param {string} column
+ * @param {string} definition full column definition (type + constraints)
+ */
+function addColumnIfMissing (table, column, definition) {
+  const cols = sqlite.prepare(`PRAGMA table_info(${table})`).all()
+  if (cols.some(c => c.name === column)) return
+  sqlite.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`)
+}
+
+/**
  * Idempotent SQL migrations. Creates all tables, indexes and the append-only
  * triggers on activity_log. Safe to run on every boot.
  */
@@ -218,7 +232,17 @@ BEFORE DELETE ON activity_log
 BEGIN
   SELECT RAISE(ABORT, 'activity_log is append-only');
 END;
+
+CREATE INDEX IF NOT EXISTS idx_activity_entity ON activity_log (entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_log (created_at);
 `)
+
+  // Two-factor auth columns on users (added post-launch; encrypted at rest in
+  // the service layer — see twoFactorService). totp_recovery_codes holds a JSON
+  // array of bcrypt-hashed single-use recovery codes.
+  addColumnIfMissing('users', 'totp_secret', 'TEXT')
+  addColumnIfMissing('users', 'totp_enabled', 'INTEGER NOT NULL DEFAULT 0')
+  addColumnIfMissing('users', 'totp_recovery_codes', 'TEXT')
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

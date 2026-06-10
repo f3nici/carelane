@@ -38,7 +38,7 @@ async function commit () {
     const res = await api.post('/billing-codes/import/commit', {
       price_guide_version: version.value,
       deactivate_missing: deactivateMissing.value ? 1 : 0,
-      rows: rows.value.map(({ confidence, ...r }) => r)
+      rows: rows.value.map(({ confidence: _confidence, ...r }) => r)
     })
     toast.push(`Import complete: ${res.data.inserted} new, ${res.data.updated} updated, ${res.data.deactivated} deactivated`, 'success')
     rows.value = []

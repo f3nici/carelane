@@ -8,6 +8,9 @@ export const users = sqliteTable('users', {
   passwordHash: text('password_hash').notNull(),
   displayName: text('display_name'),
   role: text('role').notNull().default('admin'),
+  totpSecret: text('totp_secret'), // 🔒 base32 TOTP secret (null until enrolled)
+  totpEnabled: integer('totp_enabled').notNull().default(0),
+  totpRecoveryCodes: text('totp_recovery_codes'), // 🔒 JSON array of bcrypt-hashed single-use codes
   createdAt: text('created_at'),
   updatedAt: text('updated_at')
 })

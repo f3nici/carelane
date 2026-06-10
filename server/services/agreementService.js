@@ -125,7 +125,7 @@ export function updateAgreement (id, data) {
 export function signAgreement (id, signedDate) {
   const a = getAgreement(id)
   if (!a.body_markdown) throw new ApiError(409, 'NO_BODY', 'Agreement has no body to sign')
-  sqlite.prepare(`UPDATE service_agreements SET signed_by_client = 1, signed_date = ?, status = 'active', updated_at = ? WHERE id = ?`)
+  sqlite.prepare('UPDATE service_agreements SET signed_by_client = 1, signed_date = ?, status = \'active\', updated_at = ? WHERE id = ?')
     .run(signedDate || now().slice(0, 10), now(), id)
   return getAgreement(id)
 }

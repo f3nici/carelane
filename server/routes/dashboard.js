@@ -17,13 +17,13 @@ router.get('/stats', (req, res) => {
   const soon = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
   res.json(ok({
     active_clients: get('SELECT COUNT(*) AS c FROM clients WHERE deleted_at IS NULL AND active = 1').c,
-    agreements_active: get(`SELECT COUNT(*) AS c FROM service_agreements WHERE deleted_at IS NULL AND status = 'active'`).c,
+    agreements_active: get('SELECT COUNT(*) AS c FROM service_agreements WHERE deleted_at IS NULL AND status = \'active\'').c,
     shifts_this_month: sqlite.prepare('SELECT COUNT(*) AS c FROM shift_notes WHERE deleted_at IS NULL AND shift_date >= ?')
       .get(today.slice(0, 8) + '01').c,
     unbilled_shifts: get('SELECT COUNT(*) AS c FROM shift_notes WHERE deleted_at IS NULL AND billed = 0 AND finalised = 1').c,
     open_incidents: get('SELECT COUNT(*) AS c FROM shift_notes WHERE deleted_at IS NULL AND incident_flag = 1 AND follow_up_required = 1').c,
-    plan_reviews_due: sqlite.prepare(`SELECT COUNT(*) AS c FROM clients WHERE deleted_at IS NULL AND active = 1 AND plan_end IS NOT NULL AND plan_end BETWEEN ? AND ?`).get(today, soon).c,
-    draft_reports: get(`SELECT COUNT(*) AS c FROM reports WHERE deleted_at IS NULL AND status = 'draft'`).c,
+    plan_reviews_due: sqlite.prepare('SELECT COUNT(*) AS c FROM clients WHERE deleted_at IS NULL AND active = 1 AND plan_end IS NOT NULL AND plan_end BETWEEN ? AND ?').get(today, soon).c,
+    draft_reports: get('SELECT COUNT(*) AS c FROM reports WHERE deleted_at IS NULL AND status = \'draft\'').c,
     documents_indexed: get('SELECT COUNT(*) AS c FROM documents WHERE indexed = 1').c
   }))
 })

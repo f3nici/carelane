@@ -3,6 +3,8 @@ import { ref, onMounted } from 'vue'
 import { useApi } from '../composables/useApi.js'
 import { useToastStore } from '../stores/toast.js'
 import BrandingSettings from '../components/BrandingSettings.vue'
+import TwoFactorSettings from '../components/TwoFactorSettings.vue'
+import BackupSettings from '../components/BackupSettings.vue'
 
 const api = useApi()
 const toast = useToastStore()
@@ -24,6 +26,10 @@ async function save () {
     <h1 class="text-2xl font-semibold">Settings</h1>
 
     <BrandingSettings :settings="settings" @save="save" />
+
+    <TwoFactorSettings />
+
+    <BackupSettings />
 
     <div class="card space-y-4">
       <h3 class="font-semibold">AI models</h3>

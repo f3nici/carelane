@@ -7,7 +7,27 @@ const bool01 = z.union([z.boolean(), z.literal(0), z.literal(1)]).transform(v =>
 
 export const loginSchema = z.object({
   username: z.string().trim().min(1),
+  password: z.string().min(1),
+  token: z.string().trim().max(20).nullish() // TOTP code or recovery code (when 2FA is enabled)
+})
+
+export const totpConfirmSchema = z.object({
+  token: z.string().trim().min(6).max(10)
+})
+
+export const totpDisableSchema = z.object({
   password: z.string().min(1)
+})
+
+export const activityQuerySchema = z.object({
+  entity_type: z.string().trim().max(40).nullish(),
+  entity_id: z.coerce.number().int().positive().nullish(),
+  action: z.string().trim().max(40).nullish(),
+  user_id: z.coerce.number().int().positive().nullish(),
+  from: isoDate.nullish(),
+  to: isoDate.nullish(),
+  page: z.coerce.number().int().positive().nullish(),
+  per_page: z.coerce.number().int().positive().max(100).nullish()
 })
 
 export const clientSchema = z.object({

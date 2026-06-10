@@ -137,6 +137,53 @@ export function exportClient (id) {
 }
 
 /**
+ * Render a client data export as human-readable markdown (for the PDF copy of a
+ * data-access request). Mirrors the JSON from {@link exportClient}.
+ * @param {object} data result of exportClient
+ * @returns {string} markdown
+ */
+export function buildClientExportMarkdown (data) {
+  const c = data.client
+  const lines = []
+  const name = clientDisplayName(c)
+  lines.push(`# Participant data export — ${name}`)
+  lines.push(`Exported ${data.exported_at}`)
+  lines.push('')
+  lines.push('## Participant details')
+  const detail = [
+    ['Legal name', [c.first_name, c.last_name].filter(Boolean).join(' ')],
+    ['Preferred name', c.preferred_name],
+    ['NDIS number', c.ndis_number],
+    ['Date of birth', c.date_of_birth],
+    ['Phone', c.phone],
+    ['Email', c.email],
+    ['Address', [c.address, c.suburb, c.state, c.postcode].filter(Boolean).join(', ')],
+    ['Plan period', [c.plan_start, c.plan_end].filter(Boolean).join(' → ')],
+    ['Plan management', c.plan_management_type],
+    ['Plan manager', c.plan_manager_name],
+    ['Primary disability', c.primary_disability],
+    ['Emergency contact', [c.emergency_contact_name, c.emergency_contact_phone].filter(Boolean).join(' ')]
+  ]
+  for (const [label, value] of detail) if (value) lines.push(`- **${label}:** ${value}`)
+
+  lines.push('', `## Service agreements (${data.agreements.length})`)
+  for (const a of data.agreements) lines.push(`- ${a.title} — ${a.status}${a.start_date ? ` (${a.start_date} → ${a.end_date || '—'})` : ''}`)
+
+  lines.push('', `## Shift notes (${data.shifts.length})`)
+  for (const s of data.shifts) {
+    lines.push(`### ${s.shift_date}${s.duration_hours ? ` · ${s.duration_hours}h` : ''}${s.incident_flag ? ' · ⚠ incident' : ''}`)
+    if (s.support_provided) lines.push(`Support: ${s.support_provided}`)
+    if (s.body) lines.push(s.body)
+    if (s.incident_details) lines.push(`Incident: ${s.incident_details}`)
+    lines.push('')
+  }
+
+  lines.push(`## Reports (${data.reports.length})`)
+  for (const r of data.reports) lines.push(`- ${r.report_type} — ${r.status}${r.period_start ? ` (${r.period_start} → ${r.period_end || '—'})` : ''}`)
+  return lines.join('\n')
+}
+
+/**
  * Billing codes linked to a client (with custom rate overrides).
  * @param {number} clientId
  */

@@ -10,7 +10,12 @@
     "build": "vite build",
     "start": "NODE_ENV=production node server/index.js",
     "migrate": "node server/db/migrate.js",
-    "seed": "node server/db/seed.js"
+    "seed": "node server/db/seed.js",
+    "restore": "node server/db/restore.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
   },
   "repository": {
     "type": "git",
@@ -23,6 +28,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",
     "@xenova/transformers": "^2.17.2",
+    "archiver": "^8.0.0",
     "axios": "^1.17.0",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.10.0",
@@ -37,6 +43,7 @@
     "pdf-parse": "^2.4.5",
     "pdfkit": "^0.19.0",
     "pinia": "^3.0.4",
+    "qrcode": "^1.5.4",
     "sharp": "^0.34.5",
     "sqlite-vec": "^0.1.9",
     "swagger-jsdoc": "^6.3.0",
@@ -46,11 +53,18 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@stylistic/eslint-plugin": "^5.10.0",
     "@vitejs/plugin-vue": "^6.0.7",
     "autoprefixer": "^10.5.0",
     "concurrently": "^10.0.3",
+    "eslint": "^10.4.1",
+    "eslint-plugin-vue": "^10.9.2",
+    "globals": "^17.6.0",
     "postcss": "^8.5.15",
+    "supertest": "^7.2.2",
     "tailwindcss": "^3.4.19",
-    "vite": "^8.0.16"
+    "vite": "^8.0.16",
+    "vitest": "^4.1.8"
   }
 }
