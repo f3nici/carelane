@@ -1,17 +1,15 @@
 services:
   carelane:
-    # Docker Hub image pushed by .github/workflows/docker.yml (set to your DOCKERHUB_USERNAME)
-    image: f3nici/carelane:latest
-    build: .
+    image: f3nici/carelane:latest # Recommend to use version tags
     container_name: carelane
     ports:
-      - '3778:3778'
+      - 8000:3778
     environment:
-      PORT: 3778
+      PORT: 3778 # Internal Port
       NODE_ENV: production
       SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env}
       ENCRYPTION_SECRET: ${ENCRYPTION_SECRET:?set ENCRYPTION_SECRET in .env}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-} #Optional
       DEFAULT_USERNAME: ${DEFAULT_USERNAME:-admin}
       DEFAULT_PASSWORD: ${DEFAULT_PASSWORD:-changeme}
       BACKUP_ENABLED: ${BACKUP_ENABLED:-true}
@@ -21,3 +19,9 @@ services:
       - ./data:/app/data
       - ./uploads:/app/uploads
     restart: unless-stopped
+    networks:
+      - carelane_net
+networks:
+  carelane_net:
+    driver: bridge
+    enable_ipv6: false
