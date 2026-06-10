@@ -79,7 +79,8 @@ export function createShift (data, workerId) {
 }
 
 /**
- * Update a shift note. Finalised notes only allow billing status changes.
+ * Update a shift note. Finalised notes only allow billing status changes,
+ * unless the update sends `finalised: 0` to reopen the note for editing.
  * @param {number} id
  * @param {object} data
  */
