@@ -1,19 +1,28 @@
 # Build & push the CareLane image to Docker Hub.
 #
+# Deployment is manual: Actions → "Build & Push Docker image" → Run workflow,
+# type the version tag (e.g. 1.2.0) and tick "also tag latest" if wanted.
+#
 # Required repository secrets (Settings → Secrets and variables → Actions):
 #   DOCKERHUB_USERNAME — your Docker Hub username
 #   DOCKERHUB_TOKEN    — a Docker Hub access token (hub.docker.com → Account Settings → Security)
 #
-# Image is pushed as <DOCKERHUB_USERNAME>/carelane with:
-#   - `latest` on pushes to main
-#   - the semver tag (e.g. 1.2.0) on version tags like v1.2.0
+# Image is pushed as <DOCKERHUB_USERNAME>/carelane:<version> (+ :latest when ticked).
 
 name: Build & Push Docker image
 
 on:
-  push:
-    tags: ['v*']
-    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g. 1.2.0)'
+        required: true
+        type: string
+      push_latest:
+        description: 'Also tag latest'
+        required: false
+        type: boolean
+        default: true
 
 jobs:
   build:
@@ -39,19 +48,24 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - uses: docker/metadata-action@v5
-        id: meta
-        with:
-          images: ${{ secrets.DOCKERHUB_USERNAME }}/carelane
-          tags: |
-            type=semver,pattern={{version}}
-            type=raw,value=latest,enable={{is_default_branch}}
+      - name: Resolve image tags
+        id: tags
+        env:
+          IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/carelane
+          VERSION: ${{ inputs.version }}
+          PUSH_LATEST: ${{ inputs.push_latest }}
+        run: |
+          VERSION="${VERSION#v}"   # accept both 1.2.0 and v1.2.0
+          TAGS="$IMAGE:$VERSION"
+          if [ "$PUSH_LATEST" = "true" ]; then
+            TAGS="$TAGS,$IMAGE:latest"
+          fi
+          echo "tags=$TAGS" >> "$GITHUB_OUTPUT"
 
       - uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.tags.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
