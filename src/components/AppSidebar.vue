@@ -45,8 +45,8 @@ async function logout () {
         :key="item.name"
         :to="item.to"
         class="flex flex-col md:flex-row items-center md:gap-3 rounded-xl px-2 md:px-3 py-2 text-[11px] md:text-sm text-mid hover:text-white hover:bg-white/5 transition-colors"
-        active-class="!text-white bg-primary/20"
-        :exact="item.to === '/'"
+        :active-class="item.to === '/' ? '' : '!text-white bg-primary/20'"
+        exact-active-class="!text-white bg-primary/20"
       >
         <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" :d="item.icon" /></svg>
         <span class="md:flex-1 truncate">{{ item.label }}</span>
