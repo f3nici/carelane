@@ -41,3 +41,37 @@ export function recentActivity (limit = 25) {
     FROM activity_log a LEFT JOIN users u ON u.id = a.user_id
     ORDER BY a.id DESC LIMIT ?`).all(limit)
 }
+
+/**
+ * Filterable, paginated view over the append-only audit log (for the auditor
+ * UI). All values are already PII-redacted at write time.
+ * @param {{entity_type?:string, entity_id?:number, action?:string, user_id?:number, from?:string, to?:string}} filters
+ * @param {{perPage:number, offset:number}} pg
+ * @returns {{ rows: object[], total: number }}
+ */
+export function queryActivity (filters = {}, pg = { perPage: 50, offset: 0 }) {
+  const where = []
+  const params = []
+  if (filters.entity_type) { where.push('a.entity_type = ?'); params.push(filters.entity_type) }
+  if (filters.entity_id) { where.push('a.entity_id = ?'); params.push(filters.entity_id) }
+  if (filters.action) { where.push('a.action = ?'); params.push(filters.action) }
+  if (filters.user_id) { where.push('a.user_id = ?'); params.push(filters.user_id) }
+  if (filters.from) { where.push('a.created_at >= ?'); params.push(filters.from) }
+  if (filters.to) { where.push('a.created_at <= ?'); params.push(filters.to + 'T23:59:59.999Z') }
+  const whereSql = where.length ? 'WHERE ' + where.join(' AND ') : ''
+  const total = sqlite.prepare(`SELECT COUNT(*) AS c FROM activity_log a ${whereSql}`).get(...params).c
+  const rows = sqlite.prepare(`SELECT a.*, u.display_name AS user_name
+    FROM activity_log a LEFT JOIN users u ON u.id = a.user_id
+    ${whereSql} ORDER BY a.id DESC LIMIT ? OFFSET ?`).all(...params, pg.perPage, pg.offset)
+  return { rows, total }
+}
+
+/**
+ * Distinct entity types and actions present in the log, for filter dropdowns.
+ * @returns {{ entity_types: string[], actions: string[] }}
+ */
+export function activityFacets () {
+  const entityTypes = sqlite.prepare('SELECT DISTINCT entity_type FROM activity_log ORDER BY entity_type').all().map(r => r.entity_type)
+  const actions = sqlite.prepare('SELECT DISTINCT action FROM activity_log ORDER BY action').all().map(r => r.action)
+  return { entity_types: entityTypes, actions }
+}

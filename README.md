@@ -23,8 +23,16 @@ encrypted at rest.
 - **Reports** — AI-assisted progress/summary reports rendered to PDF.
 - **Knowledge base (RAG)** — upload PDFs/DOCX, search them with local embeddings
   and ask grounded questions.
-- **Activity log** — append-only, PII-redacted audit trail.
-- **Automated backups** — scheduled SQLite backups with retention.
+- **Activity log** — append-only, PII-redacted audit trail, with a filterable
+  audit-log viewer (per entity / action / date) for NDIS auditing.
+- **Backups** — scheduled SQLite backups with retention, integrity verification,
+  a stale-backup startup warning, and an offline restore CLI (`npm run restore`).
+- **Login hardening** — brute-force rate limiting on login and optional TOTP
+  two-factor authentication (with one-time recovery codes).
+- **Encryption canary** — refuses to boot if `ENCRYPTION_SECRET` no longer
+  matches existing ciphertext, rather than silently returning unreadable PII.
+- **Participant data export** — one-click "download everything" (PDF + JSON zip)
+  for data-access requests.
 
 ## Tech stack
 
@@ -70,6 +78,10 @@ npm run build      # build the frontend to dist/ (Express serves it in prod)
 npm start          # production server (serves dist/ and the API)
 npm run migrate    # apply idempotent SQL migrations
 npm run seed       # admin user + default settings + starter billing codes
+npm run restore    # interactive restore from a backup snapshot (stop server first)
+npm test           # Vitest unit + route integration tests
+npm run lint       # ESLint (no-semicolons / single-quote / 2-space style)
+npm run lint:fix   # auto-fix lint issues
 ```
 
 ## Production / Docker

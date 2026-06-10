@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import multer from 'multer'
+import { ZipArchive } from 'archiver'
 import { validate, validatePartial } from '../middleware/validate.js'
 import { clientSchema, clientBillingCodesSchema } from '../utils/validators.js'
 import * as clientService from '../services/clientService.js'
@@ -11,6 +12,7 @@ import * as shiftService from '../services/shiftService.js'
 import * as clientDocumentService from '../services/clientDocumentService.js'
 import { CLIENT_DOC_DIR } from '../services/clientDocumentService.js'
 import { logActivity } from '../services/activityService.js'
+import { renderPdf, pdfPath } from '../utils/pdfRenderer.js'
 import { parsePagination, paginationMeta, ok } from '../utils/pagination.js'
 import { ApiError } from '../middleware/errorHandler.js'
 import config from '../config.js'
@@ -81,6 +83,38 @@ router.get('/:id/export', (req, res) => {
   const data = clientService.exportClient(Number(req.params.id))
   logActivity('client', Number(req.params.id), req.session.userId, 'exported')
   res.json(ok(data))
+})
+
+/**
+ * @openapi
+ * /clients/{id}/export.zip:
+ *   get:
+ *     tags: [Clients]
+ *     summary: One-click "download everything" for a participant — a zip of the
+ *       full JSON export plus a branded PDF summary (data access request)
+ */
+router.get('/:id/export.zip', async (req, res, next) => {
+  const id = Number(req.params.id)
+  try {
+    const data = clientService.exportClient(id)
+    const pdfFilename = await renderPdf({
+      title: `Participant data export — ${clientService.clientDisplayName(data.client)}`,
+      subtitle: `Generated ${data.exported_at.slice(0, 10)}`,
+      body: clientService.buildClientExportMarkdown(data),
+      footer: 'Confidential — contains sensitive health information. Handle per NDIS privacy obligations.'
+    })
+    logActivity('client', id, req.session.userId, 'exported', { format: 'zip' })
+
+    res.attachment(`participant-${id}-export.zip`)
+    const archive = new ZipArchive({ zlib: { level: 9 } })
+    archive.on('error', err => next(err))
+    archive.pipe(res)
+    archive.append(JSON.stringify(data, null, 2), { name: `participant-${id}.json` })
+    archive.file(pdfPath(pdfFilename), { name: `participant-${id}.pdf` })
+    await archive.finalize()
+  } catch (err) {
+    next(err)
+  }
 })
 
 router.get('/:id/agreements', (req, res) => {

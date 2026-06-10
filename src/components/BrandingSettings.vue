@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { useApi } from '../composables/useApi.js'
 import { useToastStore } from '../stores/toast.js'
 
-const props = defineProps({
+defineProps({
   settings: { type: Object, required: true }
 })
 const emit = defineEmits(['save'])

@@ -8,6 +8,7 @@ import { settingsSchema } from '../utils/validators.js'
 import { requireAdmin } from '../middleware/auth.js'
 import { getSettings, updateSettings, getSetting } from '../services/settingsService.js'
 import { logActivity } from '../services/activityService.js'
+import { runBackup, listBackups, verifyBackup, backupFreshness } from '../services/backupService.js'
 import { ok } from '../utils/pagination.js'
 import { ApiError } from '../middleware/errorHandler.js'
 import config from '../config.js'
@@ -60,6 +61,41 @@ router.get('/logo', (req, res, next) => {
   const filename = getSetting('logo_filename')
   if (!filename) return next(new ApiError(404, 'NOT_FOUND', 'No logo uploaded'))
   res.sendFile(path.resolve(LOGO_DIR, path.basename(filename)))
+})
+
+/**
+ * @openapi
+ * /settings/backups:
+ *   get: { tags: [Settings], summary: List backup snapshots and freshness (admin only) }
+ */
+router.get('/backups', requireAdmin, (req, res) => {
+  res.json(ok({ freshness: backupFreshness(), backups: listBackups() }))
+})
+
+/**
+ * @openapi
+ * /settings/backups/run:
+ *   post: { tags: [Settings], summary: Run a backup now (admin only) }
+ */
+router.post('/backups/run', requireAdmin, async (req, res, next) => {
+  try {
+    const result = await runBackup()
+    logActivity('backup', null, req.session.userId, 'created_manual')
+    res.status(201).json(ok({ db: path.basename(result.db), uploads: result.uploads ? path.basename(result.uploads) : null, freshness: backupFreshness() }))
+  } catch (err) { next(err) }
+})
+
+/**
+ * @openapi
+ * /settings/backups/{filename}/verify:
+ *   get: { tags: [Settings], summary: Integrity-check a backup snapshot (admin only) }
+ */
+router.get('/backups/:filename/verify', requireAdmin, (req, res, next) => {
+  try {
+    res.json(ok(verifyBackup(req.params.filename)))
+  } catch (err) {
+    next(new ApiError(400, 'BACKUP_VERIFY_FAILED', err.message))
+  }
 })
 
 export default router

@@ -95,13 +95,9 @@ async function remove () {
   router.push('/clients')
 }
 
-async function exportData () {
-  const res = await api.get(`/clients/${id}/export`)
-  const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' })
-  const a = document.createElement('a')
-  a.href = URL.createObjectURL(blob)
-  a.download = `client-${id}-export.json`
-  a.click()
+/** Download everything held for this participant as a zip (PDF summary + JSON). */
+function exportData () {
+  window.open(`/api/v1/clients/${id}/export.zip`, '_blank')
 }
 </script>
 
