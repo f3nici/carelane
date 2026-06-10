@@ -29,7 +29,7 @@ async function submit () {
   <div class="min-h-screen flex items-center justify-center p-4">
     <div class="card w-full max-w-sm">
       <div class="flex items-center gap-2 mb-6">
-        <div class="h-10 w-10 rounded-xl bg-primary flex items-center justify-center font-bold text-lg">C</div>
+        <img src="/icon.svg" alt="CareLane" class="h-10 w-10" />
         <div>
           <h1 class="font-heading text-xl font-semibold">CareLane</h1>
           <p class="text-xs text-mid">NDIS support worker management</p>

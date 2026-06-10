@@ -37,6 +37,7 @@
     "pdf-parse": "^2.4.5",
     "pdfkit": "^0.19.0",
     "pinia": "^3.0.4",
+    "sharp": "^0.34.5",
     "sqlite-vec": "^0.1.9",
     "swagger-jsdoc": "^6.3.0",
     "swagger-ui-express": "^5.0.1",

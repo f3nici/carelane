@@ -1,13 +1,15 @@
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, watch, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useApi } from '../composables/useApi.js'
 import { useAuthStore } from '../stores/auth.js'
 
 const api = useApi()
 const auth = useAuthStore()
 const router = useRouter()
+const route = useRoute()
 const stats = ref({})
+const mobileOpen = ref(false)
 
 const nav = [
   { name: 'dashboard', to: '/', label: 'Dashboard', icon: 'M3 12l9-9 9 9M5 10v10h5v-6h4v6h5V10', count: null },
@@ -20,6 +22,9 @@ const nav = [
   { name: 'settings', to: '/settings', label: 'Settings', icon: 'M10.3 4.3a1.7 1.7 0 013.4 0 1.7 1.7 0 002.6 1.1 1.7 1.7 0 012.4 2.4 1.7 1.7 0 001 2.5 1.7 1.7 0 010 3.4 1.7 1.7 0 00-1 2.6 1.7 1.7 0 01-2.4 2.4 1.7 1.7 0 00-2.6 1 1.7 1.7 0 01-3.4 0 1.7 1.7 0 00-2.5-1 1.7 1.7 0 01-2.4-2.4 1.7 1.7 0 00-1.1-2.6 1.7 1.7 0 010-3.4 1.7 1.7 0 001.1-2.5 1.7 1.7 0 012.4-2.4 1.7 1.7 0 002.5-1.1zM15 12a3 3 0 11-6 0 3 3 0 016 0z', count: null }
 ]
 
+// Close the mobile drawer whenever the route changes.
+watch(() => route.fullPath, () => { mobileOpen.value = false })
+
 onMounted(async () => {
   try {
     const res = await api.get('/dashboard/stats')
@@ -28,32 +33,64 @@ onMounted(async () => {
 })
 
 async function logout () {
+  mobileOpen.value = false
   await auth.logout()
   router.push({ name: 'login' })
 }
 </script>
 
 <template>
-  <aside class="bg-surface border-white/10 md:w-60 md:min-h-screen md:border-r fixed bottom-0 inset-x-0 z-40 border-t md:static md:border-t-0">
-    <div class="hidden md:flex items-center gap-2 px-5 py-5">
-      <div class="h-8 w-8 rounded-lg bg-primary flex items-center justify-center font-bold text-white">C</div>
+  <!-- Mobile top app bar with hamburger -->
+  <header class="md:hidden fixed top-0 inset-x-0 z-30 h-14 flex items-center gap-3 bg-surface/95 backdrop-blur border-b border-white/10 px-4">
+    <button
+      class="-ml-1 p-2 rounded-lg text-mid hover:text-white hover:bg-white/5 transition-colors"
+      aria-label="Open menu"
+      @click="mobileOpen = true"
+    >
+      <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" /></svg>
+    </button>
+    <img src="/icon.svg" alt="" class="h-7 w-7" />
+    <span class="font-heading text-base font-semibold">CareLane</span>
+  </header>
+
+  <!-- Drawer backdrop (mobile only) -->
+  <div
+    v-if="mobileOpen"
+    class="md:hidden fixed inset-0 z-40 bg-black/60"
+    @click="mobileOpen = false"
+  ></div>
+
+  <!-- Sidebar (desktop) / slide-in drawer (mobile) -->
+  <aside
+    class="bg-surface border-white/10 fixed inset-y-0 left-0 z-50 w-64 flex flex-col transition-transform duration-200 md:static md:z-auto md:w-60 md:min-h-screen md:border-r md:translate-x-0"
+    :class="mobileOpen ? 'translate-x-0' : '-translate-x-full'"
+  >
+    <div class="flex items-center gap-2 px-5 py-5">
+      <img src="/icon.svg" alt="" class="h-8 w-8" />
       <span class="font-heading text-lg font-semibold">CareLane</span>
+      <button
+        class="md:hidden ml-auto p-1.5 rounded-lg text-mid hover:text-white hover:bg-white/5 transition-colors"
+        aria-label="Close menu"
+        @click="mobileOpen = false"
+      >
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6L6 18" /></svg>
+      </button>
     </div>
-    <nav class="flex md:flex-col justify-around md:justify-start md:px-3 md:gap-1 py-1 md:py-0">
+    <nav class="flex-1 overflow-y-auto flex flex-col px-3 gap-1">
       <router-link
         v-for="item in nav"
         :key="item.name"
         :to="item.to"
-        class="flex flex-col md:flex-row items-center md:gap-3 rounded-xl px-2 md:px-3 py-2 text-[11px] md:text-sm text-mid hover:text-white hover:bg-white/5 transition-colors"
+        class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-mid hover:text-white hover:bg-white/5 transition-colors"
         :active-class="item.to === '/' ? '' : '!text-white bg-primary/20'"
         exact-active-class="!text-white bg-primary/20"
       >
         <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" :d="item.icon" /></svg>
-        <span class="md:flex-1 truncate">{{ item.label }}</span>
-        <span v-if="item.count && stats[item.count]" class="hidden md:inline pill bg-white/10 text-mid">{{ stats[item.count] }}</span>
+        <span class="flex-1 truncate">{{ item.label }}</span>
+        <span v-if="item.count && stats[item.count]" class="pill bg-white/10 text-mid">{{ stats[item.count] }}</span>
       </router-link>
     </nav>
-    <div class="hidden md:block px-5 py-4 mt-auto md:absolute md:bottom-0 text-xs text-mid">
+    <div class="px-5 py-4 border-t border-white/10 text-xs text-mid">
       <p class="truncate">{{ auth.user?.display_name }}</p>
       <button class="text-accent hover:underline" @click="logout">Sign out</button>
     </div>

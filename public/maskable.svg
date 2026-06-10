@@ -1,0 +1,10 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="CareLane">
+  <defs>
+    <linearGradient id="cl" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2563eb"/>
+      <stop offset="1" stop-color="#14b8a6"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" fill="url(#cl)"/>
+  <path d="M40 22 A13 13 0 1 0 40 42" fill="none" stroke="#ffffff" stroke-width="7" stroke-linecap="round"/>
+</svg>
