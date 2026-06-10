@@ -30,6 +30,7 @@ function submit (finalise = false) {
     if (payload[k] === '') payload[k] = null
   }
   payload.duration_hours = payload.duration_hours ? Number(payload.duration_hours) : null
+  payload.billing_code_id = payload.billing_code_id ? Number(payload.billing_code_id) : null
   payload.client_id = Number(payload.client_id)
   if (finalise) payload.finalised = 1
   emit('submit', payload)
