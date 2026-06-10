@@ -1,5 +1,5 @@
 import { sqlite } from '../db/connection.js'
-import { encrypt, decryptFields, blindIndex } from './cryptoService.js'
+import { encrypt, decrypt, decryptFields, blindIndex } from './cryptoService.js'
 import { ApiError } from '../middleware/errorHandler.js'
 
 /** Snake_case column names that are encrypted at rest. */
@@ -14,6 +14,26 @@ const COLUMNS = ['first_name', 'last_name', 'preferred_name', 'ndis_number', 'da
   'notes', 'active']
 
 const now = () => new Date().toISOString()
+
+/**
+ * Build a human-readable client name for list/dashboard rows. Prefers the
+ * plaintext preferred_name, then the decrypted legal name, and only falls back
+ * to a stable `Client #<id>` label when no name is stored. Accepts either a
+ * client row or an aliased join row (e.g. `client_first_name`).
+ * @param {object} row row carrying preferred_name/first_name/last_name (or the
+ *   `client_`-prefixed aliases) plus an id/client_id
+ * @returns {string}
+ */
+export function clientDisplayName (row = {}) {
+  const preferred = (row.preferred_name ?? row.client_preferred_name)?.trim()
+  if (preferred) return preferred
+  const first = decrypt(row.first_name ?? row.client_first_name)
+  const last = decrypt(row.last_name ?? row.client_last_name)
+  const full = [first, last].map(v => v?.trim()).filter(Boolean).join(' ')
+  if (full) return full
+  const id = row.id ?? row.client_id
+  return id ? `Client #${id}` : 'Client'
+}
 
 /** Decrypt a client row for an authorised response. */
 function toClient (row) {

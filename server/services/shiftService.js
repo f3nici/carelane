@@ -1,5 +1,6 @@
 import { sqlite } from '../db/connection.js'
 import { encrypt, decryptFields } from './cryptoService.js'
+import { clientDisplayName } from './clientService.js'
 import { ApiError } from '../middleware/errorHandler.js'
 
 const ENCRYPTED = ['body', 'incident_details']
@@ -11,6 +12,18 @@ const now = () => new Date().toISOString()
 
 function toShift (row) {
   return row ? decryptFields(row, ENCRYPTED) : null
+}
+
+/**
+ * Map a list-query row: decrypt note fields, derive `client_display_name`, and
+ * drop the raw joined legal-name columns so they don't leak into the response.
+ */
+function toShiftListRow (row) {
+  const shift = toShift(row)
+  shift.client_display_name = clientDisplayName(row)
+  delete shift.client_first_name
+  delete shift.client_last_name
+  return shift
 }
 
 /**
@@ -38,13 +51,14 @@ export function listShifts (pg, filters = {}) {
   if (filters.billed === 'false') where.push('s.billed = 0')
   const whereSql = 'WHERE ' + where.join(' AND ')
   const total = sqlite.prepare(`SELECT COUNT(*) AS c FROM shift_notes s ${whereSql}`).get(...params).c
-  const rows = sqlite.prepare(`SELECT s.*, c.preferred_name AS client_preferred_name, bc.code AS billing_code
+  const rows = sqlite.prepare(`SELECT s.*, c.preferred_name AS client_preferred_name,
+      c.first_name AS client_first_name, c.last_name AS client_last_name, bc.code AS billing_code
     FROM shift_notes s
     JOIN clients c ON c.id = s.client_id
     LEFT JOIN billing_codes bc ON bc.id = s.billing_code_id
     ${whereSql} ORDER BY s.shift_date DESC, s.id DESC LIMIT ? OFFSET ?`)
     .all(...params, pg.perPage, pg.offset)
-  return { rows: rows.map(toShift), total }
+  return { rows: rows.map(toShiftListRow), total }
 }
 
 /**

@@ -1,9 +1,20 @@
 import { sqlite } from '../db/connection.js'
+import { clientDisplayName } from './clientService.js'
 import { ApiError } from '../middleware/errorHandler.js'
 
 const COLUMNS = ['client_id', 'report_type', 'period_start', 'period_end', 'body_markdown', 'source_shift_ids', 'status']
 
 const now = () => new Date().toISOString()
+
+/**
+ * Add `client_display_name` to a list row and drop the raw joined name columns.
+ */
+function toListRow (row) {
+  row.client_display_name = clientDisplayName(row)
+  delete row.client_first_name
+  delete row.client_last_name
+  return row
+}
 
 /**
  * List reports with optional client / status filters.
@@ -17,11 +28,12 @@ export function listReports (pg, filters = {}) {
   if (filters.status) { where.push('r.status = ?'); params.push(filters.status) }
   const whereSql = 'WHERE ' + where.join(' AND ')
   const total = sqlite.prepare(`SELECT COUNT(*) AS c FROM reports r ${whereSql}`).get(...params).c
-  const rows = sqlite.prepare(`SELECT r.*, c.preferred_name AS client_preferred_name
+  const rows = sqlite.prepare(`SELECT r.*, c.preferred_name AS client_preferred_name,
+      c.first_name AS client_first_name, c.last_name AS client_last_name
     FROM reports r JOIN clients c ON c.id = r.client_id
     ${whereSql} ORDER BY r.updated_at DESC LIMIT ? OFFSET ?`)
     .all(...params, pg.perPage, pg.offset)
-  return { rows, total }
+  return { rows: rows.map(toListRow), total }
 }
 
 /**

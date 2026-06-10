@@ -36,7 +36,7 @@ onMounted(load)
           <h3 class="font-semibold truncate">{{ a.title }}</h3>
           <StatusBadge :status="a.status" />
         </div>
-        <p class="text-xs text-mid mt-1">{{ a.client_preferred_name || 'client #' + a.client_id }}</p>
+        <p class="text-xs text-mid mt-1">{{ a.client_display_name }}</p>
         <p class="text-xs text-mid mt-2">{{ a.start_date || '—' }} → {{ a.end_date || '—' }}{{ a.signed_by_client ? ' · signed' : '' }}</p>
       </router-link>
     </div>

@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { sqlite } from '../db/connection.js'
 import { recentActivity } from '../services/activityService.js'
+import { clientDisplayName } from '../services/clientService.js'
 import { ok } from '../utils/pagination.js'
 
 const router = Router()
@@ -31,10 +32,10 @@ router.get('/stats', (req, res) => {
 router.get('/plan-reviews', (req, res) => {
   const today = new Date().toISOString().slice(0, 10)
   const soon = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
-  const rows = sqlite.prepare(`SELECT id, preferred_name, suburb, plan_end FROM clients
+  const rows = sqlite.prepare(`SELECT id, preferred_name, first_name, last_name, suburb, plan_end FROM clients
     WHERE deleted_at IS NULL AND active = 1 AND plan_end IS NOT NULL AND plan_end BETWEEN ? AND ?
     ORDER BY plan_end`).all(today, soon)
-  res.json(ok(rows))
+  res.json(ok(rows.map(({ first_name, last_name, ...r }) => ({ ...r, client_display_name: clientDisplayName({ first_name, last_name, ...r }) }))))
 })
 
 /**
