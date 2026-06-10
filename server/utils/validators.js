@@ -130,6 +130,16 @@ export const clientBillingCodesSchema = z.object({
   }))
 })
 
+export const templateSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  template_type: z.enum(['agreement', 'report']).default('agreement'),
+  report_type: z.enum(['progress', 'plan_review', 'incident', 'general']).nullish(),
+  description: z.string().trim().max(2000).nullish().transform(v => v || null),
+  body_markdown: z.string().trim().min(1).max(200000),
+  is_default: bool01.default(0),
+  active: bool01.default(1)
+})
+
 export const settingsSchema = z.record(z.string(), z.any())
 
 export const askSchema = z.object({
@@ -141,6 +151,11 @@ export const shiftDraftSchema = z.object({
   tone: z.string().trim().max(200).nullish()
 })
 
+export const agreementDraftSchema = z.object({
+  template_id: z.number().int().positive().nullish()
+})
+
 export const reportDraftSchema = z.object({
-  shift_ids: z.array(z.number().int().positive()).nullish()
+  shift_ids: z.array(z.number().int().positive()).nullish(),
+  template_id: z.number().int().positive().nullish()
 })

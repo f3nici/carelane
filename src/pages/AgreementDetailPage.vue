@@ -16,6 +16,8 @@ const toast = useToastStore()
 const id = computed(() => route.params.id)
 
 const clients = ref([])
+const templates = ref([])
+const templateId = ref('')
 const title = ref('')
 const clientId = ref(null)
 const status = ref('draft')
@@ -34,6 +36,11 @@ const signed = computed(() => !!agreement.value.signed_by_client)
 onMounted(async () => {
   const c = await api.get('/clients', { active: 'true', per_page: 100 })
   clients.value = c.data
+  try {
+    const t = await api.get('/templates', { template_type: 'agreement', active: 'true', per_page: 100 })
+    templates.value = t.data
+    templateId.value = t.data.find(x => x.is_default)?.id ?? ''
+  } catch { /* templates optional */ }
   if (id.value) {
     const res = await api.get(`/agreements/${id.value}`)
     setFrom(res.data)
@@ -82,7 +89,7 @@ async function draft () {
   drafting.value = true
   try {
     await api.put(`/agreements/${id.value}`, payload())
-    const res = await api.post(`/agreements/${id.value}/draft`)
+    const res = await api.post(`/agreements/${id.value}/draft`, templateId.value ? { template_id: Number(templateId.value) } : {})
     setFrom(res.data)
     toast.push('Draft generated — review every clause before signing', 'success')
   } catch { /* toast via interceptor */ } finally {
@@ -164,12 +171,21 @@ async function uploadSignedCopy (event) {
 
     <AgreementQuestionnaire v-if="!signed" v-model="questionnaire" :client="selectedClient" />
 
+    <div v-if="id && !signed && templates.length" class="card">
+      <label class="label">Template</label>
+      <select v-model="templateId" class="input max-w-md">
+        <option value="">Automatic (default template)</option>
+        <option v-for="t in templates" :key="t.id" :value="t.id">{{ t.name }}{{ t.is_default ? ' (default)' : '' }}</option>
+      </select>
+      <p class="text-xs text-mid mt-1">Claude follows this template's headings and house wording when drafting. <router-link to="/templates" class="text-accent hover:underline">Manage templates</router-link></p>
+    </div>
+
     <AiDraftPanel
       v-if="id && !signed"
       :input-text="JSON.stringify(questionnaire)"
       :busy="drafting"
       label="Draft agreement"
-      hint="Sonnet fills the agreement template from your questionnaire plus relevant guideline excerpts. You review, edit and the participant signs."
+      hint="Sonnet fills the selected template from your questionnaire plus relevant guideline excerpts. You review, edit and the participant signs."
       @draft="draft"
     />
 

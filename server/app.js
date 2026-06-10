@@ -18,6 +18,7 @@ import billingRoutes from './routes/billing.js'
 import documentRoutes from './routes/documents.js'
 import dashboardRoutes from './routes/dashboard.js'
 import settingsRoutes from './routes/settings.js'
+import templateRoutes from './routes/templates.js'
 import auditRoutes from './routes/audit.js'
 
 /**
@@ -81,6 +82,7 @@ export function createApp () {
   api.use('/documents', requireAuth, documentRoutes)
   api.use('/dashboard', requireAuth, dashboardRoutes)
   api.use('/settings', requireAuth, settingsRoutes)
+  api.use('/templates', requireAuth, templateRoutes)
   api.use('/audit', requireAuth, auditRoutes)
   app.use('/api/v1', api)
 

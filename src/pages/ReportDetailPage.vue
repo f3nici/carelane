@@ -16,6 +16,8 @@ const toast = useToastStore()
 const id = computed(() => route.params.id)
 
 const clients = ref([])
+const templates = ref([])
+const templateId = ref('')
 const setup = ref({})
 const body = ref('')
 const report = ref({})
@@ -28,6 +30,10 @@ const isFinal = computed(() => report.value.status === 'final')
 onMounted(async () => {
   const c = await api.get('/clients', { active: 'true', per_page: 100 })
   clients.value = c.data
+  try {
+    const t = await api.get('/templates', { template_type: 'report', active: 'true', per_page: 100 })
+    templates.value = t.data
+  } catch { /* templates optional */ }
   if (id.value) {
     const res = await api.get(`/reports/${id.value}`)
     report.value = res.data
@@ -66,7 +72,7 @@ async function draft () {
   drafting.value = true
   try {
     await api.put(`/reports/${id.value}`, payload())
-    const res = await api.post(`/reports/${id.value}/draft`, {})
+    const res = await api.post(`/reports/${id.value}/draft`, templateId.value ? { template_id: Number(templateId.value) } : {})
     report.value = res.data
     body.value = res.data.body_markdown || ''
     toast.push('Draft generated from shift notes — review before finalising', 'success')
@@ -121,12 +127,21 @@ async function uploadFinalCopy (event) {
 
     <ReportBuilder v-model="setup" :clients="clients" :locked="isFinal" />
 
+    <div v-if="id && !isFinal && templates.length" class="card">
+      <label class="label">Template</label>
+      <select v-model="templateId" class="input max-w-md">
+        <option value="">Automatic (default for report type)</option>
+        <option v-for="t in templates" :key="t.id" :value="t.id">{{ t.name }}{{ t.report_type ? ` · ${t.report_type.replace('_', ' ')}` : '' }}{{ t.is_default ? ' (default)' : '' }}</option>
+      </select>
+      <p class="text-xs text-mid mt-1">Claude follows this template's headings and house wording when drafting. <router-link to="/templates" class="text-accent hover:underline">Manage templates</router-link></p>
+    </div>
+
     <AiDraftPanel
       v-if="id && !isFinal"
       :input-text="`${setup.period_start || ''} ${setup.period_end || ''}`"
       :busy="drafting"
       label="Draft report from shifts"
-      hint="Each shift in the period is condensed cheaply (Haiku) first, then Sonnet drafts the report aligned to the participant's goals."
+      hint="Each shift in the period is condensed cheaply (Haiku) first, then Sonnet drafts the report into your selected template, aligned to the participant's goals."
       @draft="draft"
     />
 

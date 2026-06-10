@@ -199,3 +199,17 @@ export const settings = sqliteTable('settings', {
   key: text('key').primaryKey(),
   value: text('value')
 })
+
+export const templates = sqliteTable('templates', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  templateType: text('template_type').notNull().default('agreement'), // agreement | report
+  reportType: text('report_type'), // optional sub-type when template_type = report
+  description: text('description'),
+  bodyMarkdown: text('body_markdown').notNull(), // structure + wording Claude follows when drafting
+  isDefault: integer('is_default').notNull().default(0),
+  active: integer('active').notNull().default(1),
+  createdAt: text('created_at'),
+  updatedAt: text('updated_at'),
+  deletedAt: text('deleted_at')
+})

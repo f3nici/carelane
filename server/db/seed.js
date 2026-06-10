@@ -19,6 +19,44 @@ const starterBillingCodes = [
   { code: '01_799_0107_1_1', name: 'Provider Travel - Non-Labour Costs', category: 'Assistance with Daily Life (Core)', unit: 'E', cap: 1.00 }
 ]
 
+/**
+ * Starter drafting templates — the built-in agreement/report structures made
+ * visible and editable. Marked default so they apply automatically until the
+ * operator customises or replaces them.
+ */
+const starterTemplates = [
+  {
+    name: 'Standard service agreement',
+    template_type: 'agreement',
+    report_type: null,
+    description: 'Default NDIS service agreement structure used for new agreements.',
+    body_markdown: `# Service Agreement
+## Parties
+## Supports Provided
+## Schedule of Supports and Prices
+## Invoicing and Payment
+## Cancellations and Notice
+## Responsibilities of the Provider
+## Responsibilities of the Participant
+## Privacy and Consent
+## Feedback, Complaints and Disputes
+## Ending or Changing this Agreement
+## Agreement Period and Review
+## Signatures`
+  },
+  {
+    name: 'Standard progress report',
+    template_type: 'report',
+    report_type: 'progress',
+    description: 'Default progress / plan-review report structure.',
+    body_markdown: `## Summary
+## Supports Provided
+## Progress Toward Goals
+## Observations
+## Recommendations`
+  }
+]
+
 const defaultSettings = {
   business_name: 'CareLane Support Services',
   abn: '',
@@ -64,6 +102,15 @@ export function seed () {
       VALUES (?, ?, ?, ?, ?, 0, 'starter-seed 2024-25', 1, ?, ?)`)
     for (const c of starterBillingCodes) insert.run(c.code, c.name, c.category, c.unit, c.cap, ts, ts)
     console.log(`seeded ${starterBillingCodes.length} starter billing codes`)
+  }
+
+  const templateCount = sqlite.prepare('SELECT COUNT(*) AS c FROM templates').get().c
+  if (templateCount === 0) {
+    const insert = sqlite.prepare(`INSERT INTO templates
+      (name, template_type, report_type, description, body_markdown, is_default, active, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, 1, 1, ?, ?)`)
+    for (const t of starterTemplates) insert.run(t.name, t.template_type, t.report_type, t.description, t.body_markdown, ts, ts)
+    console.log(`seeded ${starterTemplates.length} starter templates`)
   }
 }
 
