@@ -1,12 +1,10 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { createRequire } from 'node:module'
+import { PDFParse } from 'pdf-parse'
 import { sqlite } from '../db/connection.js'
 import { ApiError } from '../middleware/errorHandler.js'
 import { indexDocument } from './ragService.js'
 import config from '../config.js'
-
-const require = createRequire(import.meta.url)
 
 const now = () => new Date().toISOString()
 
@@ -16,17 +14,14 @@ const now = () => new Date().toISOString()
  * @returns {Promise<{pages:string[], pageCount:number}>}
  */
 export async function extractPdfPages (buffer) {
-  const pdfParse = require('pdf-parse/lib/pdf-parse.js')
-  const pages = []
-  const result = await pdfParse(buffer, {
-    pagerender: async pageData => {
-      const content = await pageData.getTextContent()
-      const text = content.items.map(i => i.str).join(' ')
-      pages.push(text)
-      return text
-    }
-  })
-  return { pages, pageCount: result.numpages }
+  const parser = new PDFParse({ data: new Uint8Array(buffer) })
+  try {
+    const result = await parser.getText()
+    const pages = (result.pages || []).map(p => p.text || '')
+    return { pages, pageCount: result.total ?? pages.length }
+  } finally {
+    await parser.destroy()
+  }
 }
 
 /**
