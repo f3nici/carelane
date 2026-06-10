@@ -1,6 +1,7 @@
 services:
   carelane:
-    image: ghcr.io/f3nici/carelane:latest
+    # Docker Hub image pushed by .github/workflows/docker.yml (set to your DOCKERHUB_USERNAME)
+    image: f3nici/carelane:latest
     build: .
     container_name: carelane
     ports:
