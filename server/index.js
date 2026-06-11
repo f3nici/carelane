@@ -3,6 +3,7 @@ import { migrate } from './db/migrate.js'
 import { seed } from './db/seed.js'
 import { assertEncryptionCanary } from './services/cryptoService.js'
 import { scheduleBackups, warnIfBackupsStale } from './services/backupService.js'
+import { scheduleMaterialisation } from './services/recurrenceService.js'
 import { createApp } from './app.js'
 
 assertProductionSecrets()
@@ -24,4 +25,5 @@ app.listen(config.port, () => {
   console.log(`CareLane listening on :${config.port} (${config.nodeEnv})`)
   scheduleBackups()
   warnIfBackupsStale()
+  scheduleMaterialisation()
 })

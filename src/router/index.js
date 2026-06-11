@@ -17,6 +17,7 @@ const routes = [
       { path: 'agreements/new', name: 'agreement-new', component: () => import('../pages/AgreementDetailPage.vue') },
       { path: 'agreements/:id', name: 'agreement-detail', component: () => import('../pages/AgreementDetailPage.vue') },
       { path: 'documents', name: 'documents', component: () => import('../pages/DocumentsPage.vue') },
+      { path: 'roster', name: 'roster', component: () => import('../pages/RosterPage.vue') },
       { path: 'shifts', name: 'shifts', component: () => import('../pages/ShiftListPage.vue') },
       { path: 'shifts/new', name: 'shift-new', component: () => import('../pages/ShiftDetailPage.vue') },
       { path: 'shifts/:id', name: 'shift-detail', component: () => import('../pages/ShiftDetailPage.vue') },

@@ -28,7 +28,13 @@ const config = {
   loginMaxAttempts: parseInt(env.LOGIN_MAX_ATTEMPTS || '5', 10),
   loginWindowMinutes: parseInt(env.LOGIN_WINDOW_MINUTES || '15', 10),
   publicApiEnabled: (env.PUBLIC_API_ENABLED || 'false') === 'true',
-  corsOrigins: (env.CORS_ORIGINS || 'http://localhost:5173').split(',').map(s => s.trim())
+  corsOrigins: (env.CORS_ORIGINS || 'http://localhost:5173').split(',').map(s => s.trim()),
+  // Google Calendar one-way push (optional). App credentials live in env; the
+  // per-user refresh token is stored encrypted in settings (see
+  // googleCalendarService). Sync is a no-op until both are present.
+  googleClientId: env.GOOGLE_CLIENT_ID || '',
+  googleClientSecret: env.GOOGLE_CLIENT_SECRET || '',
+  googleRedirectUri: env.GOOGLE_REDIRECT_URI || 'http://localhost:3778/api/v1/schedule/google/callback'
 }
 
 /**

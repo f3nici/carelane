@@ -49,6 +49,7 @@
     "swagger-jsdoc": "^6.3.0",
     "swagger-ui-express": "^5.0.1",
     "vue": "^3.5.35",
+    "vue-cal": "^4.10.2",
     "vue-router": "^5.1.0",
     "zod": "^4.4.3"
   },
