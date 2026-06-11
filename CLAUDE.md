@@ -36,6 +36,22 @@ API docs at `/api/docs`, health at `/healthz`.
   verifiable via `GET /api/v1/audit/verify` (Dashboard + Audit-log widgets).
   Details are PII-redacted at write time; `updated` actions record a field-level
   `changes` diff (`{field, from, to}`) with sensitive/health values redacted.
+- Scheduling/roster: `scheduled_shifts` is the forward-looking plan (one-off or
+  generated from a `shift_recurrences` series). Lifecycle: `scheduled` →
+  `in_progress` (clock-in) → `completed` (clock-out, then a linked `shift_notes`
+  record is created via `scheduleService.createNoteFromShift`) — or `cancelled`.
+  `plan_notes` is encrypted like shift bodies. Recurrence occurrences are
+  materialised into `scheduled_shifts` on a rolling 60-day horizon by a nightly
+  cron (`recurrenceService.scheduleMaterialisation`); cancellations/edits are not
+  re-created. Scheduled shifts are soft-deleted + restorable like other records.
+  UI: the "Roster" page (`vue-cal` calendar + upcoming list + clock in/out).
+- Google Calendar (optional, one-way push): `googleCalendarService` mirrors
+  scheduled shifts to the operator's calendar via OAuth2 (native `fetch`, no SDK).
+  App creds come from env (`GOOGLE_CLIENT_ID`/`SECRET`/`REDIRECT_URI`); the
+  refresh token is stored **encrypted** in `settings.google_refresh_token_enc`
+  (a protected key). All sync is best-effort and a no-op until configured +
+  connected + enabled — shift CRUD never blocks on it. Events carry only a short
+  participant label (preferred name/initials) + location, never plan/health notes.
 - Soft-deleted records (and deactivated billing codes) are listed and restorable
   via `GET /api/v1/deleted` + `POST /api/v1/deleted/:type/:id/restore` (the
   "Deleted Items" page). Restores are themselves logged to the audit trail.

@@ -10,25 +10,30 @@ const planReviews = ref([])
 const recentShifts = ref([])
 const incidents = ref([])
 const integrity = ref(null)
+const upcoming = ref([])
+const activeShift = ref(null)
 
 onMounted(async () => {
-  const [s, p, sh, inc, audit] = await Promise.all([
+  const [s, p, sh, inc, audit, sched] = await Promise.all([
     api.get('/dashboard/stats'),
     api.get('/dashboard/plan-reviews'),
     api.get('/shifts', { per_page: 5 }),
     api.get('/shifts', { incident: 'true', per_page: 5 }),
-    api.get('/audit/verify')
+    api.get('/audit/verify'),
+    api.get('/schedule/upcoming', { days: 14 })
   ])
   stats.value = s.data
   planReviews.value = p.data
   recentShifts.value = sh.data
   incidents.value = inc.data
   integrity.value = audit.data
+  upcoming.value = sched.data.upcoming
+  activeShift.value = sched.data.active
 })
 
 const tiles = [
   { key: 'active_clients', label: 'Active clients' },
-  { key: 'agreements_active', label: 'Active agreements' },
+  { key: 'upcoming_shifts', label: 'Upcoming shifts' },
   { key: 'shifts_this_month', label: 'Shifts this month' },
   { key: 'unbilled_shifts', label: 'Unbilled shifts' },
   { key: 'plan_reviews_due', label: 'Plan reviews due (60d)' },
@@ -41,10 +46,19 @@ const tiles = [
     <div class="flex flex-wrap items-center justify-between gap-3">
       <h1 class="text-2xl font-semibold">Dashboard</h1>
       <div class="flex gap-2">
-        <router-link to="/shifts/new" class="btn-primary">+ Shift note</router-link>
+        <router-link to="/roster" class="btn-primary">Roster</router-link>
+        <router-link to="/shifts/new" class="btn-ghost">+ Shift note</router-link>
         <router-link to="/clients/new" class="btn-ghost">+ Client</router-link>
       </div>
     </div>
+
+    <router-link v-if="activeShift" to="/roster" class="card border-accent/40 flex items-center justify-between gap-3 hover:border-accent/60">
+      <div>
+        <p class="text-sm font-medium">⏱ On shift — {{ activeShift.client_display_name }}</p>
+        <p class="text-xs text-mid">Clocked in at {{ new Date(activeShift.clock_in_at).toLocaleTimeString() }} — open the roster to clock out.</p>
+      </div>
+      <span class="btn-primary">Clock out</span>
+    </router-link>
 
     <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
       <div v-for="tile in tiles" :key="tile.key" class="card !p-4">
@@ -58,6 +72,20 @@ const tiles = [
       <ul class="space-y-2">
         <li v-for="s in incidents" :key="s.id" class="text-sm">
           <router-link :to="`/shifts/${s.id}`" class="text-accent hover:underline">{{ s.shift_date }} — {{ s.client_display_name }}</router-link>
+        </li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-semibold">Upcoming shifts</h3>
+        <router-link to="/roster" class="text-xs text-accent hover:underline">Open roster →</router-link>
+      </div>
+      <p v-if="!upcoming.length" class="text-sm text-mid">Nothing scheduled in the next 14 days.</p>
+      <ul class="grid sm:grid-cols-2 gap-2">
+        <li v-for="s in upcoming" :key="s.id" class="text-sm flex items-center justify-between gap-2">
+          <span class="truncate">{{ s.scheduled_date }} — {{ s.client_display_name }}</span>
+          <span class="text-xs text-mid whitespace-nowrap">{{ s.start_time || '' }}<template v-if="s.status === 'in_progress'"> · on shift</template></span>
         </li>
       </ul>
     </div>

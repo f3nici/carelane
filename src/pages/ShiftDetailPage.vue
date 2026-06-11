@@ -20,12 +20,18 @@ const clients = ref([])
 const busy = ref(false)
 const drafting = ref(false)
 const editor = ref(null)
+// Set when this note is being written for a clocked-out scheduled shift.
+const fromSchedule = computed(() => route.query.from_schedule ? Number(route.query.from_schedule) : null)
 
 onMounted(async () => {
   const c = await api.get('/clients', { active: 'true', per_page: 100 })
   clients.value = c.data
   if (id.value) {
     const res = await api.get(`/shifts/${id.value}`)
+    shift.value = res.data
+  } else if (fromSchedule.value) {
+    // Prefill participant, date and the actual clocked times from the roster.
+    const res = await api.get(`/schedule/${fromSchedule.value}/note-prefill`)
     shift.value = res.data
   } else if (route.query.client) {
     shift.value = { client_id: Number(route.query.client) }
@@ -35,7 +41,16 @@ onMounted(async () => {
 async function save (payload) {
   busy.value = true
   try {
-    const res = id.value ? await api.put(`/shifts/${id.value}`, payload) : await api.post('/shifts', payload)
+    let res
+    if (id.value) {
+      res = await api.put(`/shifts/${id.value}`, payload)
+    } else if (fromSchedule.value) {
+      // Create the note against the scheduled shift so the two stay linked.
+      const created = await api.post(`/schedule/${fromSchedule.value}/note`, payload)
+      res = { data: created.data.note }
+    } else {
+      res = await api.post('/shifts', payload)
+    }
     shift.value = res.data
     toast.push(payload.finalised ? 'Shift note finalised' : 'Shift note saved', 'success')
     if (!id.value) router.replace(`/shifts/${res.data.id}`)

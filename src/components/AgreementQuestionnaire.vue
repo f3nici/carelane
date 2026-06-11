@@ -1,11 +1,17 @@
 <script setup>
 import { reactive, watch } from 'vue'
+import { useApi } from '../composables/useApi.js'
 
 const props = defineProps({
   modelValue: { type: Object, default: () => ({}) },
   client: { type: Object, default: null }
 })
 const emit = defineEmits(['update:modelValue'])
+
+const api = useApi()
+// Remember the last auto-generated supports text so we only refresh it while the
+// operator hasn't hand-edited the field.
+let lastAutoFill = ''
 
 const q = reactive({
   participant_name: '', ndis_number: '', plan_start: '', plan_end: '',
@@ -17,6 +23,25 @@ const q = reactive({
   start_date: '', end_date: '', review_date: ''
 })
 
+/**
+ * Prefill "Supports to be delivered" from the participant's assigned billing
+ * codes. Leaves the field alone once it's been hand-edited.
+ * @param {number} clientId
+ */
+async function populateSupports (clientId) {
+  if (!clientId) return
+  if (q.supports && q.supports.trim() && q.supports !== lastAutoFill) return
+  try {
+    const res = await api.get(`/clients/${clientId}/billing-codes`)
+    const lines = res.data.map(c => {
+      const rate = c.custom_rate ?? c.price_cap_standard
+      const rateStr = rate != null ? ` ($${Number(rate).toFixed(2)}/${c.unit || 'H'})` : ''
+      return `- ${c.code} — ${c.name}${rateStr}`
+    })
+    if (lines.length) { q.supports = lines.join('\n'); lastAutoFill = q.supports } else if (q.supports === lastAutoFill) { q.supports = ''; lastAutoFill = '' }
+  } catch { /* assigned codes are optional */ }
+}
+
 watch(() => props.client, c => {
   if (!c) return
   q.participant_name = q.participant_name || c.preferred_name || `${c.first_name} ${c.last_name}`
@@ -25,6 +50,7 @@ watch(() => props.client, c => {
   q.plan_end = q.plan_end || c.plan_end || ''
   q.plan_management_type = q.plan_management_type || c.plan_management_type || ''
   q.goals = q.goals || c.support_goals || ''
+  populateSupports(c.id)
 }, { immediate: true })
 
 watch(() => props.modelValue, v => {

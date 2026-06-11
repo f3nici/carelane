@@ -93,6 +93,54 @@ export const shiftSchema = z.object({
   finalised: bool01.default(0)
 })
 
+const weekdays = z.array(z.number().int().min(0).max(6)).max(7)
+
+export const scheduledShiftSchema = z.object({
+  client_id: z.number().int().positive(),
+  title: optStr,
+  scheduled_date: isoDate,
+  start_time: time.nullish(),
+  end_time: time.nullish(),
+  billing_code_id: z.number().int().positive().nullish(),
+  location: optStr,
+  plan_notes: z.string().max(20000).nullish().transform(v => v || null)
+})
+
+export const recurrenceSchema = z.object({
+  client_id: z.number().int().positive(),
+  title: optStr,
+  frequency: z.enum(['daily', 'weekly', 'fortnightly', 'monthly']).default('weekly'),
+  interval: z.number().int().positive().max(52).default(1),
+  weekdays: weekdays.nullish(),
+  start_date: isoDate,
+  until_date: isoDate.nullish(),
+  start_time: time.nullish(),
+  end_time: time.nullish(),
+  billing_code_id: z.number().int().positive().nullish(),
+  location: optStr,
+  plan_notes: z.string().max(20000).nullish().transform(v => v || null),
+  active: bool01.default(1)
+})
+
+// Note fields supplied at clock-out. client_id / date / times are taken from the
+// scheduled shift, so they are not accepted here.
+export const scheduleNoteSchema = z.object({
+  billing_code_id: z.number().int().positive().nullish(),
+  location: optStr,
+  support_provided: z.string().max(20000).nullish().transform(v => v || null),
+  body: z.string().max(100000).nullish().transform(v => v || null),
+  participant_response: z.string().max(20000).nullish().transform(v => v || null),
+  incident_flag: bool01.default(0),
+  incident_details: z.string().max(50000).nullish().transform(v => v || null),
+  follow_up_required: bool01.default(0)
+})
+
+export const googleSettingsSchema = z.object({
+  enabled: bool01.optional(),
+  calendar_id: z.string().trim().max(200).optional(),
+  timezone: z.string().trim().max(60).optional()
+})
+
 export const reportSchema = z.object({
   client_id: z.number().int().positive(),
   report_type: z.enum(['progress', 'plan_review', 'incident', 'general']).default('progress'),

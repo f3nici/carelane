@@ -241,6 +241,58 @@ CREATE TABLE IF NOT EXISTS templates (
 );
 CREATE INDEX IF NOT EXISTS idx_templates_type ON templates (template_type, active, deleted_at);
 
+-- Recurring-appointment series. Individual occurrences are materialised into
+-- scheduled_shifts on a rolling horizon (see recurrenceService).
+CREATE TABLE IF NOT EXISTS shift_recurrences (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  client_id INTEGER NOT NULL REFERENCES clients(id),
+  worker_id INTEGER NOT NULL REFERENCES users(id),
+  title TEXT,
+  frequency TEXT NOT NULL DEFAULT 'weekly',
+  interval INTEGER NOT NULL DEFAULT 1,
+  weekdays TEXT,
+  start_date TEXT NOT NULL,
+  until_date TEXT,
+  start_time TEXT,
+  end_time TEXT,
+  billing_code_id INTEGER REFERENCES billing_codes(id),
+  location TEXT,
+  plan_notes TEXT,
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT,
+  updated_at TEXT,
+  deleted_at TEXT
+);
+
+-- Forward-looking roster: planned shifts (one-off or generated from a series).
+-- A note is created at clock-out and linked via shift_note_id. plan_notes is
+-- encrypted at rest in the service layer like shift bodies.
+CREATE TABLE IF NOT EXISTS scheduled_shifts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  client_id INTEGER NOT NULL REFERENCES clients(id),
+  worker_id INTEGER NOT NULL REFERENCES users(id),
+  recurrence_id INTEGER REFERENCES shift_recurrences(id),
+  title TEXT,
+  scheduled_date TEXT NOT NULL,
+  start_time TEXT,
+  end_time TEXT,
+  billing_code_id INTEGER REFERENCES billing_codes(id),
+  location TEXT,
+  plan_notes TEXT,
+  status TEXT NOT NULL DEFAULT 'scheduled',
+  clock_in_at TEXT,
+  clock_out_at TEXT,
+  shift_note_id INTEGER REFERENCES shift_notes(id),
+  google_event_id TEXT,
+  created_at TEXT,
+  updated_at TEXT,
+  deleted_at TEXT,
+  cancelled_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_scheduled_shifts_date ON scheduled_shifts (scheduled_date, status);
+CREATE INDEX IF NOT EXISTS idx_scheduled_shifts_client ON scheduled_shifts (client_id, scheduled_date);
+CREATE INDEX IF NOT EXISTS idx_scheduled_shifts_recurrence ON scheduled_shifts (recurrence_id, scheduled_date);
+
 -- Append-only audit trail: block UPDATE and DELETE at the database level.
 CREATE TRIGGER IF NOT EXISTS activity_log_no_update
 BEFORE UPDATE ON activity_log

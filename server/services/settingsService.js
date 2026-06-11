@@ -1,7 +1,7 @@
 import { sqlite } from '../db/connection.js'
 
 /** Settings keys that must never be exposed or written via the API. */
-const PROTECTED_KEYS = new Set(['enc_canary'])
+const PROTECTED_KEYS = new Set(['enc_canary', 'google_refresh_token_enc'])
 
 /**
  * Read all settings as a plain object (JSON-decoded values).

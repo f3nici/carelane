@@ -3,6 +3,7 @@ import { ApiError } from '../middleware/errorHandler.js'
 import { clientDisplayName, restoreClient } from './clientService.js'
 import { restoreAgreement } from './agreementService.js'
 import { restoreShift } from './shiftService.js'
+import { restoreScheduled } from './scheduleService.js'
 import { restoreReport } from './reportService.js'
 import { restoreTemplate } from './templateService.js'
 import { reactivateBillingCode } from './billingService.js'
@@ -54,6 +55,12 @@ export function listDeleted () {
     out.push(item({ entity_type: 'template', id: r.id, label: r.name, sub_label: r.template_type, removed_at: r.deleted_at }))
   }
 
+  for (const r of sqlite.prepare(`SELECT s.id, s.scheduled_date, s.deleted_at, s.client_id,
+      c.preferred_name AS client_preferred_name, c.first_name AS client_first_name, c.last_name AS client_last_name
+    FROM scheduled_shifts s JOIN clients c ON c.id = s.client_id WHERE s.deleted_at IS NOT NULL`).all()) {
+    out.push(item({ entity_type: 'scheduled_shift', id: r.id, label: `Scheduled ${r.scheduled_date}`, sub_label: clientDisplayName(r), removed_at: r.deleted_at }))
+  }
+
   // Billing codes are deactivated (history kept), not soft-deleted — surface them
   // here too so operators have one place to bring removed items back.
   for (const r of sqlite.prepare('SELECT id, code, name, updated_at FROM billing_codes WHERE active = 0').all()) {
@@ -69,6 +76,7 @@ const RESTORERS = {
   client: { restore: restoreClient, action: 'restored' },
   agreement: { restore: restoreAgreement, action: 'restored' },
   shift: { restore: restoreShift, action: 'restored' },
+  scheduled_shift: { restore: restoreScheduled, action: 'restored' },
   report: { restore: restoreReport, action: 'restored' },
   template: { restore: restoreTemplate, action: 'restored' },
   billing_code: { restore: reactivateBillingCode, action: 'status_changed', details: { active: true } }
