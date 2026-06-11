@@ -42,19 +42,35 @@ Use the participant's preferred name or initials exactly as given. Australian En
 }
 
 /**
- * Run a non-streaming Claude call and log token usage to the audit trail.
+ * Run a Claude call and log token usage to the audit trail. When the model
+ * stops because it hit `max_tokens` partway through a long document, keep
+ * going (up to `ctx.maxContinuations` extra rounds) and stitch the pieces
+ * together — otherwise agreements/reports get truncated mid-clause. The
+ * continuation is asked for in a fresh user turn rather than by prefilling the
+ * assistant message, which the quality model (Sonnet 4.6) rejects with a 400.
  * @param {object} params messages API params
- * @param {{userId?:number, feature:string}} ctx
+ * @param {{userId?:number, feature:string, maxContinuations?:number}} ctx
  */
 async function complete (params, ctx) {
-  const response = await getClient().messages.create(params)
-  logActivity('ai', null, ctx.userId ?? null, 'ai_drafted', {
-    feature: ctx.feature,
-    model: params.model,
-    input_tokens: response.usage?.input_tokens,
-    output_tokens: response.usage?.output_tokens
-  })
-  return response.content.filter(b => b.type === 'text').map(b => b.text).join('\n')
+  const messages = [...params.messages]
+  const parts = []
+  const maxContinuations = ctx.maxContinuations ?? 0
+  for (let round = 0; ; round++) {
+    const response = await getClient().messages.create({ ...params, messages })
+    const text = response.content.filter(b => b.type === 'text').map(b => b.text).join('\n')
+    parts.push(text)
+    logActivity('ai', null, ctx.userId ?? null, 'ai_drafted', {
+      feature: ctx.feature,
+      model: params.model,
+      input_tokens: response.usage?.input_tokens,
+      output_tokens: response.usage?.output_tokens,
+      truncated: response.stop_reason === 'max_tokens' ? 1 : 0
+    })
+    if (response.stop_reason !== 'max_tokens' || round >= maxContinuations) break
+    messages.push({ role: 'assistant', content: text })
+    messages.push({ role: 'user', content: 'That response was cut off before the end. Continue exactly where you left off — do not repeat any text already written and do not add a preamble.' })
+  }
+  return parts.join('')
 }
 
 /**
@@ -119,10 +135,10 @@ export async function draftReport (input, userId) {
     '\nBase everything strictly on the summaries and goals above; do not invent details.'
   return complete({
     model: qualityModel(),
-    max_tokens: 1800,
+    max_tokens: 6000,
     system: baseSystem(),
     messages: [{ role: 'user', content: user }]
-  }, { userId, feature: 'report' })
+  }, { userId, feature: 'report', maxContinuations: 2 })
 }
 
 /** Default service-agreement structure used when no operator template is selected. */
@@ -154,13 +170,19 @@ export async function draftAgreement (input, userId) {
     ? `\nRelevant guideline excerpts (cite nothing, just align with them):\n${chunks.map(c => `[${c.title} p.${c.page}] ${c.content.slice(0, 700)}`).join('\n')}`
     : ''
   const template = input.template?.body_markdown || DEFAULT_AGREEMENT_TEMPLATE
-  const user = `Fill this service agreement template${input.template ? ` ("${input.template.name}")` : ''} for participant ${input.clientLabel}. Keep the headings and any house wording exactly; write plain-English clauses under each.\nTemplate:\n${template}\nQuestionnaire answers (JSON):\n${JSON.stringify(input.questionnaire)}${guidance}\nLeave signature lines blank. Do not invent prices or terms not given.`
+  const user = `Fill out this service agreement template${input.template ? ` ("${input.template.name}")` : ''} for participant ${input.clientLabel}.\n` +
+    'Follow the template EXACTLY:\n' +
+    '- Reproduce every heading verbatim, in the same order, with the same heading levels. Do not add, remove, rename, merge, or reorder any section.\n' +
+    '- Preserve all fixed/house wording exactly as written; only fill in the clause text that belongs under each heading.\n' +
+    '- Where the template has a placeholder or blank, complete it from the questionnaire; if the answer is not provided, write "[to be confirmed]" rather than inventing it.\n' +
+    `Template:\n${template}\nQuestionnaire answers (JSON):\n${JSON.stringify(input.questionnaire)}${guidance}\n` +
+    'Write clauses in plain English. Leave signature lines blank. Do not invent prices or terms not given.'
   return complete({
     model: qualityModel(),
-    max_tokens: 2500,
+    max_tokens: 8000,
     system: baseSystem(),
     messages: [{ role: 'user', content: user }]
-  }, { userId, feature: 'agreement' })
+  }, { userId, feature: 'agreement', maxContinuations: 2 })
 }
 
 /**
