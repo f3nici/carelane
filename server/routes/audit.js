@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { validate } from '../middleware/validate.js'
 import { activityQuerySchema } from '../utils/validators.js'
-import { queryActivity, activityFacets } from '../services/activityService.js'
+import { queryActivity, activityFacets, verifyAuditChain } from '../services/activityService.js'
 import { parsePagination, paginationMeta, ok } from '../utils/pagination.js'
 
 const router = Router()
@@ -26,6 +26,17 @@ router.get('/', validate(activityQuerySchema, 'query'), (req, res) => {
  */
 router.get('/facets', (req, res) => {
   res.json(ok(activityFacets()))
+})
+
+/**
+ * @openapi
+ * /audit/verify:
+ *   get:
+ *     tags: [Audit]
+ *     summary: Verify the integrity of the append-only audit-log hash chain
+ */
+router.get('/verify', (req, res) => {
+  res.json(ok(verifyAuditChain()))
 })
 
 export default router

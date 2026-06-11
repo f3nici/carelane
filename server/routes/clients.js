@@ -11,7 +11,7 @@ import * as agreementService from '../services/agreementService.js'
 import * as shiftService from '../services/shiftService.js'
 import * as clientDocumentService from '../services/clientDocumentService.js'
 import { CLIENT_DOC_DIR } from '../services/clientDocumentService.js'
-import { logActivity } from '../services/activityService.js'
+import { logActivity, diffChanges } from '../services/activityService.js'
 import { renderPdf, pdfPath } from '../utils/pdfRenderer.js'
 import { parsePagination, paginationMeta, ok } from '../utils/pagination.js'
 import { ApiError } from '../middleware/errorHandler.js'
@@ -67,8 +67,9 @@ router.get('/:id', (req, res) => {
 })
 
 router.put('/:id', validatePartial(clientSchema), (req, res) => {
+  const before = clientService.getClient(Number(req.params.id))
   const client = clientService.updateClient(Number(req.params.id), req.body)
-  logActivity('client', client.id, req.session.userId, 'updated', { fields: Object.keys(req.body).length })
+  logActivity('client', client.id, req.session.userId, 'updated', { changes: diffChanges(before, client, Object.keys(req.body)) })
   res.json(ok(client))
 })
 

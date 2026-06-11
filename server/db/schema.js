@@ -192,7 +192,12 @@ export const activityLog = sqliteTable('activity_log', {
   userId: integer('user_id'),
   action: text('action').notNull(),
   details: text('details'),
-  createdAt: text('created_at')
+  createdAt: text('created_at'),
+  // Tamper-evident hash chain: each entry's hash incorporates the previous
+  // entry's hash, so any silent edit/deletion breaks the chain. Combined with
+  // the append-only triggers this makes the audit trail verifiable.
+  prevHash: text('prev_hash'),
+  hash: text('hash')
 })
 
 export const settings = sqliteTable('settings', {

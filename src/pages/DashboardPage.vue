@@ -9,18 +9,21 @@ const stats = ref({})
 const planReviews = ref([])
 const recentShifts = ref([])
 const incidents = ref([])
+const integrity = ref(null)
 
 onMounted(async () => {
-  const [s, p, sh, inc] = await Promise.all([
+  const [s, p, sh, inc, audit] = await Promise.all([
     api.get('/dashboard/stats'),
     api.get('/dashboard/plan-reviews'),
     api.get('/shifts', { per_page: 5 }),
-    api.get('/shifts', { incident: 'true', per_page: 5 })
+    api.get('/shifts', { incident: 'true', per_page: 5 }),
+    api.get('/audit/verify')
   ])
   stats.value = s.data
   planReviews.value = p.data
   recentShifts.value = sh.data
   incidents.value = inc.data
+  integrity.value = audit.data
 })
 
 const tiles = [
@@ -82,6 +85,30 @@ const tiles = [
       </div>
     </div>
 
-    <ActivityFeed />
+    <div class="grid lg:grid-cols-3 gap-6">
+      <div class="lg:col-span-2">
+        <ActivityFeed />
+      </div>
+      <router-link
+        v-if="integrity"
+        to="/audit"
+        class="card flex items-start gap-3 hover:border-white/20 transition-colors"
+        :class="integrity.valid ? '' : 'border-danger/40'"
+      >
+        <div :class="['p-2 rounded-lg shrink-0', integrity.valid ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger']">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path v-if="integrity.valid" stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <path v-else stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z" />
+          </svg>
+        </div>
+        <div class="min-w-0">
+          <h3 class="font-semibold" :class="integrity.valid ? '' : 'text-danger'">Audit log integrity</h3>
+          <p class="text-sm mt-1" :class="integrity.valid ? 'text-success' : 'text-danger'">
+            {{ integrity.valid ? 'Chain verified' : 'Tampering detected' }}
+          </p>
+          <p class="text-xs text-mid mt-1">{{ integrity.verified }} of {{ integrity.total }} entries hash-chained.</p>
+        </div>
+      </router-link>
+    </div>
   </div>
 </template>

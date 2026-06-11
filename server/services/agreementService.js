@@ -147,3 +147,15 @@ export function deleteAgreement (id) {
   getAgreement(id)
   sqlite.prepare('UPDATE service_agreements SET deleted_at = ?, updated_at = ? WHERE id = ?').run(now(), now(), id)
 }
+
+/**
+ * Restore a soft-deleted agreement. Throws 404 if it does not exist or is not
+ * currently deleted.
+ * @param {number} id
+ */
+export function restoreAgreement (id) {
+  const row = sqlite.prepare('SELECT id FROM service_agreements WHERE id = ? AND deleted_at IS NOT NULL').get(id)
+  if (!row) throw new ApiError(404, 'NOT_FOUND', 'Deleted agreement not found')
+  sqlite.prepare('UPDATE service_agreements SET deleted_at = NULL, updated_at = ? WHERE id = ?').run(now(), id)
+  return getAgreement(id)
+}

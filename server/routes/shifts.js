@@ -8,7 +8,7 @@ import { shiftSchema, shiftDraftSchema } from '../utils/validators.js'
 import * as shiftService from '../services/shiftService.js'
 import * as clientService from '../services/clientService.js'
 import { draftShiftNote, estimateTokens } from '../services/aiService.js'
-import { logActivity } from '../services/activityService.js'
+import { logActivity, diffChanges } from '../services/activityService.js'
 import { parsePagination, paginationMeta, ok } from '../utils/pagination.js'
 import { ApiError } from '../middleware/errorHandler.js'
 import config from '../config.js'
@@ -59,7 +59,10 @@ router.put('/:id', validatePartial(shiftSchema), (req, res) => {
   let action = 'updated'
   if (!before.finalised && shift.finalised) action = 'finalised'
   else if (before.finalised && !shift.finalised) action = 'reopened'
-  logActivity('shift', shift.id, req.session.userId, action, { incident: !!shift.incident_flag })
+  logActivity('shift', shift.id, req.session.userId, action, {
+    incident: !!shift.incident_flag,
+    changes: diffChanges(before, shift, Object.keys(req.body))
+  })
   res.json(ok(shift))
 })
 

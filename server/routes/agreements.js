@@ -7,7 +7,7 @@ import * as clientService from '../services/clientService.js'
 import { resolveTemplateForDraft } from '../services/templateService.js'
 import { draftAgreement } from '../services/aiService.js'
 import { renderPdf, pdfPath, safeFilename } from '../utils/pdfRenderer.js'
-import { logActivity } from '../services/activityService.js'
+import { logActivity, diffChanges } from '../services/activityService.js'
 import { parsePagination, paginationMeta, ok } from '../utils/pagination.js'
 import { ApiError } from '../middleware/errorHandler.js'
 
@@ -36,8 +36,9 @@ router.get('/:id', (req, res) => {
 })
 
 router.put('/:id', validatePartial(agreementSchema), (req, res) => {
+  const before = agreementService.getAgreement(Number(req.params.id))
   const agreement = agreementService.updateAgreement(Number(req.params.id), req.body)
-  logActivity('agreement', agreement.id, req.session.userId, 'updated')
+  logActivity('agreement', agreement.id, req.session.userId, 'updated', { changes: diffChanges(before, agreement, Object.keys(req.body)) })
   res.json(ok(agreement))
 })
 

@@ -21,6 +21,7 @@ const nav = [
   { name: 'billing-codes', to: '/billing-codes', label: 'Billing Codes', icon: 'M12 8c-2 0-3 .9-3 2s1 2 3 2 3 .9 3 2-1 2-3 2m0-8V6m0 10v2m9-6a9 9 0 11-18 0 9 9 0 0118 0z', count: null },
   { name: 'knowledge', to: '/knowledge', label: 'Knowledge Base', icon: 'M12 6.25c-2.4-1.5-5.4-1.5-8 0v12c2.6-1.5 5.6-1.5 8 0 2.4-1.5 5.4-1.5 8 0v-12c-2.6-1.5-5.6-1.5-8 0zm0 0v12', count: 'documents_indexed' },
   { name: 'audit', to: '/audit', label: 'Audit Log', icon: 'M9 12l2 2 4-4m1 8H8a2 2 0 01-2-2V6a2 2 0 012-2h4l6 6v8a2 2 0 01-2 2z', count: null },
+  { name: 'deleted', to: '/deleted', label: 'Deleted Items', icon: 'M19 7l-.87 12.14A2 2 0 0116.14 21H7.86a2 2 0 01-1.99-1.86L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16', count: null },
   { name: 'settings', to: '/settings', label: 'Settings', icon: 'M10.3 4.3a1.7 1.7 0 013.4 0 1.7 1.7 0 002.6 1.1 1.7 1.7 0 012.4 2.4 1.7 1.7 0 001 2.5 1.7 1.7 0 010 3.4 1.7 1.7 0 00-1 2.6 1.7 1.7 0 01-2.4 2.4 1.7 1.7 0 00-2.6 1 1.7 1.7 0 01-3.4 0 1.7 1.7 0 00-2.5-1 1.7 1.7 0 01-2.4-2.4 1.7 1.7 0 00-1.1-2.6 1.7 1.7 0 010-3.4 1.7 1.7 0 001.1-2.5 1.7 1.7 0 012.4-2.4 1.7 1.7 0 002.5-1.1zM15 12a3 3 0 11-6 0 3 3 0 016 0z', count: null }
 ]
 

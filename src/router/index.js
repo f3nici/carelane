@@ -28,6 +28,7 @@ const routes = [
       { path: 'billing-codes', name: 'billing-codes', component: () => import('../pages/BillingCodesPage.vue') },
       { path: 'knowledge', name: 'knowledge', component: () => import('../pages/KnowledgePage.vue') },
       { path: 'audit', name: 'audit', component: () => import('../pages/AuditLogPage.vue') },
+      { path: 'deleted', name: 'deleted', component: () => import('../pages/DeletedItemsPage.vue') },
       { path: 'settings', name: 'settings', component: () => import('../pages/SettingsPage.vue') }
     ]
   }

@@ -105,3 +105,15 @@ export function deleteReport (id) {
   getReport(id)
   sqlite.prepare('UPDATE reports SET deleted_at = ?, updated_at = ? WHERE id = ?').run(now(), now(), id)
 }
+
+/**
+ * Restore a soft-deleted report. Throws 404 if it does not exist or is not
+ * currently deleted.
+ * @param {number} id
+ */
+export function restoreReport (id) {
+  const row = sqlite.prepare('SELECT id FROM reports WHERE id = ? AND deleted_at IS NOT NULL').get(id)
+  if (!row) throw new ApiError(404, 'NOT_FOUND', 'Deleted report not found')
+  sqlite.prepare('UPDATE reports SET deleted_at = NULL, updated_at = ? WHERE id = ?').run(now(), id)
+  return getReport(id)
+}

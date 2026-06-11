@@ -5,7 +5,7 @@ import { billingCodeSchema, billingImportCommitSchema } from '../utils/validator
 import * as billingService from '../services/billingService.js'
 import { parsePriceGuideDocx, parsePriceGuidePdfText } from '../utils/docxParser.js'
 import { extractPdfPages } from '../services/documentService.js'
-import { logActivity } from '../services/activityService.js'
+import { logActivity, diffChanges } from '../services/activityService.js'
 import { parsePagination, paginationMeta, ok } from '../utils/pagination.js'
 import { ApiError } from '../middleware/errorHandler.js'
 import config from '../config.js'
@@ -32,8 +32,9 @@ router.post('/', validate(billingCodeSchema), (req, res) => {
 })
 
 router.put('/:id', validatePartial(billingCodeSchema), (req, res) => {
+  const before = billingService.getBillingCode(Number(req.params.id))
   const code = billingService.updateBillingCode(Number(req.params.id), req.body)
-  logActivity('billing_code', code.id, req.session.userId, 'updated', { code: code.code })
+  logActivity('billing_code', code.id, req.session.userId, 'updated', { code: code.code, changes: diffChanges(before, code, Object.keys(req.body)) })
   res.json(ok(code))
 })
 

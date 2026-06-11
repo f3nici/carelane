@@ -31,7 +31,14 @@ API docs at `/api/docs`, health at `/healthz`.
   touch raw crypto or ciphertext.
 - Encrypted columns: clients PII fields, shift `body`/`incident_details`.
   NDIS number also gets an HMAC blind index (`ndis_number_hash`) for search.
-- `activity_log` is append-only (SQLite triggers); details are PII-redacted.
+- `activity_log` is append-only (SQLite triggers) and tamper-evident: each row
+  carries a SHA-256 hash chained off the previous row (`prev_hash`/`hash`),
+  verifiable via `GET /api/v1/audit/verify` (Dashboard + Audit-log widgets).
+  Details are PII-redacted at write time; `updated` actions record a field-level
+  `changes` diff (`{field, from, to}`) with sensitive/health values redacted.
+- Soft-deleted records (and deactivated billing codes) are listed and restorable
+  via `GET /api/v1/deleted` + `POST /api/v1/deleted/:type/:id/restore` (the
+  "Deleted Items" page). Restores are themselves logged to the audit trail.
 - Uploads (photos/documents/logos/pdfs) live under `uploads/` and are served
   **only via auth-gated routes** — never `express.static`.
 - RAG: PDF → per-page text → ~600-token chunks → local embeddings →

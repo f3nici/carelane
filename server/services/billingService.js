@@ -98,6 +98,16 @@ export function deactivateBillingCode (id) {
 }
 
 /**
+ * Reactivate a deactivated billing code. Throws 404 if it does not exist.
+ * @param {number} id
+ */
+export function reactivateBillingCode (id) {
+  getBillingCode(id)
+  sqlite.prepare('UPDATE billing_codes SET active = 1, updated_at = ? WHERE id = ?').run(now(), id)
+  return getBillingCode(id)
+}
+
+/**
  * Commit a reviewed price-guide import. Matches on `code`: updates caps on
  * existing items, inserts new ones, and optionally deactivates items absent
  * from the new guide.

@@ -20,6 +20,7 @@ import dashboardRoutes from './routes/dashboard.js'
 import settingsRoutes from './routes/settings.js'
 import templateRoutes from './routes/templates.js'
 import auditRoutes from './routes/audit.js'
+import deletedRoutes from './routes/deleted.js'
 
 /**
  * Build the configured Express app (middleware + routes) without binding a
@@ -84,6 +85,7 @@ export function createApp () {
   api.use('/settings', requireAuth, settingsRoutes)
   api.use('/templates', requireAuth, templateRoutes)
   api.use('/audit', requireAuth, auditRoutes)
+  api.use('/deleted', requireAuth, deletedRoutes)
   app.use('/api/v1', api)
 
   mountSwagger(app)

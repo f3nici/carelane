@@ -130,6 +130,18 @@ export function deleteShift (id) {
 }
 
 /**
+ * Restore a soft-deleted shift note. Throws 404 if it does not exist or is not
+ * currently deleted.
+ * @param {number} id
+ */
+export function restoreShift (id) {
+  const row = sqlite.prepare('SELECT id FROM shift_notes WHERE id = ? AND deleted_at IS NOT NULL').get(id)
+  if (!row) throw new ApiError(404, 'NOT_FOUND', 'Deleted shift note not found')
+  sqlite.prepare('UPDATE shift_notes SET deleted_at = NULL, updated_at = ? WHERE id = ?').run(now(), id)
+  return getShift(id)
+}
+
+/**
  * Attach an uploaded photo record to a shift note.
  * @param {number} shiftId
  * @param {{filename:string, originalname:string, mimetype:string, size:number}} file multer file
