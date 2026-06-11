@@ -28,17 +28,53 @@ const cheapModel = () => getSetting('claude_model_cheap', config.claudeModelChea
 const qualityModel = () => getSetting('claude_model_quality', config.claudeModelQuality)
 const tone = () => getSetting('ai_tone', 'professional, warm, person-centred')
 
-/** Stable system block shared across calls — marked for prompt caching. */
-function baseSystem () {
-  return [{
-    type: 'text',
-    text: `You are a documentation assistant for an independent NDIS support worker in Australia.
+/** Shared persona text — identical across every call, so it anchors the cache. */
+function personaText () {
+  return `You are a documentation assistant for an independent NDIS support worker in Australia.
 You produce DRAFTS only — the worker reviews, edits and finalises everything.
 Style: ${tone()}. Write respectfully and person-centredly, in line with the NDIS Code of Conduct:
 factual, strengths-based, no diagnoses or judgements beyond what the worker reported, no invented details.
-Use the participant's preferred name or initials exactly as given. Australian English.`,
-    cache_control: { type: 'ephemeral' }
-  }]
+Use the participant's preferred name or initials exactly as given. Australian English.`
+}
+
+/** Persona-only system block (cached) — used by the short Haiku tasks. */
+function baseSystem () {
+  return [{ type: 'text', text: personaText(), cache_control: { type: 'ephemeral' } }]
+}
+
+/**
+ * Build a system array whose stable prefix (persona + per-feature instructions
+ * + template/guidance) is marked for prompt caching, so repetitive drafts —
+ * continuation rounds, re-drafts of the same record, several agreements off the
+ * same template within the cache TTL — reuse it instead of reprocessing.
+ * The volatile per-record data is kept out of here, in the user turn.
+ * Caching only engages once the prefix passes the model's minimum (~2048
+ * tokens on Sonnet 4.6); below that the marker is a harmless no-op.
+ * @param {string} stable feature instructions + template + guidance
+ */
+function cachedSystem (stable) {
+  return [
+    { type: 'text', text: personaText() },
+    { type: 'text', text: stable, cache_control: { type: 'ephemeral' } }
+  ]
+}
+
+/** Wrap a user turn as a content block, optionally cached (for repetitive drafts). */
+function userMessage (text, cache = false) {
+  const block = { type: 'text', text }
+  if (cache) block.cache_control = { type: 'ephemeral' }
+  return { role: 'user', content: [block] }
+}
+
+/**
+ * Rough ~4 chars/token estimate over a whole assembled prompt (every system
+ * block plus the user turn) — a cheap pre-send indicator, not a billed figure.
+ * @param {Array|string} system system array (block form) or text
+ * @param {string} user the user turn
+ */
+function estimatePromptTokens (system, user) {
+  const sys = Array.isArray(system) ? system.map(b => b.text || '').join('') : (system || '')
+  return Math.ceil((sys.length + (user || '').length) / 4)
 }
 
 /**
@@ -84,20 +120,29 @@ async function complete (params, ctx) {
  * @param {{clientLabel:string, shiftDate:string, durationHours?:number, supportProvided:string, participantResponse?:string, incident?:string}} input
  * @param {number} userId
  */
-export async function draftShiftNote (input, userId) {
-  const user = `Draft a progress note for a support shift. Participant: ${input.clientLabel}. Date: ${input.shiftDate}.` +
+/** Assemble the shift-note prompt. Shared by the draft and the estimate. */
+function shiftNoteUserPrompt (input) {
+  return `Draft a progress note for a support shift. Participant: ${input.clientLabel}. Date: ${input.shiftDate}.` +
     (input.durationHours ? ` Duration: ${input.durationHours}h.` : '') +
     `\nSupport provided (worker's bullets):\n${input.supportProvided}` +
     (input.participantResponse ? `\nParticipant response:\n${input.participantResponse}` : '') +
     (input.incident ? `\nIncident to document factually:\n${input.incident}` : '') +
     '\nWrite 1-3 short paragraphs. First person ("I supported..."). Only include what is stated above.'
+}
+
+export async function draftShiftNote (input, userId) {
   const { text, usage } = await complete({
     model: cheapModel(),
     max_tokens: 600,
     system: baseSystem(),
-    messages: [{ role: 'user', content: user }]
+    messages: [{ role: 'user', content: shiftNoteUserPrompt(input) }]
   }, { userId, feature: 'shift_note' })
   return { body: text, usage }
+}
+
+/** Pre-send token estimate for a shift-note draft (whole assembled prompt). */
+export function estimateShiftNoteTokens (input) {
+  return estimatePromptTokens(baseSystem(), shiftNoteUserPrompt(input))
 }
 
 /**
@@ -133,20 +178,41 @@ const DEFAULT_REPORT_TEMPLATE = `## Summary
  * @param {{clientLabel:string, reportType:string, periodStart:string, periodEnd:string, goals?:string, shiftSummaries:string[], template?:{name:string, body_markdown:string}}} input
  * @param {number} userId
  */
-export async function draftReport (input, userId) {
+/**
+ * Assemble the report prompt as a cacheable stable system prefix (instructions
+ * + template) plus a volatile user turn (the participant's period, goals and
+ * shift summaries). Shared by the draft and the pre-send estimate.
+ * @param {{clientLabel:string, reportType:string, periodStart:string, periodEnd:string, goals?:string, shiftSummaries:string[], template?:{name:string, body_markdown:string}}} input
+ */
+function reportPrompt (input) {
   const structure = input.template?.body_markdown || DEFAULT_REPORT_TEMPLATE
-  const user = `Draft a ${input.reportType.replace('_', ' ')} report for participant ${input.clientLabel}, period ${input.periodStart} to ${input.periodEnd}.` +
+  const stable = `Task: draft a ${input.reportType.replace('_', ' ')} report from the worker's condensed shift summaries, aligned to the participant's goals.\n` +
+    `Follow this template${input.template ? ` ("${input.template.name}")` : ''} exactly — keep its headings and house wording, and fill each section only from the material provided. Base everything strictly on the summaries and goals; do not invent details.\n` +
+    `Template:\n${structure}`
+  const user = `Participant: ${input.clientLabel}. Reporting period: ${input.periodStart} to ${input.periodEnd}.` +
     (input.goals ? `\nParticipant goals:\n${input.goals}` : '') +
-    `\nCondensed shift summaries:\n- ${input.shiftSummaries.join('\n- ')}` +
-    `\nFollow this template${input.template ? ` ("${input.template.name}")` : ''} exactly — keep its headings and house wording, fill each section from the material above:\n${structure}` +
-    '\nBase everything strictly on the summaries and goals above; do not invent details.'
+    `\nCondensed shift summaries:\n- ${(input.shiftSummaries || []).join('\n- ')}`
+  return { system: cachedSystem(stable), user }
+}
+
+export async function draftReport (input, userId) {
+  const { system, user } = reportPrompt(input)
   const { text } = await complete({
     model: qualityModel(),
     max_tokens: 6000,
-    system: baseSystem(),
-    messages: [{ role: 'user', content: user }]
+    system,
+    messages: [userMessage(user, true)]
   }, { userId, feature: 'report', maxContinuations: 2 })
   return text
+}
+
+/**
+ * Pre-send token estimate for a report draft (whole assembled prompt).
+ * @param {object} input same shape as draftReport; pass note proxies as shiftSummaries
+ */
+export function estimateReportTokens (input) {
+  const { system, user } = reportPrompt(input)
+  return estimatePromptTokens(system, user)
 }
 
 /** Default service-agreement structure used when no operator template is selected. */
@@ -171,27 +237,57 @@ const DEFAULT_AGREEMENT_TEMPLATE = `# Service Agreement
  * @param {{clientLabel:string, questionnaire:object, template?:{name:string, body_markdown:string}}} input
  * @param {number} userId
  */
-export async function draftAgreement (input, userId) {
+/** Retrieve the fixed top-k guideline excerpts used to ground agreement drafts. */
+async function agreementGuidance () {
   const chunks = await searchChunks('NDIS service agreement requirements cancellation consent complaints', 3)
     .catch(() => [])
-  const guidance = chunks.length
+  return chunks.length
     ? `\nRelevant guideline excerpts (cite nothing, just align with them):\n${chunks.map(c => `[${c.title} p.${c.page}] ${c.content.slice(0, 700)}`).join('\n')}`
     : ''
+}
+
+/**
+ * Assemble the agreement prompt as a cacheable stable system prefix (the
+ * template-adherence instructions + template + guideline excerpts — identical
+ * across every agreement off the same template) plus a volatile user turn (the
+ * participant label + questionnaire). Shared by the draft and the estimate.
+ * @param {{clientLabel:string, questionnaire:object, template?:{name:string, body_markdown:string}}} input
+ * @param {string} guidance retrieved guideline excerpts (from agreementGuidance)
+ */
+function agreementPrompt (input, guidance) {
   const template = input.template?.body_markdown || DEFAULT_AGREEMENT_TEMPLATE
-  const user = `Fill out this service agreement template${input.template ? ` ("${input.template.name}")` : ''} for participant ${input.clientLabel}.\n` +
+  const stable = `Task: fill out an NDIS service agreement from the template below${input.template ? ` ("${input.template.name}")` : ''}.\n` +
     'Follow the template EXACTLY:\n' +
     '- Reproduce every heading verbatim, in the same order, with the same heading levels. Do not add, remove, rename, merge, or reorder any section.\n' +
     '- Preserve all fixed/house wording exactly as written; only fill in the clause text that belongs under each heading.\n' +
     '- Where the template has a placeholder or blank, complete it from the questionnaire; if the answer is not provided, write "[to be confirmed]" rather than inventing it.\n' +
-    `Template:\n${template}\nQuestionnaire answers (JSON):\n${JSON.stringify(input.questionnaire)}${guidance}\n` +
-    'Write clauses in plain English. Leave signature lines blank. Do not invent prices or terms not given.'
+    'Write clauses in plain English. Leave signature lines blank. Do not invent prices or terms not given.\n' +
+    `Template:\n${template}${guidance}`
+  const user = `Produce the agreement above for participant ${input.clientLabel}.\nQuestionnaire answers (JSON):\n${JSON.stringify(input.questionnaire)}`
+  return { system: cachedSystem(stable), user }
+}
+
+export async function draftAgreement (input, userId) {
+  const guidance = await agreementGuidance()
+  const { system, user } = agreementPrompt(input, guidance)
   const { text } = await complete({
     model: qualityModel(),
     max_tokens: 8000,
-    system: baseSystem(),
-    messages: [{ role: 'user', content: user }]
+    system,
+    messages: [userMessage(user, true)]
   }, { userId, feature: 'agreement', maxContinuations: 2 })
   return text
+}
+
+/**
+ * Pre-send token estimate for an agreement draft (whole assembled prompt,
+ * including the retrieved guideline excerpts).
+ * @param {{clientLabel:string, questionnaire:object, template?:{name:string, body_markdown:string}}} input
+ */
+export async function estimateAgreementTokens (input) {
+  const guidance = await agreementGuidance()
+  const { system, user } = agreementPrompt(input, guidance)
+  return estimatePromptTokens(system, user)
 }
 
 /**

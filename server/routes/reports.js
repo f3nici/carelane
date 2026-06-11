@@ -6,7 +6,7 @@ import * as reportService from '../services/reportService.js'
 import * as shiftService from '../services/shiftService.js'
 import * as clientService from '../services/clientService.js'
 import { resolveTemplateForDraft } from '../services/templateService.js'
-import { condenseShift, draftReport } from '../services/aiService.js'
+import { condenseShift, draftReport, estimateReportTokens } from '../services/aiService.js'
 import { renderPdf, pdfPath, safeFilename } from '../utils/pdfRenderer.js'
 import { logActivity, diffChanges } from '../services/activityService.js'
 import { parsePagination, paginationMeta, ok } from '../utils/pagination.js'
@@ -119,6 +119,45 @@ router.post('/:id/draft', validate(reportDraftSchema), async (req, res, next) =>
     const updated = reportService.updateReport(report.id, { body_markdown: body, source_shift_ids: shiftIds, status: 'draft' })
     logActivity('report', report.id, req.session.userId, 'ai_drafted', { shifts: shiftIds.length, template_id: template?.id ?? null })
     res.json(ok(updated))
+  } catch (err) { next(err) }
+})
+
+/**
+ * @openapi
+ * /reports/{id}/draft/estimate:
+ *   post: { tags: [Reports], summary: Estimate the draft's input tokens (no AI call) }
+ */
+router.post('/:id/draft/estimate', (req, res, next) => {
+  try {
+    const report = reportService.getReport(Number(req.params.id))
+    const client = clientService.getClient(report.client_id)
+    const label = client.preferred_name || `${client.first_name?.[0] || ''}${client.last_name?.[0] || ''}`.toUpperCase()
+    const periodStart = req.body.period_start ?? report.period_start ?? ''
+    const periodEnd = req.body.period_end ?? report.period_end ?? ''
+    let shiftIds = req.body.shift_ids
+    if (!shiftIds?.length) {
+      shiftIds = sqlite.prepare(`SELECT id FROM shift_notes WHERE client_id = ? AND deleted_at IS NULL
+        AND shift_date >= COALESCE(?, '0000') AND shift_date <= COALESCE(?, '9999') ORDER BY shift_date`)
+        .all(report.client_id, periodStart || null, periodEnd || null).map(r => r.id)
+    }
+    // Proxy each condensed summary with the first ~200 chars of the note — the
+    // real summaries (1-2 lines) only exist after the Haiku pass, so we estimate.
+    const shiftSummaries = shiftIds.slice(0, 60).map(id => {
+      const shift = shiftService.getShift(id)
+      const note = shift.body || shift.support_provided
+      return note ? `${shift.shift_date}: ${note.slice(0, 200)}` : null
+    }).filter(Boolean)
+    const template = resolveTemplateForDraft('report', { templateId: req.body.template_id, reportType: report.report_type })
+    const estimated_tokens = estimateReportTokens({
+      clientLabel: label,
+      reportType: report.report_type,
+      periodStart,
+      periodEnd,
+      goals: client.support_goals,
+      shiftSummaries,
+      template
+    })
+    res.json(ok({ estimated_tokens }))
   } catch (err) { next(err) }
 })
 

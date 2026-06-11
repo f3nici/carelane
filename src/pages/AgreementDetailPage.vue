@@ -197,6 +197,8 @@ async function uploadSignedCopy (event) {
     <AiDraftPanel
       v-if="id && !signed"
       :input-text="JSON.stringify(questionnaire)"
+      :estimate-endpoint="id ? `/agreements/${id}/draft/estimate` : ''"
+      :estimate-payload="{ questionnaire, template_id: templateId ? Number(templateId) : undefined }"
       :busy="drafting"
       label="Draft agreement"
       hint="Sonnet fills the selected template from your questionnaire plus relevant guideline excerpts. You review, edit and the participant signs."

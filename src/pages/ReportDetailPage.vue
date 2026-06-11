@@ -153,6 +153,8 @@ async function uploadFinalCopy (event) {
     <AiDraftPanel
       v-if="id && !isFinal"
       :input-text="`${setup.period_start || ''} ${setup.period_end || ''}`"
+      :estimate-endpoint="id ? `/reports/${id}/draft/estimate` : ''"
+      :estimate-payload="{ period_start: setup.period_start, period_end: setup.period_end, template_id: templateId ? Number(templateId) : undefined }"
       :busy="drafting"
       label="Draft report from shifts"
       hint="Each shift in the period is condensed cheaply (Haiku) first, then Sonnet drafts the report into your selected template, aligned to the participant's goals."
