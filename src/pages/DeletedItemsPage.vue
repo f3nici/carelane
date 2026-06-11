@@ -1,11 +1,26 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useApi } from '../composables/useApi.js'
 import { useToastStore } from '../stores/toast.js'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
+import AuditLogPage from './AuditLogPage.vue'
 
 const api = useApi()
 const toast = useToastStore()
+const route = useRoute()
+const router = useRouter()
+
+const tabs = [
+  { key: 'deleted', label: 'Deleted items' },
+  { key: 'audit', label: 'Audit log' }
+]
+const tab = ref(tabs.some(t => t.key === route.query.tab) ? route.query.tab : 'deleted')
+
+function setTab (key) {
+  tab.value = key
+  router.replace({ query: { ...route.query, tab: key } })
+}
 
 const items = ref([])
 const loading = ref(false)
@@ -56,6 +71,19 @@ async function doRestore () {
 
 <template>
   <div class="space-y-6">
+    <div class="flex gap-1 border-b border-white/10 overflow-x-auto">
+      <button
+        v-for="t in tabs"
+        :key="t.key"
+        class="px-4 py-2 text-sm border-b-2 -mb-px whitespace-nowrap transition-colors"
+        :class="tab === t.key ? 'border-primary text-white' : 'border-transparent text-mid hover:text-white'"
+        @click="setTab(t.key)"
+      >{{ t.label }}</button>
+    </div>
+
+    <AuditLogPage v-if="tab === 'audit'" />
+
+    <template v-else>
     <div>
       <h1 class="text-2xl font-semibold">Deleted items</h1>
       <p class="text-sm text-mid">Soft-deleted records are retained for NDIS compliance — nothing is ever hard-deleted. Restore anything here.</p>
@@ -120,5 +148,6 @@ async function doRestore () {
       @confirm="doRestore"
       @cancel="pending = null"
     />
+    </template>
   </div>
 </template>

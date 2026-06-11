@@ -17,7 +17,7 @@ onMounted(async () => {
   <div class="card">
     <div class="flex items-center justify-between mb-3">
       <h3 class="font-semibold">Recent activity</h3>
-      <router-link to="/audit" class="text-xs text-accent hover:underline">View all</router-link>
+      <router-link to="/deleted?tab=audit" class="text-xs text-accent hover:underline">View all</router-link>
     </div>
     <p v-if="!items.length" class="text-sm text-mid">No activity yet.</p>
     <ul class="space-y-3 max-h-[28rem] overflow-y-auto">

@@ -91,7 +91,7 @@ const tiles = [
       </div>
       <router-link
         v-if="integrity"
-        to="/audit"
+        to="/deleted?tab=audit"
         class="card flex items-start gap-3 hover:border-white/20 transition-colors"
         :class="integrity.valid ? '' : 'border-danger/40'"
       >
