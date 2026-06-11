@@ -105,7 +105,7 @@ function goWriteNote (scheduledId) {
           :time-from="6 * 60"
           :time-to="22 * 60"
           :disable-views="['years']"
-          default-view="month"
+          active-view="month"
           :events="events"
           events-on-month-view="short"
           @view-change="onViewChange"
