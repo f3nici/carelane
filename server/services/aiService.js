@@ -96,18 +96,27 @@ export async function condenseShift (shift, userId) {
   }, { userId, feature: 'condense_shift' })
 }
 
+/** Default report structure used when no operator template is selected. */
+const DEFAULT_REPORT_TEMPLATE = `## Summary
+## Supports Provided
+## Progress Toward Goals
+## Observations
+## Recommendations`
+
 /**
  * Report assist (Sonnet): draft a progress / plan-review report from
- * pre-condensed shift summaries, aligned to the participant's goals.
- * @param {{clientLabel:string, reportType:string, periodStart:string, periodEnd:string, goals?:string, shiftSummaries:string[]}} input
+ * pre-condensed shift summaries, aligned to the participant's goals. When an
+ * operator template is supplied, Claude follows its structure and wording.
+ * @param {{clientLabel:string, reportType:string, periodStart:string, periodEnd:string, goals?:string, shiftSummaries:string[], template?:{name:string, body_markdown:string}}} input
  * @param {number} userId
  */
 export async function draftReport (input, userId) {
+  const structure = input.template?.body_markdown || DEFAULT_REPORT_TEMPLATE
   const user = `Draft a ${input.reportType.replace('_', ' ')} report for participant ${input.clientLabel}, period ${input.periodStart} to ${input.periodEnd}.` +
     (input.goals ? `\nParticipant goals:\n${input.goals}` : '') +
     `\nCondensed shift summaries:\n- ${input.shiftSummaries.join('\n- ')}` +
-    '\nStructure (markdown): ## Summary, ## Supports Provided, ## Progress Toward Goals, ## Observations, ## Recommendations.' +
-    ' Base everything strictly on the summaries and goals above.'
+    `\nFollow this template${input.template ? ` ("${input.template.name}")` : ''} exactly — keep its headings and house wording, fill each section from the material above:\n${structure}` +
+    '\nBase everything strictly on the summaries and goals above; do not invent details.'
   return complete({
     model: qualityModel(),
     max_tokens: 1800,
@@ -116,19 +125,8 @@ export async function draftReport (input, userId) {
   }, { userId, feature: 'report' })
 }
 
-/**
- * Service agreement assist (Sonnet): fill the server-side template from the
- * intake questionnaire plus top-k retrieved guideline chunks.
- * @param {{clientLabel:string, questionnaire:object}} input
- * @param {number} userId
- */
-export async function draftAgreement (input, userId) {
-  const chunks = await searchChunks('NDIS service agreement requirements cancellation consent complaints', 3)
-    .catch(() => [])
-  const guidance = chunks.length
-    ? `\nRelevant guideline excerpts (cite nothing, just align with them):\n${chunks.map(c => `[${c.title} p.${c.page}] ${c.content.slice(0, 700)}`).join('\n')}`
-    : ''
-  const template = `# Service Agreement
+/** Default service-agreement structure used when no operator template is selected. */
+const DEFAULT_AGREEMENT_TEMPLATE = `# Service Agreement
 ## Parties
 ## Supports Provided
 ## Schedule of Supports and Prices
@@ -141,7 +139,22 @@ export async function draftAgreement (input, userId) {
 ## Ending or Changing this Agreement
 ## Agreement Period and Review
 ## Signatures`
-  const user = `Fill this service agreement template for participant ${input.clientLabel}. Keep the headings exactly; write plain-English clauses under each.\nTemplate:\n${template}\nQuestionnaire answers (JSON):\n${JSON.stringify(input.questionnaire)}${guidance}\nLeave signature lines blank. Do not invent prices or terms not given.`
+
+/**
+ * Service agreement assist (Sonnet): fill the operator's template (or the
+ * built-in default) from the intake questionnaire plus top-k retrieved
+ * guideline chunks.
+ * @param {{clientLabel:string, questionnaire:object, template?:{name:string, body_markdown:string}}} input
+ * @param {number} userId
+ */
+export async function draftAgreement (input, userId) {
+  const chunks = await searchChunks('NDIS service agreement requirements cancellation consent complaints', 3)
+    .catch(() => [])
+  const guidance = chunks.length
+    ? `\nRelevant guideline excerpts (cite nothing, just align with them):\n${chunks.map(c => `[${c.title} p.${c.page}] ${c.content.slice(0, 700)}`).join('\n')}`
+    : ''
+  const template = input.template?.body_markdown || DEFAULT_AGREEMENT_TEMPLATE
+  const user = `Fill this service agreement template${input.template ? ` ("${input.template.name}")` : ''} for participant ${input.clientLabel}. Keep the headings and any house wording exactly; write plain-English clauses under each.\nTemplate:\n${template}\nQuestionnaire answers (JSON):\n${JSON.stringify(input.questionnaire)}${guidance}\nLeave signature lines blank. Do not invent prices or terms not given.`
   return complete({
     model: qualityModel(),
     max_tokens: 2500,

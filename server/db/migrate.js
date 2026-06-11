@@ -220,6 +220,21 @@ CREATE TABLE IF NOT EXISTS settings (
   value TEXT
 );
 
+CREATE TABLE IF NOT EXISTS templates (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  template_type TEXT NOT NULL DEFAULT 'agreement',
+  report_type TEXT,
+  description TEXT,
+  body_markdown TEXT NOT NULL,
+  is_default INTEGER NOT NULL DEFAULT 0,
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT,
+  updated_at TEXT,
+  deleted_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_templates_type ON templates (template_type, active, deleted_at);
+
 -- Append-only audit trail: block UPDATE and DELETE at the database level.
 CREATE TRIGGER IF NOT EXISTS activity_log_no_update
 BEFORE UPDATE ON activity_log

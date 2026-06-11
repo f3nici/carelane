@@ -1,9 +1,10 @@
 import { Router } from 'express'
 import fs from 'node:fs'
 import { validate, validatePartial } from '../middleware/validate.js'
-import { agreementSchema } from '../utils/validators.js'
+import { agreementSchema, agreementDraftSchema } from '../utils/validators.js'
 import * as agreementService from '../services/agreementService.js'
 import * as clientService from '../services/clientService.js'
+import { resolveTemplateForDraft } from '../services/templateService.js'
 import { draftAgreement } from '../services/aiService.js'
 import { renderPdf, pdfPath, safeFilename } from '../utils/pdfRenderer.js'
 import { logActivity } from '../services/activityService.js'
@@ -53,15 +54,16 @@ router.delete('/:id', (req, res) => {
  *     tags: [Agreements]
  *     summary: AI-draft the agreement body from the stored questionnaire (draft only — worker must review)
  */
-router.post('/:id/draft', async (req, res, next) => {
+router.post('/:id/draft', validate(agreementDraftSchema), async (req, res, next) => {
   try {
     const agreement = agreementService.getAgreement(Number(req.params.id))
     if (!agreement.questionnaire_json) throw new ApiError(409, 'NO_QUESTIONNAIRE', 'Complete the questionnaire before drafting')
     const client = clientService.getClient(agreement.client_id)
     const label = client.preferred_name || `${client.first_name?.[0] || ''}${client.last_name?.[0] || ''}`.toUpperCase()
-    const body = await draftAgreement({ clientLabel: label, questionnaire: JSON.parse(agreement.questionnaire_json) }, req.session.userId)
+    const template = resolveTemplateForDraft('agreement', { templateId: req.body.template_id })
+    const body = await draftAgreement({ clientLabel: label, questionnaire: JSON.parse(agreement.questionnaire_json), template }, req.session.userId)
     const updated = agreementService.updateAgreement(agreement.id, { body_markdown: body, status: 'draft' })
-    logActivity('agreement', agreement.id, req.session.userId, 'ai_drafted')
+    logActivity('agreement', agreement.id, req.session.userId, 'ai_drafted', { template_id: template?.id ?? null })
     res.json(ok(updated))
   } catch (err) { next(err) }
 })

@@ -5,6 +5,7 @@ import { reportSchema, reportDraftSchema } from '../utils/validators.js'
 import * as reportService from '../services/reportService.js'
 import * as shiftService from '../services/shiftService.js'
 import * as clientService from '../services/clientService.js'
+import { resolveTemplateForDraft } from '../services/templateService.js'
 import { condenseShift, draftReport } from '../services/aiService.js'
 import { renderPdf, pdfPath, safeFilename } from '../utils/pdfRenderer.js'
 import { logActivity } from '../services/activityService.js'
@@ -82,17 +83,19 @@ router.post('/:id/draft', validate(reportDraftSchema), async (req, res, next) =>
     }
     if (!summaries.length) throw new ApiError(409, 'NO_CONTENT', 'Selected shifts have no notes to summarise')
 
+    const template = resolveTemplateForDraft('report', { templateId: req.body.template_id, reportType: report.report_type })
     const body = await draftReport({
       clientLabel: label,
       reportType: report.report_type,
       periodStart: report.period_start || '',
       periodEnd: report.period_end || '',
       goals: client.support_goals,
-      shiftSummaries: summaries
+      shiftSummaries: summaries,
+      template
     }, req.session.userId)
 
     const updated = reportService.updateReport(report.id, { body_markdown: body, source_shift_ids: shiftIds, status: 'draft' })
-    logActivity('report', report.id, req.session.userId, 'ai_drafted', { shifts: shiftIds.length })
+    logActivity('report', report.id, req.session.userId, 'ai_drafted', { shifts: shiftIds.length, template_id: template?.id ?? null })
     res.json(ok(updated))
   } catch (err) { next(err) }
 })
