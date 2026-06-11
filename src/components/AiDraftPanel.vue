@@ -10,7 +10,8 @@ const props = defineProps({
 })
 const emit = defineEmits(['draft'])
 
-// ~4 chars/token heuristic, mirrored server-side
+// Rough ~4 chars/token heuristic for a live pre-send hint only. The server
+// reports the real usage (from the API) once a draft has been generated.
 const estimatedTokens = computed(() => Math.ceil((props.inputText || '').length / 4))
 </script>
 

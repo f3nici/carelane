@@ -54,11 +54,16 @@ Use the participant's preferred name or initials exactly as given. Australian En
 async function complete (params, ctx) {
   const messages = [...params.messages]
   const parts = []
+  const usage = { input_tokens: 0, output_tokens: 0 }
   const maxContinuations = ctx.maxContinuations ?? 0
   for (let round = 0; ; round++) {
     const response = await getClient().messages.create({ ...params, messages })
     const text = response.content.filter(b => b.type === 'text').map(b => b.text).join('\n')
     parts.push(text)
+    // Tally the real token usage the API reports — summed across continuation
+    // rounds so callers get the true cost of the whole draft, not a guess.
+    usage.input_tokens += response.usage?.input_tokens ?? 0
+    usage.output_tokens += response.usage?.output_tokens ?? 0
     logActivity('ai', null, ctx.userId ?? null, 'ai_drafted', {
       feature: ctx.feature,
       model: params.model,
@@ -70,7 +75,7 @@ async function complete (params, ctx) {
     messages.push({ role: 'assistant', content: text })
     messages.push({ role: 'user', content: 'That response was cut off before the end. Continue exactly where you left off — do not repeat any text already written and do not add a preamble.' })
   }
-  return parts.join('')
+  return { text: parts.join(''), usage }
 }
 
 /**
@@ -86,12 +91,13 @@ export async function draftShiftNote (input, userId) {
     (input.participantResponse ? `\nParticipant response:\n${input.participantResponse}` : '') +
     (input.incident ? `\nIncident to document factually:\n${input.incident}` : '') +
     '\nWrite 1-3 short paragraphs. First person ("I supported..."). Only include what is stated above.'
-  return complete({
+  const { text, usage } = await complete({
     model: cheapModel(),
     max_tokens: 600,
     system: baseSystem(),
     messages: [{ role: 'user', content: user }]
   }, { userId, feature: 'shift_note' })
+  return { body: text, usage }
 }
 
 /**
@@ -101,7 +107,7 @@ export async function draftShiftNote (input, userId) {
  * @param {number} userId
  */
 export async function condenseShift (shift, userId) {
-  return complete({
+  const { text } = await complete({
     model: cheapModel(),
     max_tokens: 120,
     system: baseSystem(),
@@ -110,6 +116,7 @@ export async function condenseShift (shift, userId) {
       content: `Condense this shift note to 1-2 factual lines (keep date ${shift.date}):\n${shift.note.slice(0, 4000)}`
     }]
   }, { userId, feature: 'condense_shift' })
+  return text
 }
 
 /** Default report structure used when no operator template is selected. */
@@ -133,12 +140,13 @@ export async function draftReport (input, userId) {
     `\nCondensed shift summaries:\n- ${input.shiftSummaries.join('\n- ')}` +
     `\nFollow this template${input.template ? ` ("${input.template.name}")` : ''} exactly — keep its headings and house wording, fill each section from the material above:\n${structure}` +
     '\nBase everything strictly on the summaries and goals above; do not invent details.'
-  return complete({
+  const { text } = await complete({
     model: qualityModel(),
     max_tokens: 6000,
     system: baseSystem(),
     messages: [{ role: 'user', content: user }]
   }, { userId, feature: 'report', maxContinuations: 2 })
+  return text
 }
 
 /** Default service-agreement structure used when no operator template is selected. */
@@ -177,12 +185,13 @@ export async function draftAgreement (input, userId) {
     '- Where the template has a placeholder or blank, complete it from the questionnaire; if the answer is not provided, write "[to be confirmed]" rather than inventing it.\n' +
     `Template:\n${template}\nQuestionnaire answers (JSON):\n${JSON.stringify(input.questionnaire)}${guidance}\n` +
     'Write clauses in plain English. Leave signature lines blank. Do not invent prices or terms not given.'
-  return complete({
+  const { text } = await complete({
     model: qualityModel(),
     max_tokens: 8000,
     system: baseSystem(),
     messages: [{ role: 'user', content: user }]
   }, { userId, feature: 'agreement', maxContinuations: 2 })
+  return text
 }
 
 /**
@@ -190,7 +199,7 @@ export async function draftAgreement (input, userId) {
  * citations (document title + page). Read-only helper.
  * @param {string} question
  * @param {number} userId
- * @returns {Promise<{answer:string, sources:Array}>}
+ * @returns {Promise<{answer:string, sources:Array, usage?:{input_tokens:number, output_tokens:number}}>}
  */
 export async function askGuidelines (question, userId) {
   const chunks = await searchChunks(question, 5)
@@ -198,7 +207,7 @@ export async function askGuidelines (question, userId) {
     return { answer: 'No indexed guideline documents found. Upload NDIS guideline PDFs to the Knowledge Base first.', sources: [] }
   }
   const context = chunks.map((c, i) => `[${i + 1}] (${c.title}, p.${c.page}) ${c.content}`).join('\n\n')
-  const answer = await complete({
+  const { text, usage } = await complete({
     model: qualityModel(),
     max_tokens: 800,
     system: baseSystem(),
@@ -207,13 +216,5 @@ export async function askGuidelines (question, userId) {
       content: `Answer using ONLY these excerpts from the worker's NDIS document library. Cite as (Title, p.X). If the excerpts don't answer it, say so.\n\n${context}\n\nQuestion: ${question}`
     }]
   }, { userId, feature: 'guideline_qa' })
-  return { answer, sources: chunks.map(c => ({ title: c.title, page: c.page, snippet: c.content.slice(0, 300) })) }
-}
-
-/**
- * Rough token estimate for the cost indicator shown before sending.
- * @param {string} text
- */
-export function estimateTokens (text) {
-  return Math.ceil((text || '').length / 4)
+  return { answer: text, sources: chunks.map(c => ({ title: c.title, page: c.page, snippet: c.content.slice(0, 300) })), usage }
 }
