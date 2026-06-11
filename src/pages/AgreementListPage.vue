@@ -8,14 +8,15 @@ const agreements = ref([])
 const meta = ref({})
 const page = ref(1)
 const status = ref('')
+const showArchived = ref(false)
 
 async function load () {
-  const res = await api.get('/agreements', { page: page.value, per_page: 20, status: status.value || undefined })
+  const res = await api.get('/agreements', { page: page.value, per_page: 20, status: status.value || undefined, archived: showArchived.value ? 'true' : undefined })
   agreements.value = res.data
   meta.value = res.meta
 }
 
-watch([page, status], load)
+watch([page, status, showArchived], load)
 onMounted(load)
 </script>
 
@@ -23,7 +24,10 @@ onMounted(load)
   <div class="space-y-4">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <h1 class="text-2xl font-semibold">Service agreements</h1>
-      <router-link to="/agreements/new" class="btn-primary">+ New agreement</router-link>
+      <div class="flex items-center gap-2">
+        <button class="btn-ghost text-xs" :class="showArchived ? '!bg-primary/20 !text-white' : ''" @click="showArchived = !showArchived; page = 1">{{ showArchived ? 'Viewing archived' : 'Show archived' }}</button>
+        <router-link to="/agreements/new" class="btn-primary">+ New agreement</router-link>
+      </div>
     </div>
     <select v-model="status" class="input max-w-xs">
       <option value="">All statuses</option>

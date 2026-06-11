@@ -109,6 +109,18 @@ function downloadPdf () {
   window.open(`/api/v1/agreements/${id.value}/pdf?refresh=true`, '_blank')
 }
 
+async function toggleArchive () {
+  if (!id.value) return
+  busy.value = true
+  try {
+    const res = await api.post(`/agreements/${id.value}/${agreement.value.archived_at ? 'unarchive' : 'archive'}`, {})
+    setFrom(res.data)
+    toast.push(agreement.value.archived_at ? 'Agreement archived' : 'Agreement unarchived', 'success')
+  } catch { /* toast via interceptor */ } finally {
+    busy.value = false
+  }
+}
+
 const uploadingCopy = ref(false)
 
 /**
@@ -140,6 +152,8 @@ async function uploadSignedCopy (event) {
       <h1 class="text-2xl font-semibold">{{ id ? 'Service agreement' : 'New service agreement' }}</h1>
       <div class="flex items-center gap-2">
         <StatusBadge v-if="id" :status="status" />
+        <span v-if="agreement.archived_at" class="pill bg-white/10 text-mid">Archived</span>
+        <button v-if="id" class="btn-ghost" :disabled="busy" @click="toggleArchive">{{ agreement.archived_at ? 'Unarchive' : 'Archive' }}</button>
         <button v-if="id && body" class="btn-ghost" @click="downloadPdf">PDF</button>
         <label v-if="signed" class="btn-ghost cursor-pointer" :class="{ 'opacity-50 cursor-not-allowed': uploadingCopy }">
           {{ uploadingCopy ? 'Uploading…' : 'Upload signed copy' }}

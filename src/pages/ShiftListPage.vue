@@ -8,17 +8,19 @@ const shifts = ref([])
 const meta = ref({})
 const page = ref(1)
 const filter = ref('all')
+const showArchived = ref(false)
 
 async function load () {
   const params = { page: page.value, per_page: 20 }
   if (filter.value === 'incidents') params.incident = 'true'
   if (filter.value === 'unbilled') params.billed = 'false'
+  if (showArchived.value) params.archived = 'true'
   const res = await api.get('/shifts', params)
   shifts.value = res.data
   meta.value = res.meta
 }
 
-watch([page, filter], load)
+watch([page, filter, showArchived], load)
 onMounted(load)
 </script>
 
@@ -28,8 +30,9 @@ onMounted(load)
       <h1 class="text-2xl font-semibold">Shift notes</h1>
       <router-link to="/shifts/new" class="btn-primary">+ New shift note</router-link>
     </div>
-    <div class="flex gap-2">
+    <div class="flex flex-wrap items-center gap-2">
       <button v-for="f in ['all', 'incidents', 'unbilled']" :key="f" class="btn-ghost text-xs" :class="filter === f ? '!bg-primary/20 !text-white' : ''" @click="filter = f; page = 1">{{ f }}</button>
+      <button class="btn-ghost text-xs ml-auto" :class="showArchived ? '!bg-primary/20 !text-white' : ''" @click="showArchived = !showArchived; page = 1">{{ showArchived ? 'Viewing archived' : 'Show archived' }}</button>
     </div>
     <p v-if="!shifts.length" class="text-sm text-mid">No shift notes found.</p>
     <div class="card !p-0 overflow-x-auto" v-if="shifts.length">

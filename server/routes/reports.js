@@ -53,6 +53,28 @@ router.delete('/:id', (req, res) => {
 
 /**
  * @openapi
+ * /reports/{id}/archive:
+ *   post: { tags: [Reports], summary: Archive a report (hidden from active lists, not deleted) }
+ */
+router.post('/:id/archive', (req, res) => {
+  const report = reportService.archiveReport(Number(req.params.id))
+  logActivity('report', report.id, req.session.userId, 'archived')
+  res.json(ok(report))
+})
+
+/**
+ * @openapi
+ * /reports/{id}/unarchive:
+ *   post: { tags: [Reports], summary: Unarchive a report (return it to active lists) }
+ */
+router.post('/:id/unarchive', (req, res) => {
+  const report = reportService.unarchiveReport(Number(req.params.id))
+  logActivity('report', report.id, req.session.userId, 'unarchived')
+  res.json(ok(report))
+})
+
+/**
+ * @openapi
  * /reports/{id}/draft:
  *   post:
  *     tags: [Reports]

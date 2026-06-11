@@ -14,6 +14,8 @@ export const actionColors = {
   finalised: 'text-success',
   reopened: 'text-warning',
   restored: 'text-success',
+  archived: 'text-mid',
+  unarchived: 'text-info',
   deleted: 'text-danger',
   exported: 'text-accent',
   login: 'text-mid',

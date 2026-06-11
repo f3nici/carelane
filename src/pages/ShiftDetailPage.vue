@@ -56,6 +56,18 @@ async function reopen () {
   }
 }
 
+async function toggleArchive () {
+  if (!id.value) return
+  busy.value = true
+  try {
+    const res = await api.post(`/shifts/${id.value}/${shift.value.archived_at ? 'unarchive' : 'archive'}`, {})
+    shift.value = res.data
+    toast.push(shift.value.archived_at ? 'Shift note archived' : 'Shift note unarchived', 'success')
+  } catch { /* toast via interceptor */ } finally {
+    busy.value = false
+  }
+}
+
 async function draft () {
   if (!id.value) {
     toast.push('Save the shift first, then generate the draft', 'warning')
@@ -77,9 +89,13 @@ async function draft () {
 
 <template>
   <div class="space-y-6 max-w-4xl">
-    <div class="flex items-center justify-between gap-3">
+    <div class="flex flex-wrap items-center justify-between gap-3">
       <h1 class="text-2xl font-semibold">{{ id ? 'Shift note' : 'New shift note' }}</h1>
-      <StatusBadge v-if="id" :status="shift.finalised ? 'finalised' : 'draft'" />
+      <div class="flex items-center gap-2">
+        <StatusBadge v-if="id" :status="shift.finalised ? 'finalised' : 'draft'" />
+        <span v-if="shift.archived_at" class="pill bg-white/10 text-mid">Archived</span>
+        <button v-if="id" class="btn-ghost" :disabled="busy" @click="toggleArchive">{{ shift.archived_at ? 'Unarchive' : 'Archive' }}</button>
+      </div>
     </div>
 
     <AiDraftPanel

@@ -50,6 +50,28 @@ router.delete('/:id', (req, res) => {
 
 /**
  * @openapi
+ * /agreements/{id}/archive:
+ *   post: { tags: [Agreements], summary: Archive an agreement (hidden from active lists, not deleted) }
+ */
+router.post('/:id/archive', (req, res) => {
+  const agreement = agreementService.archiveAgreement(Number(req.params.id))
+  logActivity('agreement', agreement.id, req.session.userId, 'archived')
+  res.json(ok(agreement))
+})
+
+/**
+ * @openapi
+ * /agreements/{id}/unarchive:
+ *   post: { tags: [Agreements], summary: Unarchive an agreement (return it to active lists) }
+ */
+router.post('/:id/unarchive', (req, res) => {
+  const agreement = agreementService.unarchiveAgreement(Number(req.params.id))
+  logActivity('agreement', agreement.id, req.session.userId, 'unarchived')
+  res.json(ok(agreement))
+})
+
+/**
+ * @openapi
  * /agreements/{id}/draft:
  *   post:
  *     tags: [Agreements]

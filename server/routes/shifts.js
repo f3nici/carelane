@@ -74,6 +74,28 @@ router.delete('/:id', (req, res) => {
 
 /**
  * @openapi
+ * /shifts/{id}/archive:
+ *   post: { tags: [Shifts], summary: Archive a shift note (hidden from active lists, not deleted) }
+ */
+router.post('/:id/archive', (req, res) => {
+  const shift = shiftService.archiveShift(Number(req.params.id))
+  logActivity('shift', shift.id, req.session.userId, 'archived')
+  res.json(ok(shift))
+})
+
+/**
+ * @openapi
+ * /shifts/{id}/unarchive:
+ *   post: { tags: [Shifts], summary: Unarchive a shift note (return it to active lists) }
+ */
+router.post('/:id/unarchive', (req, res) => {
+  const shift = shiftService.unarchiveShift(Number(req.params.id))
+  logActivity('shift', shift.id, req.session.userId, 'unarchived')
+  res.json(ok(shift))
+})
+
+/**
+ * @openapi
  * /shifts/{id}/draft:
  *   post:
  *     tags: [Shifts]

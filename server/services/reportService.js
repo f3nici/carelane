@@ -17,13 +17,17 @@ function toListRow (row) {
 }
 
 /**
- * List reports with optional client / status filters.
+ * List reports with optional client / status / archived filters. By default
+ * archived reports are hidden; pass `archived: 'true'` for archived only, or
+ * `archived: 'all'` for both.
  * @param {{page:number, perPage:number, offset:number}} pg
- * @param {{client_id?:string, status?:string}} filters
+ * @param {{client_id?:string, status?:string, archived?:string}} filters
  */
 export function listReports (pg, filters = {}) {
   const where = ['r.deleted_at IS NULL']
   const params = []
+  if (filters.archived === 'true' || filters.archived === '1') where.push('r.archived_at IS NOT NULL')
+  else if (filters.archived !== 'all') where.push('r.archived_at IS NULL')
   if (filters.client_id) { where.push('r.client_id = ?'); params.push(Number(filters.client_id)) }
   if (filters.status) { where.push('r.status = ?'); params.push(filters.status) }
   const whereSql = 'WHERE ' + where.join(' AND ')
@@ -104,6 +108,26 @@ export function setReportPdf (id, filename) {
 export function deleteReport (id) {
   getReport(id)
   sqlite.prepare('UPDATE reports SET deleted_at = ?, updated_at = ? WHERE id = ?').run(now(), now(), id)
+}
+
+/**
+ * Archive a report (hide it from active lists without deleting it).
+ * @param {number} id
+ */
+export function archiveReport (id) {
+  getReport(id)
+  sqlite.prepare('UPDATE reports SET archived_at = ?, updated_at = ? WHERE id = ?').run(now(), now(), id)
+  return getReport(id)
+}
+
+/**
+ * Unarchive a report (return it to the active list).
+ * @param {number} id
+ */
+export function unarchiveReport (id) {
+  getReport(id)
+  sqlite.prepare('UPDATE reports SET archived_at = NULL, updated_at = ? WHERE id = ?').run(now(), id)
+  return getReport(id)
 }
 
 /**

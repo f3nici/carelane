@@ -98,7 +98,8 @@ CREATE TABLE IF NOT EXISTS service_agreements (
   pdf_filename TEXT,
   created_at TEXT,
   updated_at TEXT,
-  deleted_at TEXT
+  deleted_at TEXT,
+  archived_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS agreement_line_items (
@@ -139,7 +140,8 @@ CREATE TABLE IF NOT EXISTS shift_notes (
   finalised INTEGER NOT NULL DEFAULT 0,
   created_at TEXT,
   updated_at TEXT,
-  deleted_at TEXT
+  deleted_at TEXT,
+  archived_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_shift_notes_client ON shift_notes (client_id, shift_date);
 
@@ -166,7 +168,8 @@ CREATE TABLE IF NOT EXISTS reports (
   status TEXT NOT NULL DEFAULT 'draft',
   created_at TEXT,
   updated_at TEXT,
-  deleted_at TEXT
+  deleted_at TEXT,
+  archived_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS client_documents (
@@ -267,6 +270,12 @@ CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_log (created_at);
   addColumnIfMissing('activity_log', 'prev_hash', 'TEXT')
   addColumnIfMissing('activity_log', 'hash', 'TEXT')
   backfillAuditHashes()
+
+  // Archive (hide from active lists without deleting) for shift notes, reports
+  // and service agreements — added post-launch.
+  addColumnIfMissing('shift_notes', 'archived_at', 'TEXT')
+  addColumnIfMissing('reports', 'archived_at', 'TEXT')
+  addColumnIfMissing('service_agreements', 'archived_at', 'TEXT')
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
