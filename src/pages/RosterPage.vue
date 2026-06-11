@@ -28,9 +28,10 @@ onMounted(async () => {
   await loadUpcoming()
 })
 
-/** vue-cal emits the visible window; refetch events for that date range. */
+/** vue-cal emits the visible window (on init via `ready`, and on every change). */
 async function onViewChange (e) {
-  range.value = { from: fmt(e.startDate), to: fmt(e.endDate) }
+  // In month view the grid spills into adjacent months — load that full range.
+  range.value = { from: fmt(e.firstCellDate || e.startDate), to: fmt(e.lastCellDate || e.endDate) }
   await loadEvents()
 }
 
@@ -108,6 +109,7 @@ function goWriteNote (scheduledId) {
           active-view="month"
           :events="events"
           events-on-month-view="short"
+          @ready="onViewChange"
           @view-change="onViewChange"
           @event-click="openExisting($event.raw)"
           @cell-click="openNew"
