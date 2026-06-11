@@ -59,4 +59,19 @@ describe('shiftService business rules', () => {
     expect(sqlite.prepare('SELECT deleted_at FROM shift_notes WHERE id = ?').get(shift.id).deleted_at).toBeTruthy()
     expect(() => shiftService.getShift(shift.id)).toThrow(/not found/i)
   })
+
+  it('archives a note out of the default list and back again', () => {
+    const shift = shiftService.createShift(baseShift({ shift_date: '2026-07-01' }), workerId)
+    const pg = { page: 1, perPage: 100, offset: 0 }
+
+    shiftService.archiveShift(shift.id)
+    expect(shiftService.getShift(shift.id).archived_at).toBeTruthy()
+    // Hidden from the active list, visible in the archived list.
+    expect(shiftService.listShifts(pg, { client_id: clientId }).rows.some(r => r.id === shift.id)).toBe(false)
+    expect(shiftService.listShifts(pg, { client_id: clientId, archived: 'true' }).rows.some(r => r.id === shift.id)).toBe(true)
+
+    shiftService.unarchiveShift(shift.id)
+    expect(shiftService.getShift(shift.id).archived_at).toBeNull()
+    expect(shiftService.listShifts(pg, { client_id: clientId }).rows.some(r => r.id === shift.id)).toBe(true)
+  })
 })

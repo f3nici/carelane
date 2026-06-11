@@ -8,7 +8,7 @@ import { shiftSchema, shiftDraftSchema } from '../utils/validators.js'
 import * as shiftService from '../services/shiftService.js'
 import * as clientService from '../services/clientService.js'
 import { draftShiftNote, estimateTokens } from '../services/aiService.js'
-import { logActivity } from '../services/activityService.js'
+import { logActivity, diffChanges } from '../services/activityService.js'
 import { parsePagination, paginationMeta, ok } from '../utils/pagination.js'
 import { ApiError } from '../middleware/errorHandler.js'
 import config from '../config.js'
@@ -59,7 +59,10 @@ router.put('/:id', validatePartial(shiftSchema), (req, res) => {
   let action = 'updated'
   if (!before.finalised && shift.finalised) action = 'finalised'
   else if (before.finalised && !shift.finalised) action = 'reopened'
-  logActivity('shift', shift.id, req.session.userId, action, { incident: !!shift.incident_flag })
+  logActivity('shift', shift.id, req.session.userId, action, {
+    incident: !!shift.incident_flag,
+    changes: diffChanges(before, shift, Object.keys(req.body))
+  })
   res.json(ok(shift))
 })
 
@@ -67,6 +70,28 @@ router.delete('/:id', (req, res) => {
   shiftService.deleteShift(Number(req.params.id))
   logActivity('shift', Number(req.params.id), req.session.userId, 'deleted')
   res.json(ok({ deleted: true }))
+})
+
+/**
+ * @openapi
+ * /shifts/{id}/archive:
+ *   post: { tags: [Shifts], summary: Archive a shift note (hidden from active lists, not deleted) }
+ */
+router.post('/:id/archive', (req, res) => {
+  const shift = shiftService.archiveShift(Number(req.params.id))
+  logActivity('shift', shift.id, req.session.userId, 'archived')
+  res.json(ok(shift))
+})
+
+/**
+ * @openapi
+ * /shifts/{id}/unarchive:
+ *   post: { tags: [Shifts], summary: Unarchive a shift note (return it to active lists) }
+ */
+router.post('/:id/unarchive', (req, res) => {
+  const shift = shiftService.unarchiveShift(Number(req.params.id))
+  logActivity('shift', shift.id, req.session.userId, 'unarchived')
+  res.json(ok(shift))
 })
 
 /**

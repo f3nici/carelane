@@ -110,6 +110,18 @@ export function deleteTemplate (id) {
 }
 
 /**
+ * Restore a soft-deleted template. Throws 404 if it does not exist or is not
+ * currently deleted.
+ * @param {number} id
+ */
+export function restoreTemplate (id) {
+  const row = sqlite.prepare('SELECT id FROM templates WHERE id = ? AND deleted_at IS NOT NULL').get(id)
+  if (!row) throw new ApiError(404, 'NOT_FOUND', 'Deleted template not found')
+  sqlite.prepare('UPDATE templates SET deleted_at = NULL, updated_at = ? WHERE id = ?').run(now(), id)
+  return getTemplate(id)
+}
+
+/**
  * Resolve the template body Claude should follow for a draft. An explicit
  * `templateId` wins; otherwise the active default for the type (and report
  * sub-type, when given) is used. Returns null when nothing is configured, so

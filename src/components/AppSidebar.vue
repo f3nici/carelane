@@ -14,13 +14,10 @@ const mobileOpen = ref(false)
 const nav = [
   { name: 'dashboard', to: '/', label: 'Dashboard', icon: 'M3 12l9-9 9 9M5 10v10h5v-6h4v6h5V10', count: null },
   { name: 'clients', to: '/clients', label: 'Clients', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z', count: 'active_clients' },
-  { name: 'agreements', to: '/agreements', label: 'Agreements', icon: 'M9 12h6m-6 4h6M7 3h7l5 5v13H7a2 2 0 01-2-2V5a2 2 0 012-2z', count: 'agreements_active' },
-  { name: 'shifts', to: '/shifts', label: 'Shift Notes', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', count: 'shifts_this_month' },
-  { name: 'reports', to: '/reports', label: 'Reports', icon: 'M9 17v-6m4 6V7m4 10v-3M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z', count: 'draft_reports' },
-  { name: 'templates', to: '/templates', label: 'Templates', icon: 'M4 5a1 1 0 011-1h14a1 1 0 011 1v3H4V5zm0 5h9v9H5a1 1 0 01-1-1v-8zm11 0h5v8a1 1 0 01-1 1h-4v-9z', count: null },
-  { name: 'billing-codes', to: '/billing-codes', label: 'Billing Codes', icon: 'M12 8c-2 0-3 .9-3 2s1 2 3 2 3 .9 3 2-1 2-3 2m0-8V6m0 10v2m9-6a9 9 0 11-18 0 9 9 0 0118 0z', count: null },
+  { name: 'shifts', to: '/shifts', label: 'Notes', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', count: 'shifts_this_month' },
+  { name: 'documents', to: '/documents', label: 'Documents', icon: 'M9 12h6m-6 4h6M7 3h7l5 5v13H7a2 2 0 01-2-2V5a2 2 0 012-2z', count: null },
   { name: 'knowledge', to: '/knowledge', label: 'Knowledge Base', icon: 'M12 6.25c-2.4-1.5-5.4-1.5-8 0v12c2.6-1.5 5.6-1.5 8 0 2.4-1.5 5.4-1.5 8 0v-12c-2.6-1.5-5.6-1.5-8 0zm0 0v12', count: 'documents_indexed' },
-  { name: 'audit', to: '/audit', label: 'Audit Log', icon: 'M9 12l2 2 4-4m1 8H8a2 2 0 01-2-2V6a2 2 0 012-2h4l6 6v8a2 2 0 01-2 2z', count: null },
+  { name: 'deleted', to: '/deleted', label: 'Deleted Items', icon: 'M19 7l-.87 12.14A2 2 0 0116.14 21H7.86a2 2 0 01-1.99-1.86L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16', count: null },
   { name: 'settings', to: '/settings', label: 'Settings', icon: 'M10.3 4.3a1.7 1.7 0 013.4 0 1.7 1.7 0 002.6 1.1 1.7 1.7 0 012.4 2.4 1.7 1.7 0 001 2.5 1.7 1.7 0 010 3.4 1.7 1.7 0 00-1 2.6 1.7 1.7 0 01-2.4 2.4 1.7 1.7 0 00-2.6 1 1.7 1.7 0 01-3.4 0 1.7 1.7 0 00-2.5-1 1.7 1.7 0 01-2.4-2.4 1.7 1.7 0 00-1.1-2.6 1.7 1.7 0 010-3.4 1.7 1.7 0 001.1-2.5 1.7 1.7 0 012.4-2.4 1.7 1.7 0 002.5-1.1zM15 12a3 3 0 11-6 0 3 3 0 016 0z', count: null }
 ]
 

@@ -63,7 +63,8 @@ export const serviceAgreements = sqliteTable('service_agreements', {
   pdfFilename: text('pdf_filename'),
   createdAt: text('created_at'),
   updatedAt: text('updated_at'),
-  deletedAt: text('deleted_at')
+  deletedAt: text('deleted_at'),
+  archivedAt: text('archived_at')
 })
 
 export const agreementLineItems = sqliteTable('agreement_line_items', {
@@ -121,7 +122,8 @@ export const shiftNotes = sqliteTable('shift_notes', {
   finalised: integer('finalised').notNull().default(0),
   createdAt: text('created_at'),
   updatedAt: text('updated_at'),
-  deletedAt: text('deleted_at')
+  deletedAt: text('deleted_at'),
+  archivedAt: text('archived_at')
 })
 
 export const shiftPhotos = sqliteTable('shift_photos', {
@@ -147,7 +149,8 @@ export const reports = sqliteTable('reports', {
   status: text('status').notNull().default('draft'),
   createdAt: text('created_at'),
   updatedAt: text('updated_at'),
-  deletedAt: text('deleted_at')
+  deletedAt: text('deleted_at'),
+  archivedAt: text('archived_at')
 })
 
 export const clientDocuments = sqliteTable('client_documents', {
@@ -192,7 +195,12 @@ export const activityLog = sqliteTable('activity_log', {
   userId: integer('user_id'),
   action: text('action').notNull(),
   details: text('details'),
-  createdAt: text('created_at')
+  createdAt: text('created_at'),
+  // Tamper-evident hash chain: each entry's hash incorporates the previous
+  // entry's hash, so any silent edit/deletion breaks the chain. Combined with
+  // the append-only triggers this makes the audit trail verifiable.
+  prevHash: text('prev_hash'),
+  hash: text('hash')
 })
 
 export const settings = sqliteTable('settings', {

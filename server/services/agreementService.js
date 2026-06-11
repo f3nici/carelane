@@ -18,13 +18,17 @@ function toListRow (row) {
 }
 
 /**
- * List service agreements with optional client / status filters.
+ * List service agreements with optional client / status / archived filters. By
+ * default archived agreements are hidden; pass `archived: 'true'` for archived
+ * only, or `archived: 'all'` for both.
  * @param {{page:number, perPage:number, offset:number}} pg
- * @param {{client_id?:string, status?:string}} filters
+ * @param {{client_id?:string, status?:string, archived?:string}} filters
  */
 export function listAgreements (pg, filters = {}) {
   const where = ['a.deleted_at IS NULL']
   const params = []
+  if (filters.archived === 'true' || filters.archived === '1') where.push('a.archived_at IS NOT NULL')
+  else if (filters.archived !== 'all') where.push('a.archived_at IS NULL')
   if (filters.client_id) { where.push('a.client_id = ?'); params.push(Number(filters.client_id)) }
   if (filters.status) { where.push('a.status = ?'); params.push(filters.status) }
   const whereSql = 'WHERE ' + where.join(' AND ')
@@ -146,4 +150,36 @@ export function setAgreementPdf (id, filename) {
 export function deleteAgreement (id) {
   getAgreement(id)
   sqlite.prepare('UPDATE service_agreements SET deleted_at = ?, updated_at = ? WHERE id = ?').run(now(), now(), id)
+}
+
+/**
+ * Archive an agreement (hide it from active lists without deleting it).
+ * @param {number} id
+ */
+export function archiveAgreement (id) {
+  getAgreement(id)
+  sqlite.prepare('UPDATE service_agreements SET archived_at = ?, updated_at = ? WHERE id = ?').run(now(), now(), id)
+  return getAgreement(id)
+}
+
+/**
+ * Unarchive an agreement (return it to the active list).
+ * @param {number} id
+ */
+export function unarchiveAgreement (id) {
+  getAgreement(id)
+  sqlite.prepare('UPDATE service_agreements SET archived_at = NULL, updated_at = ? WHERE id = ?').run(now(), id)
+  return getAgreement(id)
+}
+
+/**
+ * Restore a soft-deleted agreement. Throws 404 if it does not exist or is not
+ * currently deleted.
+ * @param {number} id
+ */
+export function restoreAgreement (id) {
+  const row = sqlite.prepare('SELECT id FROM service_agreements WHERE id = ? AND deleted_at IS NOT NULL').get(id)
+  if (!row) throw new ApiError(404, 'NOT_FOUND', 'Deleted agreement not found')
+  sqlite.prepare('UPDATE service_agreements SET deleted_at = NULL, updated_at = ? WHERE id = ?').run(now(), id)
+  return getAgreement(id)
 }

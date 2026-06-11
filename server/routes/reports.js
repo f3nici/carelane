@@ -8,7 +8,7 @@ import * as clientService from '../services/clientService.js'
 import { resolveTemplateForDraft } from '../services/templateService.js'
 import { condenseShift, draftReport } from '../services/aiService.js'
 import { renderPdf, pdfPath, safeFilename } from '../utils/pdfRenderer.js'
-import { logActivity } from '../services/activityService.js'
+import { logActivity, diffChanges } from '../services/activityService.js'
 import { parsePagination, paginationMeta, ok } from '../utils/pagination.js'
 import { ApiError } from '../middleware/errorHandler.js'
 import { sqlite } from '../db/connection.js'
@@ -41,7 +41,7 @@ router.put('/:id', validatePartial(reportSchema), (req, res) => {
   const before = reportService.getReport(Number(req.params.id))
   const report = reportService.updateReport(Number(req.params.id), req.body)
   const action = before.status === 'draft' && report.status === 'final' ? 'finalised' : 'updated'
-  logActivity('report', report.id, req.session.userId, action)
+  logActivity('report', report.id, req.session.userId, action, { changes: diffChanges(before, report, Object.keys(req.body)) })
   res.json(ok(report))
 })
 
@@ -49,6 +49,28 @@ router.delete('/:id', (req, res) => {
   reportService.deleteReport(Number(req.params.id))
   logActivity('report', Number(req.params.id), req.session.userId, 'deleted')
   res.json(ok({ deleted: true }))
+})
+
+/**
+ * @openapi
+ * /reports/{id}/archive:
+ *   post: { tags: [Reports], summary: Archive a report (hidden from active lists, not deleted) }
+ */
+router.post('/:id/archive', (req, res) => {
+  const report = reportService.archiveReport(Number(req.params.id))
+  logActivity('report', report.id, req.session.userId, 'archived')
+  res.json(ok(report))
+})
+
+/**
+ * @openapi
+ * /reports/{id}/unarchive:
+ *   post: { tags: [Reports], summary: Unarchive a report (return it to active lists) }
+ */
+router.post('/:id/unarchive', (req, res) => {
+  const report = reportService.unarchiveReport(Number(req.params.id))
+  logActivity('report', report.id, req.session.userId, 'unarchived')
+  res.json(ok(report))
 })
 
 /**

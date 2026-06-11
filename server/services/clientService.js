@@ -124,6 +124,18 @@ export function deleteClient (id) {
 }
 
 /**
+ * Restore a soft-deleted client (re-activates them). Throws 404 if the client
+ * does not exist or is not currently deleted.
+ * @param {number} id
+ */
+export function restoreClient (id) {
+  const row = sqlite.prepare('SELECT id FROM clients WHERE id = ? AND deleted_at IS NOT NULL').get(id)
+  if (!row) throw new ApiError(404, 'NOT_FOUND', 'Deleted client not found')
+  sqlite.prepare('UPDATE clients SET deleted_at = NULL, active = 1, updated_at = ? WHERE id = ?').run(now(), id)
+  return getClient(id)
+}
+
+/**
  * Export all data held for a client (privacy/data-access request).
  * @param {number} id
  */

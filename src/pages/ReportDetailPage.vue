@@ -85,6 +85,18 @@ function downloadPdf () {
   window.open(`/api/v1/reports/${id.value}/pdf?refresh=true`, '_blank')
 }
 
+async function toggleArchive () {
+  if (!id.value) return
+  busy.value = true
+  try {
+    const res = await api.post(`/reports/${id.value}/${report.value.archived_at ? 'unarchive' : 'archive'}`, {})
+    report.value = res.data
+    toast.push(report.value.archived_at ? 'Report archived' : 'Report unarchived', 'success')
+  } catch { /* toast via interceptor */ } finally {
+    busy.value = false
+  }
+}
+
 const uploadingCopy = ref(false)
 
 /**
@@ -116,6 +128,8 @@ async function uploadFinalCopy (event) {
       <h1 class="text-2xl font-semibold">{{ id ? 'Report' : 'New report' }}</h1>
       <div class="flex items-center gap-2">
         <StatusBadge v-if="id" :status="report.status || 'draft'" />
+        <span v-if="report.archived_at" class="pill bg-white/10 text-mid">Archived</span>
+        <button v-if="id" class="btn-ghost" :disabled="busy" @click="toggleArchive">{{ report.archived_at ? 'Unarchive' : 'Archive' }}</button>
         <button v-if="id && body" class="btn-ghost" @click="downloadPdf">PDF</button>
         <label v-if="isFinal" class="btn-ghost cursor-pointer" :class="{ 'opacity-50 cursor-not-allowed': uploadingCopy }">
           {{ uploadingCopy ? 'Uploading…' : 'Upload final copy' }}

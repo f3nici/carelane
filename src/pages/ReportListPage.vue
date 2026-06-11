@@ -7,14 +7,15 @@ const api = useApi()
 const reports = ref([])
 const meta = ref({})
 const page = ref(1)
+const showArchived = ref(false)
 
 async function load () {
-  const res = await api.get('/reports', { page: page.value, per_page: 20 })
+  const res = await api.get('/reports', { page: page.value, per_page: 20, archived: showArchived.value ? 'true' : undefined })
   reports.value = res.data
   meta.value = res.meta
 }
 
-watch(page, load)
+watch([page, showArchived], load)
 onMounted(load)
 </script>
 
@@ -22,7 +23,10 @@ onMounted(load)
   <div class="space-y-4">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <h1 class="text-2xl font-semibold">Reports</h1>
-      <router-link to="/reports/new" class="btn-primary">+ New report</router-link>
+      <div class="flex items-center gap-2">
+        <button class="btn-ghost text-xs" :class="showArchived ? '!bg-primary/20 !text-white' : ''" @click="showArchived = !showArchived; page = 1">{{ showArchived ? 'Viewing archived' : 'Show archived' }}</button>
+        <router-link to="/reports/new" class="btn-primary">+ New report</router-link>
+      </div>
     </div>
     <p v-if="!reports.length" class="text-sm text-mid">No reports yet.</p>
     <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { validate, validatePartial } from '../middleware/validate.js'
 import { templateSchema } from '../utils/validators.js'
 import * as templateService from '../services/templateService.js'
-import { logActivity } from '../services/activityService.js'
+import { logActivity, diffChanges } from '../services/activityService.js'
 import { parsePagination, paginationMeta, ok } from '../utils/pagination.js'
 
 const router = Router()
@@ -30,8 +30,9 @@ router.get('/:id', (req, res) => {
 })
 
 router.put('/:id', validatePartial(templateSchema), (req, res) => {
+  const before = templateService.getTemplate(Number(req.params.id))
   const template = templateService.updateTemplate(Number(req.params.id), req.body)
-  logActivity('template', template.id, req.session.userId, 'updated')
+  logActivity('template', template.id, req.session.userId, 'updated', { changes: diffChanges(before, template, Object.keys(req.body)) })
   res.json(ok(template))
 })
 

@@ -39,13 +39,17 @@ function computeDuration (start, end) {
 }
 
 /**
- * List shift notes with optional client / incident / billed filters.
+ * List shift notes with optional client / incident / billed / archived filters.
+ * By default archived notes are hidden; pass `archived: 'true'` for archived
+ * only, or `archived: 'all'` for both.
  * @param {{page:number, perPage:number, offset:number}} pg
- * @param {{client_id?:string, incident?:string, billed?:string}} filters
+ * @param {{client_id?:string, incident?:string, billed?:string, archived?:string}} filters
  */
 export function listShifts (pg, filters = {}) {
   const where = ['s.deleted_at IS NULL']
   const params = []
+  if (filters.archived === 'true' || filters.archived === '1') where.push('s.archived_at IS NOT NULL')
+  else if (filters.archived !== 'all') where.push('s.archived_at IS NULL')
   if (filters.client_id) { where.push('s.client_id = ?'); params.push(Number(filters.client_id)) }
   if (filters.incident === 'true') where.push('s.incident_flag = 1')
   if (filters.billed === 'false') where.push('s.billed = 0')
@@ -127,6 +131,38 @@ export function deleteShift (id) {
   const shift = getShift(id)
   if (shift.incident_flag) throw new ApiError(409, 'INCIDENT_RETAINED', 'Incident-flagged shift notes cannot be deleted')
   sqlite.prepare('UPDATE shift_notes SET deleted_at = ?, updated_at = ? WHERE id = ?').run(now(), now(), id)
+}
+
+/**
+ * Archive a shift note (hide it from active lists without deleting it).
+ * @param {number} id
+ */
+export function archiveShift (id) {
+  getShift(id)
+  sqlite.prepare('UPDATE shift_notes SET archived_at = ?, updated_at = ? WHERE id = ?').run(now(), now(), id)
+  return getShift(id)
+}
+
+/**
+ * Unarchive a shift note (return it to the active list).
+ * @param {number} id
+ */
+export function unarchiveShift (id) {
+  getShift(id)
+  sqlite.prepare('UPDATE shift_notes SET archived_at = NULL, updated_at = ? WHERE id = ?').run(now(), id)
+  return getShift(id)
+}
+
+/**
+ * Restore a soft-deleted shift note. Throws 404 if it does not exist or is not
+ * currently deleted.
+ * @param {number} id
+ */
+export function restoreShift (id) {
+  const row = sqlite.prepare('SELECT id FROM shift_notes WHERE id = ? AND deleted_at IS NOT NULL').get(id)
+  if (!row) throw new ApiError(404, 'NOT_FOUND', 'Deleted shift note not found')
+  sqlite.prepare('UPDATE shift_notes SET deleted_at = NULL, updated_at = ? WHERE id = ?').run(now(), id)
+  return getShift(id)
 }
 
 /**

@@ -7,7 +7,7 @@ import * as clientService from '../services/clientService.js'
 import { resolveTemplateForDraft } from '../services/templateService.js'
 import { draftAgreement } from '../services/aiService.js'
 import { renderPdf, pdfPath, safeFilename } from '../utils/pdfRenderer.js'
-import { logActivity } from '../services/activityService.js'
+import { logActivity, diffChanges } from '../services/activityService.js'
 import { parsePagination, paginationMeta, ok } from '../utils/pagination.js'
 import { ApiError } from '../middleware/errorHandler.js'
 
@@ -36,8 +36,9 @@ router.get('/:id', (req, res) => {
 })
 
 router.put('/:id', validatePartial(agreementSchema), (req, res) => {
+  const before = agreementService.getAgreement(Number(req.params.id))
   const agreement = agreementService.updateAgreement(Number(req.params.id), req.body)
-  logActivity('agreement', agreement.id, req.session.userId, 'updated')
+  logActivity('agreement', agreement.id, req.session.userId, 'updated', { changes: diffChanges(before, agreement, Object.keys(req.body)) })
   res.json(ok(agreement))
 })
 
@@ -45,6 +46,28 @@ router.delete('/:id', (req, res) => {
   agreementService.deleteAgreement(Number(req.params.id))
   logActivity('agreement', Number(req.params.id), req.session.userId, 'deleted')
   res.json(ok({ deleted: true }))
+})
+
+/**
+ * @openapi
+ * /agreements/{id}/archive:
+ *   post: { tags: [Agreements], summary: Archive an agreement (hidden from active lists, not deleted) }
+ */
+router.post('/:id/archive', (req, res) => {
+  const agreement = agreementService.archiveAgreement(Number(req.params.id))
+  logActivity('agreement', agreement.id, req.session.userId, 'archived')
+  res.json(ok(agreement))
+})
+
+/**
+ * @openapi
+ * /agreements/{id}/unarchive:
+ *   post: { tags: [Agreements], summary: Unarchive an agreement (return it to active lists) }
+ */
+router.post('/:id/unarchive', (req, res) => {
+  const agreement = agreementService.unarchiveAgreement(Number(req.params.id))
+  logActivity('agreement', agreement.id, req.session.userId, 'unarchived')
+  res.json(ok(agreement))
 })
 
 /**

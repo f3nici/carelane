@@ -1,4 +1,5 @@
 import { sqlite } from './connection.js'
+import { backfillAuditHashes } from '../services/activityService.js'
 
 /**
  * Add a column to a table only if it does not already exist. SQLite has no
@@ -97,7 +98,8 @@ CREATE TABLE IF NOT EXISTS service_agreements (
   pdf_filename TEXT,
   created_at TEXT,
   updated_at TEXT,
-  deleted_at TEXT
+  deleted_at TEXT,
+  archived_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS agreement_line_items (
@@ -138,7 +140,8 @@ CREATE TABLE IF NOT EXISTS shift_notes (
   finalised INTEGER NOT NULL DEFAULT 0,
   created_at TEXT,
   updated_at TEXT,
-  deleted_at TEXT
+  deleted_at TEXT,
+  archived_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_shift_notes_client ON shift_notes (client_id, shift_date);
 
@@ -165,7 +168,8 @@ CREATE TABLE IF NOT EXISTS reports (
   status TEXT NOT NULL DEFAULT 'draft',
   created_at TEXT,
   updated_at TEXT,
-  deleted_at TEXT
+  deleted_at TEXT,
+  archived_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS client_documents (
@@ -212,7 +216,9 @@ CREATE TABLE IF NOT EXISTS activity_log (
   user_id INTEGER,
   action TEXT NOT NULL,
   details TEXT,
-  created_at TEXT
+  created_at TEXT,
+  prev_hash TEXT,
+  hash TEXT
 );
 
 CREATE TABLE IF NOT EXISTS settings (
@@ -258,6 +264,18 @@ CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_log (created_at);
   addColumnIfMissing('users', 'totp_secret', 'TEXT')
   addColumnIfMissing('users', 'totp_enabled', 'INTEGER NOT NULL DEFAULT 0')
   addColumnIfMissing('users', 'totp_recovery_codes', 'TEXT')
+
+  // Tamper-evident hash chain on activity_log (added post-launch). Add the
+  // columns on existing databases, then seal any legacy rows into the chain.
+  addColumnIfMissing('activity_log', 'prev_hash', 'TEXT')
+  addColumnIfMissing('activity_log', 'hash', 'TEXT')
+  backfillAuditHashes()
+
+  // Archive (hide from active lists without deleting) for shift notes, reports
+  // and service agreements — added post-launch.
+  addColumnIfMissing('shift_notes', 'archived_at', 'TEXT')
+  addColumnIfMissing('reports', 'archived_at', 'TEXT')
+  addColumnIfMissing('service_agreements', 'archived_at', 'TEXT')
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
