@@ -72,6 +72,19 @@ describe('schedule routes', () => {
     expect(res.body.data.error).toMatch(/not connected/i)
   })
 
+  it('reports nothing synced when sync-all runs while disconnected', async () => {
+    const res = await agent.post('/api/v1/schedule/google/sync-all').set('x-csrf-token', csrf)
+    expect(res.status).toBe(200)
+    expect(res.body.data.ok).toBe(false)
+    expect(res.body.data.synced).toBe(0)
+  })
+
+  it('clears the sync-error banner', async () => {
+    const res = await agent.post('/api/v1/schedule/google/clear-error').set('x-csrf-token', csrf)
+    expect(res.status).toBe(200)
+    expect(res.body.data.last_sync_error).toBe(null)
+  })
+
   it('rejects an invalid recurrence frequency', async () => {
     const res = await agent.post('/api/v1/schedule/recurrences').set('x-csrf-token', csrf)
       .send({ client_id: clientId, frequency: 'hourly', start_date: '2026-08-03' })

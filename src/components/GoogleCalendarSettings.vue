@@ -45,6 +45,23 @@ async function testConnection () {
   } catch { /* */ } finally { busy.value = false }
 }
 
+async function syncAll () {
+  busy.value = true
+  testResult.value = null
+  try {
+    const res = await api.post('/schedule/google/sync-all', {})
+    const { total, synced, failed } = res.data
+    if (failed > 0) toast.push(`Synced ${synced}/${total} shifts — ${failed} failed`, 'error')
+    else toast.push(`Synced ${synced} shift${synced === 1 ? '' : 's'}`, 'success')
+    await load()
+  } catch { /* */ } finally { busy.value = false }
+}
+
+async function clearError () {
+  busy.value = true
+  try { const res = await api.post('/schedule/google/clear-error', {}); status.value = res.data } catch { /* */ } finally { busy.value = false }
+}
+
 async function disconnect () {
   if (!confirm('Disconnect Google Calendar? Future shifts will no longer sync.')) return
   busy.value = true
@@ -100,10 +117,13 @@ async function saveSettings () {
             <span class="text-mid">Last successful sync</span>
             <span>{{ status.last_synced_at ? new Date(status.last_synced_at).toLocaleString() : 'never' }}</span>
           </div>
-          <p v-if="status.last_sync_error" class="text-danger">
-            Last error{{ status.last_sync_error.at ? ' (' + new Date(status.last_sync_error.at).toLocaleString() + ')' : '' }}:
-            {{ status.last_sync_error.error || 'unknown' }}
-          </p>
+          <div v-if="status.last_sync_error" class="flex items-start justify-between gap-2">
+            <p class="text-danger">
+              Last error{{ status.last_sync_error.at ? ' (' + new Date(status.last_sync_error.at).toLocaleString() + ')' : '' }}:
+              {{ status.last_sync_error.error || 'unknown' }}
+            </p>
+            <button class="btn-ghost text-xs shrink-0" :disabled="busy" @click="clearError">Clear</button>
+          </div>
           <p v-if="testResult" :class="testResult.ok ? 'text-success' : 'text-danger'">
             <template v-if="testResult.ok">
               Connection OK — calendar “{{ testResult.calendar_summary || status.calendar_id }}”{{ testResult.calendar_timezone ? ' (' + testResult.calendar_timezone + ')' : '' }}
@@ -117,9 +137,10 @@ async function saveSettings () {
           <div><label class="label">Calendar ID</label><input v-model="status.calendar_id" class="input" placeholder="primary" /></div>
           <div><label class="label">Timezone</label><input v-model="status.timezone" class="input" placeholder="Australia/Perth" /></div>
         </div>
-        <div class="flex gap-2">
+        <div class="flex flex-wrap gap-2">
           <button class="btn-primary" :disabled="busy" @click="saveSettings">Save</button>
           <button class="btn-ghost" :disabled="busy" @click="testConnection">Test connection</button>
+          <button class="btn-ghost" :disabled="busy || !status.enabled" @click="syncAll">Sync all shifts</button>
           <button class="btn-ghost text-danger" :disabled="busy" @click="disconnect">Disconnect</button>
         </div>
       </template>
