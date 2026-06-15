@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import axios from 'axios'
+import { startAuthentication, browserSupportsWebAuthn } from '@simplewebauthn/browser'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -38,6 +39,23 @@ export const useAuthStore = defineStore('auth', {
       this.csrfToken = res.data.data.csrf_token
       this.checked = true
       return { totpRequired: false }
+    },
+    /**
+     * Passwordless login via a registered passkey (WebAuthn). Runs the full
+     * options → authenticator → verify ceremony and establishes the session.
+     * @returns {Promise<void>}
+     */
+    async loginWithPasskey () {
+      const optRes = await axios.post('/api/v1/auth/passkeys/login/options', {}, { withCredentials: true })
+      const assertion = await startAuthentication({ optionsJSON: optRes.data.data })
+      const res = await axios.post('/api/v1/auth/passkeys/login/verify', { response: assertion }, { withCredentials: true })
+      this.user = res.data.data
+      this.csrfToken = res.data.data.csrf_token
+      this.checked = true
+    },
+    /** Whether this browser can do WebAuthn (gates the passkey UI). */
+    supportsPasskeys () {
+      return browserSupportsWebAuthn()
     },
     async logout () {
       try {

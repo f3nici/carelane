@@ -3,15 +3,45 @@ import bcrypt from 'bcryptjs'
 import QRCode from 'qrcode'
 import { sqlite } from '../db/connection.js'
 import { validate } from '../middleware/validate.js'
-import { loginSchema, totpConfirmSchema, totpDisableSchema } from '../utils/validators.js'
+import {
+  loginSchema, totpConfirmSchema, totpDisableSchema, changePasswordSchema,
+  passkeyRegisterSchema, passkeyLoginSchema, passkeyRenameSchema
+} from '../utils/validators.js'
 import { ApiError } from '../middleware/errorHandler.js'
 import { requireAuth, ensureCsrfToken } from '../middleware/auth.js'
 import { logActivity } from '../services/activityService.js'
 import * as twoFactor from '../services/twoFactorService.js'
+import * as passkeys from '../services/passkeyService.js'
+import { changePassword } from '../services/accountService.js'
 import { throttleKey, checkLockout, recordFailure, clearAttempts } from '../services/loginThrottle.js'
 import { ok } from '../utils/pagination.js'
 
 const router = Router()
+
+/**
+ * Regenerate the session, mark it authenticated and return the user envelope
+ * (with a fresh CSRF token). Shared by the password and passkey login paths.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {object} user user row
+ * @param {Function} next
+ * @param {object} [details] extra audit detail (e.g. login method)
+ */
+function establishSession (req, res, user, next, details) {
+  req.session.regenerate(err => {
+    if (err) return next(err)
+    req.session.userId = user.id
+    req.session.role = user.role
+    const csrf = ensureCsrfToken(req.session)
+    logActivity('auth', user.id, user.id, 'login', details)
+    res.json(ok({ id: user.id, username: user.username, display_name: user.display_name, role: user.role, csrf_token: csrf }))
+  })
+}
+
+/** Relying-party context (id/name/origin) derived from the current request. */
+function rpContext (req) {
+  return passkeys.resolveRp({ originHeader: req.get('origin'), host: req.get('host'), protocol: req.protocol })
+}
 
 /**
  * @openapi
@@ -48,14 +78,7 @@ router.post('/login', validate(loginSchema), (req, res, next) => {
   }
 
   clearAttempts(key)
-  req.session.regenerate(err => {
-    if (err) return next(err)
-    req.session.userId = user.id
-    req.session.role = user.role
-    const csrf = ensureCsrfToken(req.session)
-    logActivity('auth', user.id, user.id, 'login')
-    res.json(ok({ id: user.id, username: user.username, display_name: user.display_name, role: user.role, csrf_token: csrf }))
-  })
+  establishSession(req, res, user, next)
 })
 
 /**
@@ -130,6 +153,123 @@ router.post('/2fa/disable', requireAuth, validate(totpDisableSchema), (req, res,
   twoFactor.disable(req.session.userId)
   logActivity('auth', req.session.userId, req.session.userId, '2fa_disabled')
   res.json(ok({ enabled: false }))
+})
+
+/**
+ * @openapi
+ * /auth/change-password:
+ *   post: { tags: [Auth], summary: Change the current user's password (requires the current password) }
+ */
+router.post('/change-password', requireAuth, validate(changePasswordSchema), (req, res, next) => {
+  try {
+    changePassword(req.session.userId, req.body.current_password, req.body.new_password)
+    logActivity('auth', req.session.userId, req.session.userId, 'password_changed')
+    res.json(ok({ changed: true }))
+  } catch (err) { next(err) }
+})
+
+/**
+ * @openapi
+ * /auth/passkeys:
+ *   get: { tags: [Auth], summary: List the current user's registered passkeys }
+ */
+router.get('/passkeys', requireAuth, (req, res) => {
+  res.json(ok({ passkeys: passkeys.listCredentials(req.session.userId) }))
+})
+
+/**
+ * @openapi
+ * /auth/passkeys/register/options:
+ *   post: { tags: [Auth], summary: Begin passkey enrolment (returns WebAuthn creation options) }
+ */
+router.post('/passkeys/register/options', requireAuth, async (req, res, next) => {
+  try {
+    const user = sqlite.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId)
+    const options = await passkeys.beginRegistration(req.session.userId, user, rpContext(req))
+    req.session.webauthnChallenge = options.challenge
+    res.json(ok(options))
+  } catch (err) { next(err) }
+})
+
+/**
+ * @openapi
+ * /auth/passkeys/register/verify:
+ *   post: { tags: [Auth], summary: Complete passkey enrolment with the authenticator response }
+ */
+router.post('/passkeys/register/verify', requireAuth, validate(passkeyRegisterSchema), async (req, res, next) => {
+  try {
+    const expectedChallenge = req.session.webauthnChallenge
+    if (!expectedChallenge) throw new ApiError(400, 'NO_CHALLENGE', 'No passkey registration in progress')
+    const rp = rpContext(req)
+    const result = await passkeys.finishRegistration(req.session.userId, {
+      response: req.body.response,
+      expectedChallenge,
+      expectedOrigin: rp.origin,
+      expectedRPID: rp.rpID,
+      name: req.body.name
+    })
+    req.session.webauthnChallenge = null
+    logActivity('auth', req.session.userId, req.session.userId, 'passkey_registered')
+    res.json(ok(result))
+  } catch (err) { next(err) }
+})
+
+/**
+ * @openapi
+ * /auth/passkeys/{id}:
+ *   put: { tags: [Auth], summary: Rename a registered passkey }
+ */
+router.put('/passkeys/:id', requireAuth, validate(passkeyRenameSchema), (req, res, next) => {
+  try {
+    passkeys.renameCredential(req.session.userId, Number(req.params.id), req.body.name)
+    res.json(ok({ renamed: true }))
+  } catch (err) { next(err) }
+})
+
+/**
+ * @openapi
+ * /auth/passkeys/{id}:
+ *   delete: { tags: [Auth], summary: Remove a registered passkey }
+ */
+router.delete('/passkeys/:id', requireAuth, (req, res, next) => {
+  try {
+    passkeys.deleteCredential(req.session.userId, Number(req.params.id))
+    logActivity('auth', req.session.userId, req.session.userId, 'passkey_removed')
+    res.json(ok({ removed: true }))
+  } catch (err) { next(err) }
+})
+
+/**
+ * @openapi
+ * /auth/passkeys/login/options:
+ *   post: { tags: [Auth], summary: Begin a passwordless passkey login (returns WebAuthn request options) }
+ */
+router.post('/passkeys/login/options', async (req, res, next) => {
+  try {
+    const options = await passkeys.beginLogin(rpContext(req))
+    req.session.webauthnChallenge = options.challenge
+    res.json(ok(options))
+  } catch (err) { next(err) }
+})
+
+/**
+ * @openapi
+ * /auth/passkeys/login/verify:
+ *   post: { tags: [Auth], summary: Complete a passwordless passkey login and start a session }
+ */
+router.post('/passkeys/login/verify', validate(passkeyLoginSchema), async (req, res, next) => {
+  try {
+    const expectedChallenge = req.session.webauthnChallenge
+    if (!expectedChallenge) throw new ApiError(400, 'NO_CHALLENGE', 'No passkey login in progress')
+    const rp = rpContext(req)
+    const user = await passkeys.finishLogin({
+      response: req.body.response,
+      expectedChallenge,
+      expectedOrigin: rp.origin,
+      expectedRPID: rp.rpID
+    })
+    establishSession(req, res, user, next, { method: 'passkey' })
+  } catch (err) { next(err) }
 })
 
 export default router

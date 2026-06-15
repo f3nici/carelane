@@ -42,6 +42,13 @@ const config = {
   backupStaleHours: parseInt(env.BACKUP_STALE_HOURS || '48', 10),
   loginMaxAttempts: parseInt(env.LOGIN_MAX_ATTEMPTS || '5', 10),
   loginWindowMinutes: parseInt(env.LOGIN_WINDOW_MINUTES || '15', 10),
+  // Passkeys / WebAuthn (passwordless login). The relying-party id must be the
+  // registrable domain the app is served from (e.g. carelane.example.org) and
+  // the expected origin its full URL. Both are auto-derived from the incoming
+  // request's Origin/Host when left blank, which is correct for a same-origin
+  // deployment; pin them here when running behind a proxy that rewrites Host.
+  webauthnRpId: env.WEBAUTHN_RP_ID || '',
+  webauthnOrigin: env.WEBAUTHN_ORIGIN || '',
   publicApiEnabled: (env.PUBLIC_API_ENABLED || 'false') === 'true',
   corsOrigins: (env.CORS_ORIGINS || 'http://localhost:5173').split(',').map(s => s.trim()),
   // Google Calendar one-way push (optional). App credentials live in env; the

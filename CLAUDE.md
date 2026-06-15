@@ -17,6 +17,7 @@ npm start          # production server
 npm run migrate    # apply idempotent SQL migrations
 npm run seed       # admin user + default settings + starter billing codes
 npm run restore    # interactive restore from a backup snapshot (stop server first)
+npm run reset-password  # offline CLI to reset a forgotten login password
 npm test           # Vitest unit + route integration tests
 npm run lint       # ESLint (enforces no-semi / single-quote / 2-space style)
 ```
@@ -94,7 +95,18 @@ API docs at `/api/docs`, health at `/healthz`.
 - Incident-flagged shift notes cannot be deleted.
 - `/auth/login` is brute-force throttled (per ip+username) and supports optional
   TOTP 2FA; the TOTP secret + recovery-code hashes are encrypted at rest like
-  any other PII (in `twoFactorService`, never in routes).
+  any other PII (in `twoFactorService`, never in routes). The login form always
+  shows the 2FA code field (left blank when the account has no 2FA).
+- Passkeys (WebAuthn) are a passwordless login factor (`passkeyService.js`,
+  `@simplewebauthn`). Each authenticator is a `webauthn_credentials` row; public
+  keys are non-secret (not encrypted) and the in-flight challenge lives on the
+  session. Passkey *login* endpoints (`/auth/passkeys/login/*`) are CSRF-exempt
+  (the WebAuthn challenge is the anti-forgery guard); registration/management
+  sits behind the normal auth+CSRF gate. RP id/origin auto-derive from the
+  request unless pinned via `WEBAUTHN_RP_ID`/`WEBAUTHN_ORIGIN`.
+- Passwords are bcrypt-hashed (cost 12, `accountService.js`). Logged-in users
+  change theirs in Settings (current password required); a forgotten password is
+  reset offline via `npm run reset-password` — never over the API.
 - Backups can be restored only via the offline `npm run restore` CLI (never over
   the API); a stale-backup warning logs on startup.
 

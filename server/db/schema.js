@@ -15,6 +15,20 @@ export const users = sqliteTable('users', {
   updatedAt: text('updated_at')
 })
 
+export const webauthnCredentials = sqliteTable('webauthn_credentials', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id').notNull().references(() => users.id),
+  credentialId: text('credential_id').notNull().unique(), // base64url credential id
+  publicKey: blob('public_key').notNull(), // COSE public key bytes
+  counter: integer('counter').notNull().default(0), // signature counter (replay defence)
+  transports: text('transports'), // JSON array of authenticator transports
+  deviceType: text('device_type'), // singleDevice | multiDevice
+  backedUp: integer('backed_up').notNull().default(0),
+  name: text('name'), // operator-supplied label (e.g. "iPhone")
+  createdAt: text('created_at'),
+  lastUsedAt: text('last_used_at')
+})
+
 export const clients = sqliteTable('clients', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   firstName: text('first_name').notNull(), // 🔒
