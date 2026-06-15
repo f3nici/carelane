@@ -68,7 +68,9 @@ async function squareFetch (path, opts = {}) {
   try { json = await res.json() } catch { /* empty body */ }
   if (!res.ok) {
     const first = json && Array.isArray(json.errors) ? json.errors[0] : null
-    throw new Error((first && (first.detail || first.code)) || `Square API returned ${res.status}`)
+    const err = new Error((first && (first.detail || first.code)) || `Square API returned ${res.status}`)
+    err.status = res.status
+    throw err
   }
   return json
 }
@@ -185,7 +187,18 @@ export function resolveLineItem (shift, code, customRate) {
  */
 async function ensureCustomer (client) {
   const row = sqlite.prepare('SELECT square_customer_id FROM clients WHERE id = ?').get(client.id)
-  if (row && row.square_customer_id) return row.square_customer_id
+  if (row && row.square_customer_id) {
+    // Verify the cached id still resolves — it can go stale if the account or
+    // environment changed (Square ids are per-account/per-environment). On a
+    // 404 we drop it and recreate; other errors are surfaced as-is.
+    try {
+      await squareFetch(`/v2/customers/${row.square_customer_id}`)
+      return row.square_customer_id
+    } catch (err) {
+      if (err.status !== 404) throw err
+      sqlite.prepare('UPDATE clients SET square_customer_id = NULL WHERE id = ?').run(client.id)
+    }
+  }
 
   let customerId = null
   if (client.email) {
