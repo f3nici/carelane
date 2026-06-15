@@ -15,7 +15,7 @@ const nav = [
   { name: 'dashboard', to: '/', label: 'Dashboard', icon: 'M3 12l9-9 9 9M5 10v10h5v-6h4v6h5V10', count: null },
   { name: 'clients', to: '/clients', label: 'Clients', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z', count: 'active_clients' },
   { name: 'roster', to: '/roster', label: 'Roster', icon: 'M8 7V3m8 4V3m-9 8h18M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', count: 'upcoming_shifts' },
-  { name: 'shifts', to: '/shifts', label: 'Notes', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', count: 'shifts_this_month' },
+  { name: 'shifts', to: '/shifts', label: 'Notes', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', count: 'unfinalised_notes' },
   { name: 'documents', to: '/documents', label: 'Documents', icon: 'M9 12h6m-6 4h6M7 3h7l5 5v13H7a2 2 0 01-2-2V5a2 2 0 012-2z', count: null },
   { name: 'knowledge', to: '/knowledge', label: 'Knowledge Base', icon: 'M12 6.25c-2.4-1.5-5.4-1.5-8 0v12c2.6-1.5 5.6-1.5 8 0 2.4-1.5 5.4-1.5 8 0v-12c-2.6-1.5-5.6-1.5-8 0zm0 0v12', count: 'documents_indexed' },
   { name: 'deleted', to: '/deleted', label: 'Deleted Items', icon: 'M19 7l-.87 12.14A2 2 0 0116.14 21H7.86a2 2 0 01-1.99-1.86L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16', count: null },
