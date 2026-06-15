@@ -49,14 +49,20 @@ async function run () {
       <div v-if="sources.length">
         <h4 class="text-xs font-semibold text-mid uppercase mb-1">Sources</h4>
         <ul class="space-y-1 text-xs text-mid">
-          <li v-for="(s, i) in sources" :key="i"><span class="text-accent">{{ s.title }}</span>, p.{{ s.page }} — {{ s.snippet }}…</li>
+          <li v-for="(s, i) in sources" :key="i">
+            <span class="text-accent">{{ s.title }}</span>, p.{{ s.page }} — {{ s.snippet }}…
+            <a v-if="s.document_id" class="text-accent hover:underline ml-1" :href="`/api/v1/documents/${s.document_id}/file`" target="_blank" rel="noopener">(download)</a>
+          </li>
         </ul>
       </div>
     </div>
 
     <ul v-if="results.length" class="space-y-3">
       <li v-for="(r, i) in results" :key="i" class="text-sm border-b border-white/5 pb-2">
-        <p class="text-xs text-accent mb-1">{{ r.title }} · page {{ r.page }}<span v-if="r.score" class="text-mid"> · {{ (r.score * 100).toFixed(0) }}% match</span></p>
+        <p class="text-xs mb-1">
+          <span class="text-accent">{{ r.title }} · page {{ r.page }}</span><span v-if="r.score" class="text-mid"> · {{ (r.score * 100).toFixed(0) }}% match</span>
+          <a class="text-accent hover:underline ml-1" :href="`/api/v1/documents/${r.document_id}/file`" target="_blank" rel="noopener">(download)</a>
+        </p>
         <p class="text-mid">{{ r.content.slice(0, 350) }}…</p>
       </li>
     </ul>

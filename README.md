@@ -114,7 +114,10 @@ All configuration is via environment variables (see [`.env.example`](.env.exampl
 | `DEFAULT_USERNAME` / `DEFAULT_PASSWORD` | Seeded admin login. |
 | `DB_PATH` | SQLite database file path. |
 | `UPLOAD_PATH` / `MAX_UPLOAD_SIZE` | Upload directory and per-file size cap (bytes). |
-| `EMBEDDING_MODEL` | transformers.js embedding model for RAG. |
+| `EMBEDDING_MODEL` | transformers.js embedding model for RAG (default `Xenova/bge-small-en-v1.5`). Changing it requires `npm run reindex`. |
+| `EMBEDDING_QUERY_PREFIX` | Optional query instruction prefix (auto-set for bge models). |
+| `SEARCH_CANDIDATE_POOL` | Candidates pulled per arm (vector + BM25) before fusion/rerank. |
+| `RERANK_ENABLED` / `RERANKER_MODEL` | Local cross-encoder reranker for the knowledge base. |
 | `DEFAULT_PRICE_REGION` | NDIS price region for billing. |
 | `BACKUP_ENABLED` / `BACKUP_PATH` / `BACKUP_RETENTION` / `BACKUP_TIME` | Scheduled backup settings. |
 | `PUBLIC_API_ENABLED` | Toggle for the public API surface. |

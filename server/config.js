@@ -18,7 +18,22 @@ const config = {
   dbPath: env.DB_PATH || './data/carelane.db',
   uploadPath: env.UPLOAD_PATH || './uploads',
   maxUploadSize: parseInt(env.MAX_UPLOAD_SIZE || '10485760', 10),
-  embeddingModel: env.EMBEDDING_MODEL || 'Xenova/all-MiniLM-L6-v2',
+  embeddingModel: env.EMBEDDING_MODEL || 'Xenova/bge-small-en-v1.5',
+  // bge-style retrieval models expect a short instruction prefixed to the
+  // *query* (not the stored passages). Auto-applied for bge models unless an
+  // explicit prefix (possibly empty) is given. Other models default to none.
+  embeddingQueryPrefix: env.EMBEDDING_QUERY_PREFIX ??
+    ((env.EMBEDDING_MODEL || 'Xenova/bge-small-en-v1.5').includes('bge')
+      ? 'Represent this sentence for searching relevant passages: '
+      : ''),
+  // Hybrid search: pull this many candidates from each of the vector + keyword
+  // (BM25) arms before fusing with Reciprocal Rank Fusion and reranking.
+  searchCandidatePool: parseInt(env.SEARCH_CANDIDATE_POOL || '40', 10),
+  // Local cross-encoder reranker (transformers.js). Reorders the fused
+  // candidates for a large precision gain. Degrades gracefully if the model
+  // cannot load (e.g. offline first run) — results fall back to the fused order.
+  rerankEnabled: (env.RERANK_ENABLED || 'true') === 'true',
+  rerankerModel: env.RERANKER_MODEL || 'Xenova/ms-marco-MiniLM-L-6-v2',
   defaultPriceRegion: env.DEFAULT_PRICE_REGION || 'standard',
   backupEnabled: (env.BACKUP_ENABLED || 'true') === 'true',
   backupPath: env.BACKUP_PATH || './data/backups',

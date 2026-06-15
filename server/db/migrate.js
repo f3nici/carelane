@@ -354,6 +354,37 @@ CREATE TABLE IF NOT EXISTS square_invoices (
 CREATE INDEX IF NOT EXISTS idx_square_invoices_client ON square_invoices (client_id);
 CREATE INDEX IF NOT EXISTS idx_square_invoices_shift ON square_invoices (shift_note_id);
 `)
+
+  // Hybrid search (added post-launch): a full-text (BM25) index over chunk text
+  // sitting alongside the vector embeddings. The two are fused with Reciprocal
+  // Rank Fusion at query time so exact terms (NDIS codes, acronyms, proper
+  // nouns) and semantic matches both surface. The FTS index is external-content
+  // (stores only the index, joins back to document_chunks) and is kept in sync
+  // by triggers, so all existing chunk read/write paths are unaffected.
+  sqlite.exec(`
+CREATE VIRTUAL TABLE IF NOT EXISTS document_chunks_fts USING fts5(
+  content,
+  content='document_chunks',
+  content_rowid='id'
+);
+CREATE TRIGGER IF NOT EXISTS document_chunks_ai AFTER INSERT ON document_chunks BEGIN
+  INSERT INTO document_chunks_fts(rowid, content) VALUES (new.id, new.content);
+END;
+CREATE TRIGGER IF NOT EXISTS document_chunks_ad AFTER DELETE ON document_chunks BEGIN
+  INSERT INTO document_chunks_fts(document_chunks_fts, rowid, content) VALUES ('delete', old.id, old.content);
+END;
+CREATE TRIGGER IF NOT EXISTS document_chunks_au AFTER UPDATE ON document_chunks BEGIN
+  INSERT INTO document_chunks_fts(document_chunks_fts, rowid, content) VALUES ('delete', old.id, old.content);
+  INSERT INTO document_chunks_fts(rowid, content) VALUES (new.id, new.content);
+END;
+`)
+  // One-time backfill for chunks indexed before the FTS table existed
+  // (idempotent: only rebuilds when the index is empty but chunks exist).
+  const ftsCount = sqlite.prepare('SELECT COUNT(*) AS c FROM document_chunks_fts').get().c
+  const chunkCount = sqlite.prepare('SELECT COUNT(*) AS c FROM document_chunks').get().c
+  if (ftsCount === 0 && chunkCount > 0) {
+    sqlite.exec("INSERT INTO document_chunks_fts(document_chunks_fts) VALUES('rebuild')")
+  }
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

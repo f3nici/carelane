@@ -90,6 +90,7 @@ async function remove (id) {
             <td class="p-3">{{ d.chunk_count }}</td>
             <td class="p-3"><StatusBadge :status="d.indexed ? 'indexed' : 'indexing'" /></td>
             <td class="p-3 text-xs whitespace-nowrap">
+              <a class="text-accent hover:underline mr-2" :href="`/api/v1/documents/${d.id}/file`" target="_blank" rel="noopener">download</a>
               <button class="text-accent hover:underline mr-2" @click="reindex(d.id)">re-index</button>
               <button class="text-danger hover:underline" @click="remove(d.id)">delete</button>
             </td>
