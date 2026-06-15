@@ -59,9 +59,10 @@ API docs at `/api/docs`, health at `/healthz`.
   item is priced at the per-participant rate (`client_billing_codes.custom_rate`,
   falling back to the code's standard cap). The participant is mirrored to a Square
   customer (id cached on `clients.square_customer_id`) and set as the invoice's
-  one `primary_recipient`; the plan-manager email is surfaced on the draft as a
-  custom field + description note (Square allows only one recipient). Each draft is
-  tracked in `square_invoices` so a shift is never invoiced twice.
+  one `primary_recipient`; the plan-manager email is surfaced in the invoice
+  description (Square allows only one recipient, and invoice custom fields need a
+  paid Square plan). Each draft is tracked in `square_invoices` so a shift is
+  never invoiced twice.
 - Soft-deleted records (and deactivated billing codes) are listed and restorable
   via `GET /api/v1/deleted` + `POST /api/v1/deleted/:type/:id/restore` (the
   "Deleted Items" page). Restores are themselves logged to the audit trail.

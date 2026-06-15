@@ -288,19 +288,13 @@ export async function createDraftInvoiceFromShift (shiftNoteId, userId) {
     })
     const orderId = orderRes.order.id
 
-    // 2. Plan-manager email can't be a true CC on a Square invoice — surface it
-    //    on the draft so the operator can add it before sending.
+    // Plan-manager email can't be a true CC on a Square invoice, and invoice
+    // custom fields need a paid Square subscription — so surface the plan manager
+    // in the (free) description for the operator to action before sending.
     const planManagerEmail = extractEmail(client.plan_manager_contact)
-    const customFields = []
-    if (client.plan_manager_name || planManagerEmail) {
-      customFields.push({
-        label: 'Plan manager',
-        value: [client.plan_manager_name, planManagerEmail].filter(Boolean).join(' · '),
-        placement: 'ABOVE_LINE_ITEMS'
-      })
-    }
+    const planManager = [client.plan_manager_name, planManagerEmail].filter(Boolean).join(' · ')
     const description = `NDIS supports for ${clientDisplayName(client)}.` +
-      (planManagerEmail ? ` Plan manager (please CC when sending): ${planManagerEmail}.` : '')
+      (planManager ? ` Plan manager (please CC when sending): ${planManager}.` : '')
 
     // Payment term comes from the participant (defaulting to 45 days).
     const dueDays = client.invoice_due_days ?? 45
@@ -323,8 +317,7 @@ export async function createDraftInvoiceFromShift (shiftNoteId, userId) {
           accepted_payment_methods: { card: true },
           title: 'NDIS supports',
           description,
-          sale_or_service_date: shift.shift_date,
-          custom_fields: customFields.length ? customFields : undefined
+          sale_or_service_date: shift.shift_date
         }
       }
     })

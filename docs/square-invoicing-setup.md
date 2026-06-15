@@ -139,10 +139,10 @@ shows the invoice status so you don't invoice the same shift twice.
 
 Square's Invoices API allows only **one** recipient on an invoice, so CareLane
 sets the **participant** as the recipient and adds the **plan manager** (name +
-email, taken from the participant's *Plan manager contact* field) as a **custom
-field** and a line in the invoice description. When you review the draft in
-Square, add the plan manager as an additional recipient there if your plan
-supports it, or forward the sent invoice to them.
+email, taken from the participant's *Plan manager contact* field) to the invoice
+**description**. When you review the draft in Square, add the plan manager as an
+additional recipient there if your plan supports it, or forward the sent invoice
+to them.
 
 ---
 
