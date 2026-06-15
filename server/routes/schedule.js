@@ -107,6 +107,13 @@ router.get('/google/callback', async (req, res) => {
   }
 })
 
+/** Live health check: confirm the stored credentials can reach the calendar. */
+router.post('/google/test', async (req, res) => {
+  const result = await googleCalendar.testConnection()
+  logActivity('google_calendar', null, req.session.userId, 'tested', { ok: result.ok })
+  res.json(ok(result))
+})
+
 router.post('/google/disconnect', (req, res) => {
   googleCalendar.disconnect()
   logActivity('google_calendar', null, req.session.userId, 'disconnected')

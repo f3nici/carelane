@@ -47,15 +47,64 @@ export function syncEnabled () {
   return isConnected() && !!getSetting('google_calendar_enabled', 0)
 }
 
+/** Number of scheduled shifts currently mirrored into Google (have an event id). */
+function syncedShiftCount () {
+  const row = sqlite.prepare(
+    'SELECT COUNT(*) AS c FROM scheduled_shifts WHERE google_event_id IS NOT NULL AND deleted_at IS NULL'
+  ).get()
+  return row ? row.c : 0
+}
+
+/** Most recent sync failure recorded in the audit log, for surfacing in the UI. */
+function lastSyncError () {
+  const row = sqlite.prepare(
+    "SELECT created_at, details FROM activity_log WHERE entity_type = 'google_calendar' AND action = 'sync_failed' ORDER BY id DESC LIMIT 1"
+  ).get()
+  if (!row) return null
+  let error = null
+  try { error = JSON.parse(row.details || '{}').error || null } catch { /* ignore */ }
+  return { at: row.created_at, error }
+}
+
 /** Operator-facing connection status for the settings UI. */
 export function status () {
+  const connected = isConnected()
   return {
     configured: isConfigured(),
-    connected: isConnected(),
+    connected,
     enabled: !!getSetting('google_calendar_enabled', 0),
     account_email: getSetting('google_account_email', null),
     calendar_id: getSetting('google_calendar_id', 'primary'),
-    timezone: getSetting('google_calendar_timezone', 'Australia/Perth')
+    timezone: getSetting('google_calendar_timezone', 'Australia/Perth'),
+    last_synced_at: getSetting('google_last_synced_at', null),
+    synced_shifts: connected ? syncedShiftCount() : 0,
+    last_sync_error: connected ? lastSyncError() : null
+  }
+}
+
+/**
+ * Live health check: confirm the stored credentials can actually reach the
+ * configured calendar. Hits the Calendar API for the calendar's metadata
+ * (read-only) so the operator can verify the integration works end-to-end.
+ * Never throws — returns a result object for the settings UI.
+ * @returns {Promise<{ok:boolean, calendar_summary?:string, calendar_timezone?:string, error?:string}>}
+ */
+export async function testConnection () {
+  if (!isConnected()) return { ok: false, error: 'Google Calendar is not connected' }
+  try {
+    const token = await getAccessToken()
+    const calendarId = encodeURIComponent(getSetting('google_calendar_id', 'primary'))
+    const res = await fetch(`${API_BASE}/calendars/${calendarId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (!res.ok) {
+      const detail = res.status === 404 ? 'Calendar not found — check the Calendar ID' : `Google API returned ${res.status}`
+      return { ok: false, error: detail }
+    }
+    const cal = await res.json()
+    return { ok: true, calendar_summary: cal.summary || null, calendar_timezone: cal.timeZone || null }
+  } catch (err) {
+    return { ok: false, error: String(err.message || err).slice(0, 120) }
   }
 }
 
@@ -213,6 +262,8 @@ export async function syncScheduledShift (shift) {
     if (event.id && event.id !== existing) {
       sqlite.prepare('UPDATE scheduled_shifts SET google_event_id = ? WHERE id = ?').run(event.id, shift.id)
     }
+    // Record a heartbeat so the settings UI can show sync is live.
+    updateSettings({ google_last_synced_at: new Date().toISOString() })
   } catch (err) {
     logActivity('google_calendar', shift.id, null, 'sync_failed', { error: String(err.message || err).slice(0, 120) })
   }
