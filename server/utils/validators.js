@@ -53,6 +53,7 @@ export const clientSchema = z.object({
   emergency_contact_name: optStr,
   emergency_contact_phone: optStr,
   notes: z.string().trim().max(20000).nullish().transform(v => v || null),
+  invoice_due_days: z.coerce.number().int().min(0).max(365).nullish(),
   active: bool01.default(1)
 })
 

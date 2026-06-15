@@ -334,6 +334,8 @@ CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_log (created_at);
   // square_invoices table tracks each draft we create from a shift note so the
   // UI can show its status / link and we never invoice the same shift twice.
   addColumnIfMissing('clients', 'square_customer_id', 'TEXT')
+  // Per-participant invoice payment term (days until due); null → default of 45.
+  addColumnIfMissing('clients', 'invoice_due_days', 'INTEGER')
   sqlite.exec(`
 CREATE TABLE IF NOT EXISTS square_invoices (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

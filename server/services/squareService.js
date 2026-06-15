@@ -289,7 +289,9 @@ export async function createDraftInvoiceFromShift (shiftNoteId, userId) {
     const description = `NDIS supports for ${clientDisplayName(client)}.` +
       (planManagerEmail ? ` Plan manager (please CC when sending): ${planManagerEmail}.` : '')
 
-    const dueDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    // Payment term comes from the participant (defaulting to 45 days).
+    const dueDays = client.invoice_due_days ?? 45
+    const dueDate = new Date(Date.now() + dueDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
     // 3. Create the invoice as a DRAFT (no publish call → nothing is sent).
     const invRes = await squareFetch('/v2/invoices', {

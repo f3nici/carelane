@@ -107,10 +107,14 @@ invoice time, and the most recent error (with a **Clear** button).
 The amount CareLane bills comes from the **rate you set per participant**, which
 can differ from one participant to the next:
 
-1. Open a participant → **Billing codes**.
+1. Open a participant → **Edit** → **Billing codes**.
 2. Add the support items you bill for that participant.
 3. Enter the **rate** (per hour / per unit) in the box next to each item. Leave it
    blank to fall back to the NDIS standard price-cap.
+
+You can also set the **Invoice due (days)** on the participant's edit page — the
+payment term used for that participant's invoices. Leave it blank to use the
+default of **45 days**.
 
 ## 6. Generate a draft invoice from a shift
 

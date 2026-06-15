@@ -10,7 +10,7 @@ const emit = defineEmits(['submit'])
 const form = reactive({
   first_name: '', last_name: '', preferred_name: '', ndis_number: '', date_of_birth: '',
   phone: '', email: '', address: '', suburb: '', state: 'WA', postcode: '',
-  plan_start: '', plan_end: '', plan_management_type: '', plan_manager_name: '', plan_manager_contact: '',
+  plan_start: '', plan_end: '', plan_management_type: '', plan_manager_name: '', plan_manager_contact: '', invoice_due_days: '',
   primary_disability: '', communication_needs: '', support_goals: '',
   emergency_contact_name: '', emergency_contact_phone: '', notes: '', active: 1
 })
@@ -72,6 +72,7 @@ function submit () {
         </div>
         <div><label class="label">Plan manager name</label><input v-model="form.plan_manager_name" class="input" /></div>
         <div><label class="label">Plan manager contact</label><input v-model="form.plan_manager_contact" class="input" /></div>
+        <div><label class="label">Invoice due (days)</label><input v-model="form.invoice_due_days" type="number" min="0" max="365" class="input" placeholder="45" /></div>
       </div>
     </div>
 
