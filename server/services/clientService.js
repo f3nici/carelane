@@ -11,7 +11,7 @@ const COLUMNS = ['first_name', 'last_name', 'preferred_name', 'ndis_number', 'da
   'phone', 'email', 'address', 'suburb', 'state', 'postcode', 'plan_start', 'plan_end',
   'plan_management_type', 'plan_manager_name', 'plan_manager_contact', 'primary_disability',
   'communication_needs', 'support_goals', 'emergency_contact_name', 'emergency_contact_phone',
-  'notes', 'active']
+  'notes', 'invoice_due_days', 'active']
 
 const now = () => new Date().toISOString()
 

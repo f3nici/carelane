@@ -16,6 +16,7 @@ import shiftRoutes from './routes/shifts.js'
 import scheduleRoutes from './routes/schedule.js'
 import reportRoutes from './routes/reports.js'
 import billingRoutes from './routes/billing.js'
+import invoiceRoutes from './routes/invoices.js'
 import documentRoutes from './routes/documents.js'
 import dashboardRoutes from './routes/dashboard.js'
 import settingsRoutes from './routes/settings.js'
@@ -82,6 +83,7 @@ export function createApp () {
   api.use('/schedule', requireAuth, scheduleRoutes)
   api.use('/reports', requireAuth, reportRoutes)
   api.use('/billing-codes', requireAuth, billingRoutes)
+  api.use('/invoices', requireAuth, invoiceRoutes)
   api.use('/documents', requireAuth, documentRoutes)
   api.use('/dashboard', requireAuth, dashboardRoutes)
   api.use('/settings', requireAuth, settingsRoutes)

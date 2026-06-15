@@ -89,6 +89,17 @@ async function removeCode (codeId) {
   billingCodes.value = res.data
 }
 
+/** Persist the per-participant rates after editing a custom rate inline. */
+async function saveRates () {
+  const codes = billingCodes.value.map(c => ({
+    billing_code_id: c.id,
+    custom_rate: c.custom_rate === '' || c.custom_rate == null ? null : Number(c.custom_rate)
+  }))
+  const res = await api.put(`/clients/${id}/billing-codes`, { codes })
+  billingCodes.value = res.data
+  toast.push('Rates saved', 'success')
+}
+
 async function remove () {
   await api.del(`/clients/${id}`)
   toast.push('Client archived (soft-deleted for record retention)', 'success')
@@ -137,6 +148,7 @@ function exportData () {
           <div class="flex justify-between"><dt class="text-mid">Plan period</dt><dd>{{ client.plan_start || '—' }} → {{ client.plan_end || '—' }}</dd></div>
           <div class="flex justify-between"><dt class="text-mid">Management</dt><dd>{{ client.plan_management_type || '—' }}</dd></div>
           <div class="flex justify-between"><dt class="text-mid">Plan manager</dt><dd>{{ client.plan_manager_name || '—' }}</dd></div>
+          <div class="flex justify-between"><dt class="text-mid">Invoice due</dt><dd>{{ (client.invoice_due_days ?? 45) }} days</dd></div>
           <div class="flex justify-between"><dt class="text-mid">Disability</dt><dd>{{ client.primary_disability || '—' }}</dd></div>
         </dl>
       </div>
@@ -165,10 +177,24 @@ function exportData () {
         </select>
       </div>
       <p v-if="!billingCodes.length" class="text-sm text-mid">No support items linked yet.</p>
+      <p class="text-xs text-mid mb-2">Set the rate you charge this participant for each item — this is the rate used when generating a Square invoice. Leave blank to use the NDIS price-cap (<span class="italic">standard</span>).</p>
       <ul class="space-y-2">
-        <li v-for="c in billingCodes" :key="c.id" class="text-sm flex items-center justify-between gap-2">
-          <span class="truncate">{{ c.code }} — {{ c.name }} <span class="text-mid">(${{ c.custom_rate ?? c.price_cap_standard }}/{{ c.unit }})</span></span>
-          <button class="text-danger text-xs hover:underline shrink-0" @click="removeCode(c.id)">remove</button>
+        <li v-for="c in billingCodes" :key="c.id" class="text-sm flex items-center justify-between gap-3">
+          <span class="truncate min-w-0">{{ c.code }} — {{ c.name }}</span>
+          <span class="flex items-center gap-2 shrink-0">
+            <span class="text-mid">$</span>
+            <input
+              v-model="c.custom_rate"
+              type="number"
+              step="0.01"
+              min="0"
+              class="input w-24 text-right py-1"
+              :placeholder="c.price_cap_standard ?? '—'"
+              @change="saveRates"
+            />
+            <span class="text-mid">/{{ c.unit }}</span>
+            <button class="text-danger text-xs hover:underline" @click="removeCode(c.id)">remove</button>
+          </span>
         </li>
       </ul>
     </div>
