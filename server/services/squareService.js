@@ -304,6 +304,10 @@ export async function createDraftInvoiceFromShift (shiftNoteId, userId) {
           primary_recipient: { customer_id: customerId },
           delivery_method: 'EMAIL',
           payment_requests: [{ request_type: 'BALANCE', due_date: dueDate, automatic_payment_source: 'NONE' }],
+          // Square requires this on create. Card is the AU-supported online method;
+          // it's a draft, so the operator can change payment options in Square
+          // before sending (e.g. add bank-transfer instructions).
+          accepted_payment_methods: { card: true },
           title: 'NDIS supports',
           description,
           sale_or_service_date: shift.shift_date,

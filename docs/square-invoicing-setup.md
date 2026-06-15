@@ -128,6 +128,10 @@ default of **45 days**.
    - creates the invoice as a **draft** addressed to the participant.
 4. Open **Square → Invoices** to review the draft, then send it when you're ready.
 
+The draft accepts **card** payment by default (the online method Square supports
+in Australia). Since it's a draft, you can change the payment options — or add
+bank-transfer instructions — in Square before sending.
+
 The shift is marked **billed** once a draft has been created, and the shift page
 shows the invoice status so you don't invoice the same shift twice.
 
