@@ -18,6 +18,9 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-} # Optional: Google Calendar sync
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-} # Optional: Google Calendar sync
       GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-} # e.g. https://your-domain/api/v1/schedule/google/callback
+      SQUARE_ACCESS_TOKEN: ${SQUARE_ACCESS_TOKEN:-} # Optional: Square invoicing
+      SQUARE_ENVIRONMENT: ${SQUARE_ENVIRONMENT:-sandbox} # 'sandbox' or 'production'
+      SQUARE_LOCATION_ID: ${SQUARE_LOCATION_ID:-} # Optional: auto-detected on Test connection
     volumes:
       - ./data:/app/data
       - ./uploads:/app/uploads

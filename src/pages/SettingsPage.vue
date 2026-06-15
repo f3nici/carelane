@@ -7,6 +7,7 @@ import BrandingSettings from '../components/BrandingSettings.vue'
 import TwoFactorSettings from '../components/TwoFactorSettings.vue'
 import BackupSettings from '../components/BackupSettings.vue'
 import GoogleCalendarSettings from '../components/GoogleCalendarSettings.vue'
+import SquareInvoicingSettings from '../components/SquareInvoicingSettings.vue'
 import BillingCodesPage from './BillingCodesPage.vue'
 
 const api = useApi()
@@ -59,6 +60,8 @@ async function save () {
     <TwoFactorSettings />
 
     <GoogleCalendarSettings />
+
+    <SquareInvoicingSettings />
 
     <BackupSettings />
 

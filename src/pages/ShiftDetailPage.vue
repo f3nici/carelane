@@ -20,6 +20,9 @@ const clients = ref([])
 const busy = ref(false)
 const drafting = ref(false)
 const editor = ref(null)
+const squareStatus = ref(null)
+const invoice = ref(null)
+const invoicing = ref(false)
 // Set when this note is being written for a clocked-out scheduled shift.
 const fromSchedule = computed(() => route.query.from_schedule ? Number(route.query.from_schedule) : null)
 
@@ -29,6 +32,7 @@ onMounted(async () => {
   if (id.value) {
     const res = await api.get(`/shifts/${id.value}`)
     shift.value = res.data
+    loadSquare()
   } else if (fromSchedule.value) {
     // Prefill participant, date and the actual clocked times from the roster.
     const res = await api.get(`/schedule/${fromSchedule.value}/note-prefill`)
@@ -83,6 +87,32 @@ async function toggleArchive () {
   }
 }
 
+/** Load Square config + any existing invoice for this shift (best-effort). */
+async function loadSquare () {
+  if (!id.value) return
+  try {
+    const [s, inv] = await Promise.all([
+      api.get('/invoices/square/status'),
+      api.get('/invoices', { shift_note_id: id.value })
+    ])
+    squareStatus.value = s.data
+    invoice.value = inv.data[0] || null
+  } catch { /* invoicing is optional */ }
+}
+
+/** Create a draft invoice in Square from this shift note. */
+async function generateInvoice () {
+  if (!id.value) return
+  invoicing.value = true
+  try {
+    const res = await api.post(`/invoices/from-shift/${id.value}`, {})
+    invoice.value = res.data.invoice
+    toast.push('Draft invoice created in Square — review and send it from Square', 'success')
+  } catch { /* toast via interceptor */ } finally {
+    invoicing.value = false
+  }
+}
+
 async function draft () {
   if (!id.value) {
     toast.push('Save the shift first, then generate the draft', 'warning')
@@ -126,6 +156,34 @@ async function draft () {
     />
 
     <ShiftNoteEditor ref="editor" :model-value="shift" :clients="clients" :busy="busy" :locked="!!shift.finalised" @submit="save" @reopen="reopen" />
+
+    <div v-if="id && squareStatus && squareStatus.configured" class="card space-y-3">
+      <div class="flex items-center justify-between gap-3">
+        <h3 class="font-semibold">Square invoice</h3>
+        <span v-if="invoice" class="pill bg-success/15 text-success">{{ invoice.status || 'DRAFT' }}</span>
+      </div>
+      <template v-if="invoice">
+        <p class="text-sm text-mid">
+          {{ invoice.invoice_number ? `Invoice ${invoice.invoice_number}` : 'Draft invoice' }}
+          · {{ invoice.currency }} {{ Number(invoice.amount).toFixed(2) }}
+          · created {{ (invoice.created_at || '').slice(0, 10) }}
+        </p>
+        <a v-if="invoice.public_url" :href="invoice.public_url" target="_blank" class="text-accent text-sm hover:underline">Open in Square →</a>
+        <p v-else class="text-xs text-mid">This draft lives in your Square account — open Square to review and send it.</p>
+      </template>
+      <template v-else>
+        <p class="text-sm text-mid">
+          Create a <strong>draft</strong> invoice in Square for this shift using the participant's rate for the
+          selected billing code. Nothing is sent — you review and send it from Square.
+        </p>
+        <button
+          class="btn-primary"
+          :disabled="invoicing || !squareStatus.enabled"
+          @click="generateInvoice"
+        >{{ invoicing ? 'Creating…' : 'Create draft invoice in Square' }}</button>
+        <p v-if="!squareStatus.enabled" class="text-xs text-warning">Enable Square invoicing in Settings first.</p>
+      </template>
+    </div>
 
     <div v-if="id" class="card">
       <div class="flex items-center justify-between mb-3">

@@ -34,7 +34,16 @@ const config = {
   // googleCalendarService). Sync is a no-op until both are present.
   googleClientId: env.GOOGLE_CLIENT_ID || '',
   googleClientSecret: env.GOOGLE_CLIENT_SECRET || '',
-  googleRedirectUri: env.GOOGLE_REDIRECT_URI || 'http://localhost:3778/api/v1/schedule/google/callback'
+  googleRedirectUri: env.GOOGLE_REDIRECT_URI || 'http://localhost:3778/api/v1/schedule/google/callback',
+  // Square Invoicing (optional). The access token is a secret credential
+  // (a Personal Access Token from the Square Developer Dashboard) and lives in
+  // env — like ANTHROPIC_API_KEY, never stored in the database. The environment
+  // selects which Square API host to call; the location is auto-detected on the
+  // first "Test connection" but can be pinned here. Invoicing is a no-op until a
+  // token is present and the operator enables it. See squareService.
+  squareAccessToken: env.SQUARE_ACCESS_TOKEN || '',
+  squareEnvironment: env.SQUARE_ENVIRONMENT === 'production' ? 'production' : 'sandbox',
+  squareLocationId: env.SQUARE_LOCATION_ID || ''
 }
 
 /**

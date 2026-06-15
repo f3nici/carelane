@@ -328,6 +328,30 @@ CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_log (created_at);
   addColumnIfMissing('shift_notes', 'archived_at', 'TEXT')
   addColumnIfMissing('reports', 'archived_at', 'TEXT')
   addColumnIfMissing('service_agreements', 'archived_at', 'TEXT')
+
+  // Square Invoicing (added post-launch). The participant is mirrored to a Square
+  // customer once and the id cached here so repeat invoices reuse it. The
+  // square_invoices table tracks each draft we create from a shift note so the
+  // UI can show its status / link and we never invoice the same shift twice.
+  addColumnIfMissing('clients', 'square_customer_id', 'TEXT')
+  sqlite.exec(`
+CREATE TABLE IF NOT EXISTS square_invoices (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  client_id INTEGER NOT NULL REFERENCES clients(id),
+  shift_note_id INTEGER REFERENCES shift_notes(id),
+  square_invoice_id TEXT,
+  square_order_id TEXT,
+  invoice_number TEXT,
+  status TEXT,
+  public_url TEXT,
+  amount REAL,
+  currency TEXT,
+  created_at TEXT,
+  updated_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_square_invoices_client ON square_invoices (client_id);
+CREATE INDEX IF NOT EXISTS idx_square_invoices_shift ON square_invoices (shift_note_id);
+`)
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

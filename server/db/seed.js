@@ -71,6 +71,8 @@ const defaultSettings = {
   claude_model_cheap: config.claudeModelCheap,
   claude_model_quality: config.claudeModelQuality,
   ai_tone: 'professional, warm, person-centred',
+  square_invoicing_enabled: 0,
+  square_currency: 'AUD',
   disclaimer: 'CareLane is a documentation tool. It does not replace your obligations under the NDIS Practice Standards and Code of Conduct. AI outputs are drafts and must be reviewed before use.'
 }
 

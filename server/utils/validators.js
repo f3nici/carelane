@@ -141,6 +141,12 @@ export const googleSettingsSchema = z.object({
   timezone: z.string().trim().max(60).optional()
 })
 
+export const squareSettingsSchema = z.object({
+  enabled: bool01.optional(),
+  location_id: z.string().trim().max(64).optional(),
+  currency: z.string().trim().length(3).optional()
+})
+
 export const reportSchema = z.object({
   client_id: z.number().int().positive(),
   report_type: z.enum(['progress', 'plan_review', 'incident', 'general']).default('progress'),
