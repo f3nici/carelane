@@ -24,8 +24,6 @@ async function run () {
       console.log(`FAILED: ${err.message}`)
     }
   }
-  sqlite.prepare(`INSERT INTO settings (key, value) VALUES ('embedding_model', ?)
-    ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(config.embeddingModel)
   console.log(`Done — ${ok}/${docs.length} document(s) re-indexed.`)
 }
 

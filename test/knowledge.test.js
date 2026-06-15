@@ -1,7 +1,7 @@
 import os from 'node:os'
 import fs from 'node:fs'
 import path from 'node:path'
-import { describe, it, expect, beforeAll } from 'vitest'
+import { describe, it, expect, beforeAll, vi } from 'vitest'
 import request from 'supertest'
 import { freshDb } from './helpers/db.js'
 
@@ -69,6 +69,26 @@ describe('keyword (BM25) search over FTS5', () => {
   it('does not match unrelated documents', () => {
     const results = rag.keywordSearch('travel rate', 5)
     expect(results.some(r => r.title === 'Code of Conduct')).toBe(false)
+  })
+})
+
+describe('embedding-model drift warning', () => {
+  it('warns once per stale document and clears when re-stamped to the current model', async () => {
+    const config = (await import('../server/config.js')).default
+    const id = seedDoc({ title: 'Stale doc', filename: 'stale.pdf', chunks: ['anything'] })
+    // seedDoc leaves embedding_model NULL → counts as stale.
+    let warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    rag.checkEmbeddingModel()
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
+
+    sqlite.prepare('UPDATE documents SET embedding_model = ? WHERE id = ?').run(config.embeddingModel, id)
+    // Re-stamp every other seeded doc too so none remain stale.
+    sqlite.prepare('UPDATE documents SET embedding_model = ? WHERE indexed = 1').run(config.embeddingModel)
+    warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    rag.checkEmbeddingModel()
+    expect(warn).not.toHaveBeenCalled()
+    warn.mockRestore()
   })
 })
 

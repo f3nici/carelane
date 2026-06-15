@@ -83,7 +83,8 @@ export async function indexDocument (documentId, pages) {
     const vector = await embed(chunks[i].content)
     insert.run(documentId, i, chunks[i].page, chunks[i].content, Buffer.from(vector.buffer), ts)
   }
-  sqlite.prepare('UPDATE documents SET indexed = 1 WHERE id = ?').run(documentId)
+  sqlite.prepare('UPDATE documents SET indexed = 1, embedding_model = ? WHERE id = ?')
+    .run(config.embeddingModel, documentId)
   return chunks.length
 }
 
@@ -239,19 +240,18 @@ export function keywordSearch (query, k = 5) {
 }
 
 /**
- * Record / check which embedding model the stored vectors were built with.
- * Embeddings from different models are not comparable, so a change means a
- * reindex is needed. Mirrors the spirit of the encryption canary: warn loudly
- * rather than silently return poor results.
+ * Warn (don't block) when any indexed document was embedded with a different
+ * model than the one now configured. Embeddings from different models are not
+ * comparable, so those documents need re-indexing — via `npm run reindex` or the
+ * per-document re-index button. Tracked per document, so the warning clears
+ * itself as each stale document is re-indexed. Mirrors the spirit of the
+ * encryption canary: surface drift loudly rather than return poor results.
  */
 export function checkEmbeddingModel () {
-  const row = sqlite.prepare("SELECT value FROM settings WHERE key = 'embedding_model'").get()
-  if (!row) {
-    sqlite.prepare("INSERT INTO settings (key, value) VALUES ('embedding_model', ?)").run(config.embeddingModel)
-    return
-  }
-  if (row.value !== config.embeddingModel) {
-    console.warn(`Embedding model changed (${row.value} → ${config.embeddingModel}). ` +
-      'Run "npm run reindex" to re-embed all knowledge-base documents.')
+  const stale = sqlite.prepare(`SELECT COUNT(*) AS c FROM documents
+    WHERE indexed = 1 AND (embedding_model IS NULL OR embedding_model <> ?)`).get(config.embeddingModel).c
+  if (stale > 0) {
+    console.warn(`${stale} knowledge-base document(s) were embedded with a different model than ` +
+      `${config.embeddingModel}. Run "npm run reindex" (or re-index them in the UI) to refresh.`)
   }
 }

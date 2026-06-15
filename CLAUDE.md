@@ -74,8 +74,9 @@ API docs at `/api/docs`, health at `/healthz`.
   (`document_chunks_fts` FTS5, kept in sync by triggers) fused with Reciprocal
   Rank Fusion, then reordered by a local cross-encoder reranker
   (`rerankService`, degrades gracefully if unavailable). The embedding model is
-  recorded in `settings.embedding_model`; changing it warns on startup and needs
-  `npm run reindex`. Original PDFs download via auth-gated `GET /documents/:id/file`.
+  recorded per document (`documents.embedding_model`); changing it warns on
+  startup until each stale document is re-indexed (`npm run reindex` or the UI
+  re-index button). Original PDFs download via auth-gated `GET /documents/:id/file`.
 - AI: Haiku for cheap tasks (note cleanup, condensing), Sonnet for agreements/
   reports/Q&A. Stable system block uses prompt caching. Inputs are minimised
   (preferred name/initials, bullets, top-k chunks). Usage logged per call.

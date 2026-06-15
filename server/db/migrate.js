@@ -361,6 +361,9 @@ CREATE INDEX IF NOT EXISTS idx_square_invoices_shift ON square_invoices (shift_n
   // nouns) and semantic matches both surface. The FTS index is external-content
   // (stores only the index, joins back to document_chunks) and is kept in sync
   // by triggers, so all existing chunk read/write paths are unaffected.
+  // Track which embedding model a document's vectors were built with, so a
+  // model change can warn (and clear) per document as each is re-indexed.
+  addColumnIfMissing('documents', 'embedding_model', 'TEXT')
   sqlite.exec(`
 CREATE VIRTUAL TABLE IF NOT EXISTS document_chunks_fts USING fts5(
   content,
