@@ -119,6 +119,7 @@ All configuration is via environment variables (see [`.env.example`](.env.exampl
 | `BACKUP_ENABLED` / `BACKUP_PATH` / `BACKUP_RETENTION` / `BACKUP_TIME` | Scheduled backup settings. |
 | `PUBLIC_API_ENABLED` | Toggle for the public API surface. |
 | `CORS_ORIGINS` | Allowed CORS origins (comma-separated). |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_REDIRECT_URI` | Optional one-way Google Calendar sync. See the [Google Calendar setup guide](docs/google-calendar-setup.md). |
 
 > ⚠️ **`ENCRYPTION_SECRET` cannot be rotated casually.** Once data is encrypted
 > with it, changing it makes all existing PII unreadable. Back it up securely.

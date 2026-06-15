@@ -107,6 +107,25 @@ router.get('/google/callback', async (req, res) => {
   }
 })
 
+/** Live health check: confirm the stored credentials can reach the calendar. */
+router.post('/google/test', async (req, res) => {
+  const result = await googleCalendar.testConnection()
+  logActivity('google_calendar', null, req.session.userId, 'tested', { ok: result.ok })
+  res.json(ok(result))
+})
+
+/** Re-sync every active scheduled shift to Google Calendar (manual backfill). */
+router.post('/google/sync-all', async (req, res) => {
+  const result = await googleCalendar.syncAll()
+  logActivity('google_calendar', null, req.session.userId, 'sync_all', { synced: result.synced, failed: result.failed })
+  res.json(ok(result))
+})
+
+/** Dismiss the live sync-error banner (audit-log history is untouched). */
+router.post('/google/clear-error', (req, res) => {
+  res.json(ok(googleCalendar.clearSyncError()))
+})
+
 router.post('/google/disconnect', (req, res) => {
   googleCalendar.disconnect()
   logActivity('google_calendar', null, req.session.userId, 'disconnected')
