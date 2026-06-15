@@ -239,6 +239,7 @@ export async function createDraftInvoiceFromShift (shiftNoteId, userId) {
 
   const shift = sqlite.prepare('SELECT * FROM shift_notes WHERE id = ? AND deleted_at IS NULL').get(shiftNoteId)
   if (!shift) throw new ApiError(404, 'NOT_FOUND', 'Shift note not found')
+  if (!shift.finalised) throw new ApiError(409, 'NOT_FINALISED', 'Finalise the shift note before invoicing it')
 
   const prior = existingInvoiceForShift(shiftNoteId)
   if (prior && prior.status !== 'CANCELED') {

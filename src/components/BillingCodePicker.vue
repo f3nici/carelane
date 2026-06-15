@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useApi } from '../composables/useApi.js'
 
 const props = defineProps({
@@ -11,13 +11,21 @@ const emit = defineEmits(['update:modelValue'])
 
 const api = useApi()
 const codes = ref([])
-let firstLoad = true
+
+// v-model on the <select> so Vue re-syncs the selected <option> once the codes
+// load asynchronously — a plain :value binding stays unselected because it isn't
+// re-applied when only the option list changes.
+const selected = computed({
+  get: () => props.modelValue,
+  set: v => emit('update:modelValue', v)
+})
 
 // Only the billing codes assigned to the selected participant are offered.
 watch(() => props.clientId, async (clientId, prev) => {
-  // switching to a different participant invalidates a code chosen for the old one
-  if (!firstLoad && clientId !== prev && props.modelValue != null) emit('update:modelValue', null)
-  firstLoad = false
+  // Switching from one participant to *another* invalidates a code chosen for the
+  // old one. Initial hydration of an existing note goes null → id (prev == null)
+  // and must keep the saved code instead of wiping it.
+  if (prev != null && clientId !== prev && props.modelValue != null) emit('update:modelValue', null)
   if (!clientId) { codes.value = []; return }
   const res = await api.get(`/clients/${clientId}/billing-codes`)
   codes.value = res.data
@@ -33,9 +41,8 @@ function priceLabel (c) {
 <template>
   <select
     class="input"
-    :value="props.modelValue"
+    v-model="selected"
     :disabled="disabled"
-    @change="emit('update:modelValue', $event.target.value ? Number($event.target.value) : null)"
   >
     <option :value="null">{{ clientId ? '— No billing code —' : '— Select a participant first —' }}</option>
     <option v-for="c in codes" :key="c.id" :value="c.id">

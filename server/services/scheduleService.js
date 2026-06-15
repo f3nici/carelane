@@ -3,6 +3,7 @@ import { encrypt, decryptFields } from './cryptoService.js'
 import { clientDisplayName } from './clientService.js'
 import { createShift } from './shiftService.js'
 import { ApiError } from '../middleware/errorHandler.js'
+import { getSetting } from './settingsService.js'
 import * as googleCalendar from './googleCalendarService.js'
 
 /**
@@ -19,8 +20,18 @@ const COLUMNS = ['client_id', 'title', 'scheduled_date', 'start_time', 'end_time
 const STATUSES = ['scheduled', 'in_progress', 'completed', 'cancelled']
 
 const now = () => new Date().toISOString()
-/** Local HH:MM for an ISO timestamp (self-hosted in the operator's timezone). */
-const hhmm = iso => iso ? new Date(iso).toTimeString().slice(0, 5) : null
+/**
+ * HH:MM for an ISO timestamp rendered in the operator's configured timezone
+ * (shared with the calendar mirror) rather than the server's. Clock-in/out are
+ * stored as UTC, so a UTC server would otherwise stamp notes with the wrong time.
+ */
+const hhmm = iso => {
+  if (!iso) return null
+  const tz = getSetting('google_calendar_timezone', 'Australia/Perth')
+  return new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: tz
+  }).format(new Date(iso))
+}
 
 function toScheduled (row) {
   return row ? decryptFields(row, ENCRYPTED) : null

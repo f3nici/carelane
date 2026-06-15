@@ -58,6 +58,9 @@ async function save (payload) {
     shift.value = res.data
     toast.push(payload.finalised ? 'Shift note finalised' : 'Shift note saved', 'success')
     if (!id.value) router.replace(`/shifts/${res.data.id}`)
+    // Refresh Square status/invoice so the option appears as soon as the note is
+    // finalised, without needing to leave and re-open the note.
+    loadSquare()
   } catch { /* toast via interceptor */ } finally {
     busy.value = false
   }
@@ -89,11 +92,14 @@ async function toggleArchive () {
 
 /** Load Square config + any existing invoice for this shift (best-effort). */
 async function loadSquare () {
-  if (!id.value) return
+  // After creating a note the route param lags a tick behind, so fall back to the
+  // saved note's id to load Square status without waiting for a remount.
+  const shiftId = id.value || shift.value.id
+  if (!shiftId) return
   try {
     const [s, inv] = await Promise.all([
       api.get('/invoices/square/status'),
-      api.get('/invoices', { shift_note_id: id.value })
+      api.get('/invoices', { shift_note_id: shiftId })
     ])
     squareStatus.value = s.data
     invoice.value = inv.data[0] || null
@@ -157,7 +163,7 @@ async function draft () {
 
     <ShiftNoteEditor ref="editor" :model-value="shift" :clients="clients" :busy="busy" :locked="!!shift.finalised" @submit="save" @reopen="reopen" />
 
-    <div v-if="id && squareStatus && squareStatus.configured" class="card space-y-3">
+    <div v-if="id && shift.finalised && squareStatus && squareStatus.configured" class="card space-y-3">
       <div class="flex items-center justify-between gap-3">
         <h3 class="font-semibold">Square invoice</h3>
         <span v-if="invoice" class="pill bg-success/15 text-success">{{ invoice.status || 'DRAFT' }}</span>
