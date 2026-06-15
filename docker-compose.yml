@@ -15,6 +15,9 @@ services:
       BACKUP_ENABLED: ${BACKUP_ENABLED:-true}
       BACKUP_RETENTION: ${BACKUP_RETENTION:-14}
       BACKUP_TIME: ${BACKUP_TIME:-02:00}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-} # Optional: Google Calendar sync
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-} # Optional: Google Calendar sync
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-} # e.g. https://your-domain/api/v1/schedule/google/callback
     volumes:
       - ./data:/app/data
       - ./uploads:/app/uploads
