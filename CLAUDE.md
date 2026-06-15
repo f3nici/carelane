@@ -68,8 +68,15 @@ API docs at `/api/docs`, health at `/healthz`.
   "Deleted Items" page). Restores are themselves logged to the audit trail.
 - Uploads (photos/documents/logos/pdfs) live under `uploads/` and are served
   **only via auth-gated routes** — never `express.static`.
-- RAG: PDF → per-page text → ~600-token chunks → local embeddings →
-  `document_chunks.embedding` BLOB; search via sqlite-vec or JS cosine.
+- RAG: PDF → per-page text → ~300-token chunks → local embeddings
+  (`bge-small-en-v1.5`, query-instruction prefix) → `document_chunks.embedding`
+  BLOB. Search is **hybrid**: vector (sqlite-vec or JS cosine) + BM25 keyword
+  (`document_chunks_fts` FTS5, kept in sync by triggers) fused with Reciprocal
+  Rank Fusion, then reordered by a local cross-encoder reranker
+  (`rerankService`, degrades gracefully if unavailable). The embedding model is
+  recorded per document (`documents.embedding_model`); changing it warns on
+  startup until each stale document is re-indexed (`npm run reindex` or the UI
+  re-index button). Original PDFs download via auth-gated `GET /documents/:id/file`.
 - AI: Haiku for cheap tasks (note cleanup, condensing), Sonnet for agreements/
   reports/Q&A. Stable system block uses prompt caching. Inputs are minimised
   (preferred name/initials, bullets, top-k chunks). Usage logged per call.

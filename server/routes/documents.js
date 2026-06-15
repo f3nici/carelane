@@ -72,6 +72,18 @@ router.post('/ask', validate(askSchema), async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+/**
+ * @openapi
+ * /documents/{id}/file:
+ *   get: { tags: [Knowledge], summary: Download the original PDF (auth-gated) }
+ */
+router.get('/:id/file', (req, res, next) => {
+  try {
+    const doc = documentService.getDocument(Number(req.params.id))
+    res.download(path.join(DOC_DIR, doc.filename), doc.original_name || `${doc.title}.pdf`)
+  } catch (err) { next(err) }
+})
+
 router.post('/:id/reindex', async (req, res, next) => {
   try {
     const chunks = await documentService.reindexDocument(Number(req.params.id))

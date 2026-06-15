@@ -312,5 +312,5 @@ export async function askGuidelines (question, userId) {
       content: `Answer using ONLY these excerpts from the worker's NDIS document library. Cite as (Title, p.X). If the excerpts don't answer it, say so.\n\n${context}\n\nQuestion: ${question}`
     }]
   }, { userId, feature: 'guideline_qa' })
-  return { answer: text, sources: chunks.map(c => ({ title: c.title, page: c.page, snippet: c.content.slice(0, 300) })), usage }
+  return { answer: text, sources: chunks.map(c => ({ document_id: c.document_id, title: c.title, page: c.page, snippet: c.content.slice(0, 300) })), usage }
 }

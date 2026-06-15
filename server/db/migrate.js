@@ -354,6 +354,67 @@ CREATE TABLE IF NOT EXISTS square_invoices (
 CREATE INDEX IF NOT EXISTS idx_square_invoices_client ON square_invoices (client_id);
 CREATE INDEX IF NOT EXISTS idx_square_invoices_shift ON square_invoices (shift_note_id);
 `)
+
+  // Hybrid search (added post-launch): a full-text (BM25) index over chunk text
+  // sitting alongside the vector embeddings. The two are fused with Reciprocal
+  // Rank Fusion at query time so exact terms (NDIS codes, acronyms, proper
+  // nouns) and semantic matches both surface. The FTS index is self-contained
+  // (stores its own copy of the text) and kept in sync by plain INSERT/DELETE
+  // triggers, so all existing chunk read/write paths are unaffected.
+  // Track which embedding model a document's vectors were built with, so a
+  // model change can warn (and clear) per document as each is re-indexed.
+  addColumnIfMissing('documents', 'embedding_model', 'TEXT')
+  migrateChunkFts()
+}
+
+/**
+ * Create/repair the FTS5 keyword index over document_chunks. Idempotent.
+ *
+ * Earlier builds used an *external-content* FTS5 table whose delete trigger
+ * used the special `('delete', rowid, content)` command. If that shadow index
+ * ever drifted from document_chunks it raised `SQLITE_CORRUPT_VTAB` ("database
+ * disk image is malformed") on the next delete/re-index. A self-contained FTS5
+ * table with plain `DELETE FROM ... WHERE rowid = ?` triggers cannot reach that
+ * state, so we migrate any external-content (or missing) table to this form and
+ * rebuild it from the base data — the chunk rows themselves are never affected.
+ */
+function migrateChunkFts () {
+  const existing = sqlite.prepare("SELECT sql FROM sqlite_master WHERE name = 'document_chunks_fts'").get()?.sql || ''
+  const isSelfContained = existing && !/content\s*=/.test(existing)
+  if (isSelfContained) return // already the robust form
+
+  sqlite.exec(`
+    DROP TRIGGER IF EXISTS document_chunks_ai;
+    DROP TRIGGER IF EXISTS document_chunks_ad;
+    DROP TRIGGER IF EXISTS document_chunks_au;
+  `)
+  try {
+    sqlite.exec('DROP TABLE IF EXISTS document_chunks_fts')
+  } catch {
+    // A corrupt vtable can refuse a normal drop; clear its schema + shadow
+    // tables directly, then recreate from scratch.
+    sqlite.pragma('writable_schema = ON')
+    sqlite.exec("DELETE FROM sqlite_master WHERE name LIKE 'document_chunks_fts%'")
+    sqlite.pragma('writable_schema = OFF')
+    for (const suffix of ['_data', '_idx', '_docsize', '_content', '_config']) {
+      try { sqlite.exec(`DROP TABLE IF EXISTS document_chunks_fts${suffix}`) } catch { /* already gone */ }
+    }
+  }
+
+  sqlite.exec(`
+CREATE VIRTUAL TABLE document_chunks_fts USING fts5(content);
+CREATE TRIGGER document_chunks_ai AFTER INSERT ON document_chunks BEGIN
+  INSERT INTO document_chunks_fts(rowid, content) VALUES (new.id, new.content);
+END;
+CREATE TRIGGER document_chunks_ad AFTER DELETE ON document_chunks BEGIN
+  DELETE FROM document_chunks_fts WHERE rowid = old.id;
+END;
+CREATE TRIGGER document_chunks_au AFTER UPDATE ON document_chunks BEGIN
+  DELETE FROM document_chunks_fts WHERE rowid = old.id;
+  INSERT INTO document_chunks_fts(rowid, content) VALUES (new.id, new.content);
+END;
+`)
+  sqlite.exec('INSERT INTO document_chunks_fts(rowid, content) SELECT id, content FROM document_chunks')
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

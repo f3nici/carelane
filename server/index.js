@@ -2,6 +2,7 @@ import config, { assertProductionSecrets } from './config.js'
 import { migrate } from './db/migrate.js'
 import { seed } from './db/seed.js'
 import { assertEncryptionCanary } from './services/cryptoService.js'
+import { checkEmbeddingModel } from './services/ragService.js'
 import { scheduleBackups, warnIfBackupsStale } from './services/backupService.js'
 import { scheduleMaterialisation } from './services/recurrenceService.js'
 import { createApp } from './app.js'
@@ -18,6 +19,9 @@ try {
   console.error('Refusing to start:\n  - ' + err.message)
   process.exit(1)
 }
+
+// Warn (don't block) if the embedding model changed and a reindex is pending.
+checkEmbeddingModel()
 
 const app = createApp()
 
