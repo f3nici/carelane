@@ -215,8 +215,7 @@ function toEventBody (shift, label) {
   const event = {
     summary: shift.title || `CareLane: ${label}`,
     location: shift.location || undefined,
-    description: 'Scheduled support shift (managed by CareLane).',
-    source: { title: 'CareLane' }
+    description: 'Scheduled support shift (managed by CareLane).'
   }
   if (shift.start_time && shift.end_time) {
     event.start = { dateTime: `${shift.scheduled_date}T${shift.start_time}:00`, timeZone: tz }
