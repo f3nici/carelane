@@ -20,6 +20,7 @@ router.get('/stats', (req, res) => {
     agreements_active: get('SELECT COUNT(*) AS c FROM service_agreements WHERE deleted_at IS NULL AND archived_at IS NULL AND status = \'active\'').c,
     shifts_this_month: sqlite.prepare('SELECT COUNT(*) AS c FROM shift_notes WHERE deleted_at IS NULL AND archived_at IS NULL AND shift_date >= ?')
       .get(today.slice(0, 8) + '01').c,
+    unfinalised_notes: get('SELECT COUNT(*) AS c FROM shift_notes WHERE deleted_at IS NULL AND archived_at IS NULL AND finalised = 0').c,
     unbilled_shifts: get('SELECT COUNT(*) AS c FROM shift_notes WHERE deleted_at IS NULL AND archived_at IS NULL AND billed = 0 AND finalised = 1').c,
     open_incidents: get('SELECT COUNT(*) AS c FROM shift_notes WHERE deleted_at IS NULL AND archived_at IS NULL AND incident_flag = 1 AND follow_up_required = 1').c,
     plan_reviews_due: sqlite.prepare('SELECT COUNT(*) AS c FROM clients WHERE deleted_at IS NULL AND active = 1 AND plan_end IS NOT NULL AND plan_end BETWEEN ? AND ?').get(today, soon).c,
