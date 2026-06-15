@@ -2,7 +2,7 @@ import crypto from 'node:crypto'
 import { sqlite } from '../db/connection.js'
 import config from '../config.js'
 import { getSetting, updateSettings } from './settingsService.js'
-import { getClient, clientDisplayName } from './clientService.js'
+import { getClient } from './clientService.js'
 import { logActivity } from './activityService.js'
 import { ApiError } from '../middleware/errorHandler.js'
 
@@ -143,13 +143,6 @@ export async function testConnection () {
   }
 }
 
-/** Pull the first email-looking token out of a free-text contact field. */
-function extractEmail (text) {
-  if (!text) return null
-  const m = String(text).match(/[\w.+-]+@[\w-]+\.[\w.-]+/)
-  return m ? m[0] : null
-}
-
 /** Human label for a billing-code unit, used in the line-item note. */
 function unitLabel (unit) {
   return ({ H: 'hours', E: 'each', D: 'days', WK: 'weeks', MON: 'months' })[unit] || 'units'
@@ -288,13 +281,11 @@ export async function createDraftInvoiceFromShift (shiftNoteId, userId) {
     })
     const orderId = orderRes.order.id
 
-    // Plan-manager email can't be a true CC on a Square invoice, and invoice
-    // custom fields need a paid Square subscription — so surface the plan manager
-    // in the (free) description for the operator to action before sending.
-    const planManagerEmail = extractEmail(client.plan_manager_contact)
-    const planManager = [client.plan_manager_name, planManagerEmail].filter(Boolean).join(' · ')
-    const description = `NDIS supports for ${clientDisplayName(client)}.` +
-      (planManager ? ` Plan manager (please CC when sending): ${planManager}.` : '')
+    // Plan-manager can't be a true CC on a Square invoice, and invoice custom
+    // fields need a paid Square plan — so surface the plan manager in the (free)
+    // description for the operator to action before sending.
+    const planManager = [client.plan_manager_name, client.plan_manager_contact].filter(Boolean).join(' ')
+    const description = planManager ? `Plan Manager: ${planManager}` : undefined
 
     // Payment term comes from the participant (defaulting to 45 days).
     const dueDays = client.invoice_due_days ?? 45
@@ -315,7 +306,6 @@ export async function createDraftInvoiceFromShift (shiftNoteId, userId) {
           // it's a draft, so the operator can change payment options in Square
           // before sending (e.g. add bank-transfer instructions).
           accepted_payment_methods: { card: true },
-          title: 'NDIS supports',
           description,
           sale_or_service_date: shift.shift_date
         }
