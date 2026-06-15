@@ -7,7 +7,7 @@ import { validate, validatePartial } from '../middleware/validate.js'
 import { shiftSchema, shiftDraftSchema } from '../utils/validators.js'
 import * as shiftService from '../services/shiftService.js'
 import * as clientService from '../services/clientService.js'
-import { draftShiftNote, estimateTokens } from '../services/aiService.js'
+import { draftShiftNote, estimateShiftNoteTokens } from '../services/aiService.js'
 import { logActivity, diffChanges } from '../services/activityService.js'
 import { parsePagination, paginationMeta, ok } from '../utils/pagination.js'
 import { ApiError } from '../middleware/errorHandler.js'
@@ -110,7 +110,7 @@ router.post('/:id/draft', validate(shiftDraftSchema), async (req, res, next) => 
     const client = clientService.getClient(shift.client_id)
     // minimise PII in prompts: preferred name or initials only
     const label = client.preferred_name || `${client.first_name?.[0] || ''}${client.last_name?.[0] || ''}`.toUpperCase()
-    const body = await draftShiftNote({
+    const { body, usage } = await draftShiftNote({
       clientLabel: label,
       shiftDate: shift.shift_date,
       durationHours: shift.duration_hours,
@@ -119,7 +119,29 @@ router.post('/:id/draft', validate(shiftDraftSchema), async (req, res, next) => 
       incident: shift.incident_flag ? shift.incident_details : null
     }, req.session.userId)
     const updated = shiftService.updateShift(shift.id, { body })
-    res.json(ok({ ...updated, estimated_tokens: estimateTokens(bullets) }))
+    res.json(ok({ ...updated, tokens: usage }))
+  } catch (err) { next(err) }
+})
+
+/**
+ * @openapi
+ * /shifts/{id}/draft/estimate:
+ *   post: { tags: [Shifts], summary: Estimate the draft's input tokens (no AI call) }
+ */
+router.post('/:id/draft/estimate', (req, res, next) => {
+  try {
+    const shift = shiftService.getShift(Number(req.params.id))
+    const client = clientService.getClient(shift.client_id)
+    const label = client.preferred_name || `${client.first_name?.[0] || ''}${client.last_name?.[0] || ''}`.toUpperCase()
+    const estimated_tokens = estimateShiftNoteTokens({
+      clientLabel: label,
+      shiftDate: shift.shift_date,
+      durationHours: shift.duration_hours,
+      supportProvided: req.body.bullets ?? shift.support_provided ?? '',
+      participantResponse: shift.participant_response,
+      incident: shift.incident_flag ? shift.incident_details : null
+    })
+    res.json(ok({ estimated_tokens }))
   } catch (err) { next(err) }
 })
 

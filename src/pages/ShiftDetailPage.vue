@@ -116,6 +116,8 @@ async function draft () {
     <AiDraftPanel
       v-if="!shift.finalised"
       :input-text="editor?.form?.support_provided || ''"
+      :estimate-endpoint="id ? `/shifts/${id}/draft/estimate` : ''"
+      :estimate-payload="{ bullets: editor?.form?.support_provided || '' }"
       :busy="drafting"
       :disabled="!id || !(editor?.form?.support_provided)"
       label="Draft note from bullets"

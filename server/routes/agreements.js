@@ -5,7 +5,7 @@ import { agreementSchema, agreementDraftSchema } from '../utils/validators.js'
 import * as agreementService from '../services/agreementService.js'
 import * as clientService from '../services/clientService.js'
 import { resolveTemplateForDraft } from '../services/templateService.js'
-import { draftAgreement } from '../services/aiService.js'
+import { draftAgreement, estimateAgreementTokens } from '../services/aiService.js'
 import { renderPdf, pdfPath, safeFilename } from '../utils/pdfRenderer.js'
 import { logActivity, diffChanges } from '../services/activityService.js'
 import { parsePagination, paginationMeta, ok } from '../utils/pagination.js'
@@ -88,6 +88,25 @@ router.post('/:id/draft', validate(agreementDraftSchema), async (req, res, next)
     const updated = agreementService.updateAgreement(agreement.id, { body_markdown: body, status: 'draft' })
     logActivity('agreement', agreement.id, req.session.userId, 'ai_drafted', { template_id: template?.id ?? null })
     res.json(ok(updated))
+  } catch (err) { next(err) }
+})
+
+/**
+ * @openapi
+ * /agreements/{id}/draft/estimate:
+ *   post: { tags: [Agreements], summary: Estimate the draft's input tokens (no AI call) }
+ */
+router.post('/:id/draft/estimate', async (req, res, next) => {
+  try {
+    const agreement = agreementService.getAgreement(Number(req.params.id))
+    const client = clientService.getClient(agreement.client_id)
+    const label = client.preferred_name || `${client.first_name?.[0] || ''}${client.last_name?.[0] || ''}`.toUpperCase()
+    // Prefer the live (possibly unsaved) questionnaire from the editor; fall
+    // back to the stored one.
+    const questionnaire = req.body.questionnaire ?? (agreement.questionnaire_json ? JSON.parse(agreement.questionnaire_json) : {})
+    const template = resolveTemplateForDraft('agreement', { templateId: req.body.template_id })
+    const estimated_tokens = await estimateAgreementTokens({ clientLabel: label, questionnaire, template })
+    res.json(ok({ estimated_tokens }))
   } catch (err) { next(err) }
 })
 
