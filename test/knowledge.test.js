@@ -5,14 +5,14 @@ import { describe, it, expect, beforeAll, vi } from 'vitest'
 import request from 'supertest'
 import { freshDb } from './helpers/db.js'
 
-let sqlite, rag, app, agent, uploadDir
+let sqlite, rag, migrate, app, agent, uploadDir
 
 beforeAll(async () => {
   // UPLOAD_PATH must be set before config is imported (inside freshDb).
   uploadDir = path.join(os.tmpdir(), `carelane-uploads-${process.pid}-${Date.now()}`)
   process.env.UPLOAD_PATH = uploadDir
   process.env.RERANK_ENABLED = 'false'
-  ;({ sqlite } = await freshDb())
+  ;({ sqlite, migrate } = await freshDb())
   rag = await import('../server/services/ragService.js')
 
   const { seed } = await import('../server/db/seed.js')
@@ -69,6 +69,39 @@ describe('keyword (BM25) search over FTS5', () => {
   it('does not match unrelated documents', () => {
     const results = rag.keywordSearch('travel rate', 5)
     expect(results.some(r => r.title === 'Code of Conduct')).toBe(false)
+  })
+
+  it('uses a self-contained FTS5 table (no external content) so re-index cannot corrupt it', () => {
+    const sql = sqlite.prepare("SELECT sql FROM sqlite_master WHERE name = 'document_chunks_fts'").get().sql
+    expect(sql).not.toMatch(/content\s*=/)
+  })
+
+  it('keeps the index in sync when chunks are deleted (re-index path) without corruption', () => {
+    const id = seedDoc({ title: 'Transient', filename: 'transient.pdf', chunks: ['unique kangaroo allowance clause'] })
+    expect(rag.keywordSearch('kangaroo', 5).length).toBe(1)
+    // Mirrors what indexDocument does first: delete the document's chunks.
+    expect(() => sqlite.prepare('DELETE FROM document_chunks WHERE document_id = ?').run(id)).not.toThrow()
+    expect(rag.keywordSearch('kangaroo', 5).length).toBe(0)
+  })
+
+  it('migrates an existing external-content FTS table to the self-contained form', () => {
+    // Reproduce the old (fragile) external-content table + delete trigger.
+    sqlite.exec(`
+      DROP TRIGGER IF EXISTS document_chunks_ai;
+      DROP TRIGGER IF EXISTS document_chunks_ad;
+      DROP TRIGGER IF EXISTS document_chunks_au;
+      DROP TABLE IF EXISTS document_chunks_fts;
+      CREATE VIRTUAL TABLE document_chunks_fts USING fts5(content, content='document_chunks', content_rowid='id');
+    `)
+    expect(sqlite.prepare("SELECT sql FROM sqlite_master WHERE name='document_chunks_fts'").get().sql).toMatch(/content\s*=/)
+
+    migrate() // should detect the external-content table and rebuild it
+
+    const sql = sqlite.prepare("SELECT sql FROM sqlite_master WHERE name='document_chunks_fts'").get().sql
+    expect(sql).not.toMatch(/content\s*=/)
+    // Backfilled from the base rows, and a delete still works cleanly.
+    expect(rag.keywordSearch('travel', 5).length).toBeGreaterThan(0)
+    expect(() => migrate()).not.toThrow() // idempotent second run
   })
 })
 
