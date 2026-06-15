@@ -84,9 +84,11 @@ export function status () {
 
 /**
  * Live health check: confirm the stored credentials can actually reach the
- * configured calendar. Hits the Calendar API for the calendar's metadata
- * (read-only) so the operator can verify the integration works end-to-end.
- * Never throws — returns a result object for the settings UI.
+ * configured calendar. Lists a single event — the same `calendar.events` scope
+ * that sync relies on — so the probe exercises exactly the permission shift
+ * sync needs (reading the calendar resource itself would require a broader
+ * scope and would 403). The events response also carries the calendar summary
+ * and timezone, which we surface for the UI. Never throws.
  * @returns {Promise<{ok:boolean, calendar_summary?:string, calendar_timezone?:string, error?:string}>}
  */
 export async function testConnection () {
@@ -94,11 +96,17 @@ export async function testConnection () {
   try {
     const token = await getAccessToken()
     const calendarId = encodeURIComponent(getSetting('google_calendar_id', 'primary'))
-    const res = await fetch(`${API_BASE}/calendars/${calendarId}`, {
+    const res = await fetch(`${API_BASE}/calendars/${calendarId}/events?maxResults=1`, {
       headers: { Authorization: `Bearer ${token}` }
     })
     if (!res.ok) {
-      const detail = res.status === 404 ? 'Calendar not found — check the Calendar ID' : `Google API returned ${res.status}`
+      let reason = null
+      try { reason = (await res.json())?.error?.errors?.[0]?.reason || null } catch { /* ignore */ }
+      let detail
+      if (res.status === 404) detail = 'Calendar not found — check the Calendar ID'
+      else if (reason === 'accessNotConfigured') detail = 'Google Calendar API is not enabled for this project — enable it in Google Cloud Console'
+      else if (res.status === 403) detail = 'Access denied (403) — check the requested scope was granted and the Calendar API is enabled'
+      else detail = `Google API returned ${res.status}`
       return { ok: false, error: detail }
     }
     const cal = await res.json()
