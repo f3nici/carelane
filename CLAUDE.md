@@ -66,7 +66,24 @@ API docs at `/api/docs`, health at `/healthz`.
   never invoiced twice.
 - Soft-deleted records (and deactivated billing codes) are listed and restorable
   via `GET /api/v1/deleted` + `POST /api/v1/deleted/:type/:id/restore` (the
-  "Deleted Items" page). Restores are themselves logged to the audit trail.
+  "Deleted Items" page) — clients, agreements, shifts, reports, templates,
+  scheduled shifts, **consent/documents and goals**. Restores are themselves
+  logged to the audit trail.
+- Consent & document records: `client_documents` is a first-class, trackable
+  store for completed paperwork (consent forms, signed agreements, …), not just
+  generic uploads. Each row carries a `doc_type` (media_consent, consent_to_share,
+  …) plus `issue_date`/`expiry_date`; the service computes an `expiry_status`
+  (expired/expiring/ok) and the dashboard surfaces lapsing items
+  (`GET /dashboard/document-expiries`, `documents_expiring` stat) before they
+  lapse. Metadata is editable without re-uploading (`PUT
+  /clients/:id/documents/:docId`). Files stay served auth-gated only.
+- Structured goals: `client_goals` are discrete, trackable participant outcomes
+  (status active/achieved/on_hold/discontinued, optional target date) that
+  supersede the free-text `clients.support_goals` blob (kept as a quick-notes
+  fallback). Each goal accrues dated `goal_progress_notes` whose `body` is
+  encrypted like shift bodies. The report drafter prefers a structured goals +
+  recent-progress summary (`goalService.buildGoalsSummary`) over the free-text
+  field. CRUD nests under `clients/:id/goals` (+ `…/goals/:goalId/progress`).
 - Uploads (photos/documents/logos/pdfs) live under `uploads/` and are served
   **only via auth-gated routes** — never `express.static`.
 - RAG: PDF → per-page text → ~300-token chunks → local embeddings

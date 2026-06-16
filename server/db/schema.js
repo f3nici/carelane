@@ -171,10 +171,46 @@ export const clientDocuments = sqliteTable('client_documents', {
   title: text('title').notNull(),
   sourceType: text('source_type').notNull().default('upload'), // agreement | report | upload
   sourceId: integer('source_id'),
+  // First-class document classification (media_consent, consent_to_share, …) so
+  // consent forms and other expirable paperwork are trackable, not generic
+  // uploads. issue_date/expiry_date drive the expiry surfacing on the dashboard.
+  docType: text('doc_type').notNull().default('other'),
+  issueDate: text('issue_date'),
+  expiryDate: text('expiry_date'),
   filename: text('filename').notNull(),
   originalName: text('original_name'),
   mimeType: text('mime_type'),
   sizeBytes: integer('size_bytes'),
+  createdAt: text('created_at'),
+  updatedAt: text('updated_at'),
+  deletedAt: text('deleted_at')
+})
+
+// Structured participant goals — discrete, trackable outcomes that replace the
+// free-text support_goals blob. Each goal accrues dated progress notes
+// (goal_progress_notes) so participant outcomes can be demonstrated over time
+// and fed to the AI report drafter as structured input.
+export const clientGoals = sqliteTable('client_goals', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  clientId: integer('client_id').notNull().references(() => clients.id),
+  title: text('title').notNull(),
+  description: text('description'),
+  category: text('category'),
+  status: text('status').notNull().default('active'), // active | achieved | on_hold | discontinued
+  targetDate: text('target_date'),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: text('created_at'),
+  updatedAt: text('updated_at'),
+  deletedAt: text('deleted_at')
+})
+
+export const goalProgressNotes = sqliteTable('goal_progress_notes', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  goalId: integer('goal_id').notNull().references(() => clientGoals.id),
+  clientId: integer('client_id').notNull().references(() => clients.id),
+  noteDate: text('note_date').notNull(),
+  progressRating: integer('progress_rating'), // optional 1-5 self-assessed progress
+  body: text('body'), // 🔒 encrypted like shift bodies
   createdAt: text('created_at'),
   deletedAt: text('deleted_at')
 })

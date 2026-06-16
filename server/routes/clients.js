@@ -5,11 +5,12 @@ import crypto from 'node:crypto'
 import multer from 'multer'
 import { ZipArchive } from 'archiver'
 import { validate, validatePartial } from '../middleware/validate.js'
-import { clientSchema, clientBillingCodesSchema } from '../utils/validators.js'
+import { clientSchema, clientBillingCodesSchema, clientDocumentMetaSchema, goalSchema, goalProgressSchema } from '../utils/validators.js'
 import * as clientService from '../services/clientService.js'
 import * as agreementService from '../services/agreementService.js'
 import * as shiftService from '../services/shiftService.js'
 import * as clientDocumentService from '../services/clientDocumentService.js'
+import * as goalService from '../services/goalService.js'
 import { CLIENT_DOC_DIR } from '../services/clientDocumentService.js'
 import { logActivity, diffChanges } from '../services/activityService.js'
 import { renderPdf, pdfPath } from '../utils/pdfRenderer.js'
@@ -153,8 +154,20 @@ router.get('/:id/documents', (req, res) => {
 router.post('/:id/documents', docUpload.single('file'), (req, res, next) => {
   if (!req.file) return next(new ApiError(400, 'UPLOAD_ERROR', 'Upload a PDF or image file'))
   const doc = clientDocumentService.createClientDocument(Number(req.params.id), req.file, req.body)
-  logActivity('client', Number(req.params.id), req.session.userId, 'updated', { document_added: doc.source_type })
+  logActivity('client', Number(req.params.id), req.session.userId, 'updated', { document_added: doc.doc_type })
   res.status(201).json(ok(doc))
+})
+
+/**
+ * @openapi
+ * /clients/{id}/documents/{docId}:
+ *   put: { tags: [Clients], summary: Update a document's metadata (type, issue/expiry dates) without re-uploading }
+ *   delete: { tags: [Clients], summary: Archive (soft-delete) a completed document }
+ */
+router.put('/:id/documents/:docId', validatePartial(clientDocumentMetaSchema), (req, res) => {
+  const doc = clientDocumentService.updateClientDocument(Number(req.params.id), Number(req.params.docId), req.body)
+  logActivity('client', Number(req.params.id), req.session.userId, 'updated', { document_updated: doc.doc_type })
+  res.json(ok(doc))
 })
 
 /** Auth-gated file serving — completed documents are never exposed as a public static path. */
@@ -167,6 +180,64 @@ router.delete('/:id/documents/:docId', (req, res) => {
   clientDocumentService.deleteClientDocument(Number(req.params.id), Number(req.params.docId))
   logActivity('client', Number(req.params.id), req.session.userId, 'updated', { document_archived: true })
   res.json(ok({ deleted: true }))
+})
+
+/**
+ * @openapi
+ * /clients/{id}/goals:
+ *   get: { tags: [Clients], summary: List a participant's structured goals (with progress summary) }
+ *   post: { tags: [Clients], summary: Create a structured goal }
+ */
+router.get('/:id/goals', (req, res) => {
+  res.json(ok(goalService.listGoals(Number(req.params.id), req.query)))
+})
+
+router.post('/:id/goals', validate(goalSchema), (req, res) => {
+  const goal = goalService.createGoal(Number(req.params.id), req.body)
+  logActivity('goal', goal.id, req.session.userId, 'created', { client_id: Number(req.params.id) })
+  res.status(201).json(ok(goal))
+})
+
+/**
+ * @openapi
+ * /clients/{id}/goals/{goalId}:
+ *   get: { tags: [Clients], summary: Get one goal with its progress notes }
+ *   put: { tags: [Clients], summary: Update a goal (e.g. mark achieved) }
+ *   delete: { tags: [Clients], summary: Soft-delete a goal (record retention) }
+ */
+router.get('/:id/goals/:goalId', (req, res) => {
+  res.json(ok(goalService.getGoal(Number(req.params.id), Number(req.params.goalId))))
+})
+
+router.put('/:id/goals/:goalId', validatePartial(goalSchema), (req, res) => {
+  const before = goalService.getGoal(Number(req.params.id), Number(req.params.goalId))
+  const goal = goalService.updateGoal(Number(req.params.id), Number(req.params.goalId), req.body)
+  const action = before.status !== 'achieved' && goal.status === 'achieved' ? 'achieved' : 'updated'
+  logActivity('goal', goal.id, req.session.userId, action, { changes: diffChanges(before, goal, Object.keys(req.body)) })
+  res.json(ok(goal))
+})
+
+router.delete('/:id/goals/:goalId', (req, res) => {
+  goalService.deleteGoal(Number(req.params.id), Number(req.params.goalId))
+  logActivity('goal', Number(req.params.goalId), req.session.userId, 'deleted')
+  res.json(ok({ deleted: true }))
+})
+
+/**
+ * @openapi
+ * /clients/{id}/goals/{goalId}/progress:
+ *   post: { tags: [Clients], summary: Add a dated progress note to a goal (body encrypted at rest) }
+ */
+router.post('/:id/goals/:goalId/progress', validate(goalProgressSchema), (req, res) => {
+  const goal = goalService.addProgressNote(Number(req.params.id), Number(req.params.goalId), req.body)
+  logActivity('goal', goal.id, req.session.userId, 'progress_logged', { note_date: req.body.note_date || null })
+  res.status(201).json(ok(goal))
+})
+
+router.delete('/:id/goals/:goalId/progress/:noteId', (req, res) => {
+  const goal = goalService.deleteProgressNote(Number(req.params.id), Number(req.params.goalId), Number(req.params.noteId))
+  logActivity('goal', goal.id, req.session.userId, 'updated', { progress_removed: true })
+  res.json(ok(goal))
 })
 
 export default router

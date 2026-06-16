@@ -191,14 +191,47 @@ CREATE TABLE IF NOT EXISTS client_documents (
   title TEXT NOT NULL,
   source_type TEXT NOT NULL DEFAULT 'upload',
   source_id INTEGER,
+  doc_type TEXT NOT NULL DEFAULT 'other',
+  issue_date TEXT,
+  expiry_date TEXT,
   filename TEXT NOT NULL,
   original_name TEXT,
   mime_type TEXT,
   size_bytes INTEGER,
   created_at TEXT,
+  updated_at TEXT,
   deleted_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_client_documents_client ON client_documents (client_id);
+
+-- Structured participant goals + dated progress notes (replaces the free-text
+-- support_goals blob; progress note bodies are encrypted in the service layer).
+CREATE TABLE IF NOT EXISTS client_goals (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  client_id INTEGER NOT NULL REFERENCES clients(id),
+  title TEXT NOT NULL,
+  description TEXT,
+  category TEXT,
+  status TEXT NOT NULL DEFAULT 'active',
+  target_date TEXT,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT,
+  updated_at TEXT,
+  deleted_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_client_goals_client ON client_goals (client_id, status);
+
+CREATE TABLE IF NOT EXISTS goal_progress_notes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  goal_id INTEGER NOT NULL REFERENCES client_goals(id),
+  client_id INTEGER NOT NULL REFERENCES clients(id),
+  note_date TEXT NOT NULL,
+  progress_rating INTEGER,
+  body TEXT,
+  created_at TEXT,
+  deleted_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_goal_progress_goal ON goal_progress_notes (goal_id, note_date);
 
 CREATE TABLE IF NOT EXISTS documents (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -398,6 +431,16 @@ CREATE INDEX IF NOT EXISTS idx_square_invoices_shift ON square_invoices (shift_n
   // Track which embedding model a document's vectors were built with, so a
   // model change can warn (and clear) per document as each is re-indexed.
   addColumnIfMissing('documents', 'embedding_model', 'TEXT')
+
+  // Consent & document records (added post-launch): promote completed documents
+  // to a trackable type with issue/expiry dates so consent forms (and other
+  // expirable paperwork) can be surfaced before they lapse. updated_at lets the
+  // metadata be edited (type/dates) without re-uploading the file.
+  addColumnIfMissing('client_documents', 'doc_type', "TEXT NOT NULL DEFAULT 'other'")
+  addColumnIfMissing('client_documents', 'issue_date', 'TEXT')
+  addColumnIfMissing('client_documents', 'expiry_date', 'TEXT')
+  addColumnIfMissing('client_documents', 'updated_at', 'TEXT')
+  sqlite.exec('CREATE INDEX IF NOT EXISTS idx_client_documents_expiry ON client_documents (expiry_date)')
 
   // Retire the NDIS plan start/end dates (removed post-launch). Independent
   // support workers track service-agreement expiry, not plan-manager plan

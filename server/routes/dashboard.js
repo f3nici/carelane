@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { sqlite } from '../db/connection.js'
 import { recentActivity } from '../services/activityService.js'
 import { clientDisplayName } from '../services/clientService.js'
+import { listExpiringDocuments, countExpiringDocuments } from '../services/clientDocumentService.js'
 import { ok } from '../utils/pagination.js'
 
 const router = Router()
@@ -26,8 +27,18 @@ router.get('/stats', (req, res) => {
     agreements_expiring: sqlite.prepare("SELECT COUNT(*) AS c FROM service_agreements WHERE deleted_at IS NULL AND archived_at IS NULL AND status = 'active' AND end_date IS NOT NULL AND end_date BETWEEN ? AND ?").get(today, soon).c,
     upcoming_shifts: sqlite.prepare("SELECT COUNT(*) AS c FROM scheduled_shifts WHERE deleted_at IS NULL AND status IN ('scheduled','in_progress') AND scheduled_date >= ?").get(today).c,
     draft_reports: get('SELECT COUNT(*) AS c FROM reports WHERE deleted_at IS NULL AND archived_at IS NULL AND status = \'draft\'').c,
-    documents_indexed: get('SELECT COUNT(*) AS c FROM documents WHERE indexed = 1').c
+    documents_indexed: get('SELECT COUNT(*) AS c FROM documents WHERE indexed = 1').c,
+    documents_expiring: countExpiringDocuments(90)
   }))
+})
+
+/**
+ * @openapi
+ * /dashboard/document-expiries:
+ *   get: { tags: [Dashboard], summary: Consent forms & documents expired or expiring within 90 days }
+ */
+router.get('/document-expiries', (req, res) => {
+  res.json(ok(listExpiringDocuments(90)))
 })
 
 /** Active service agreements whose end_date falls in the next 90 days. */

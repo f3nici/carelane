@@ -7,6 +7,7 @@ import StatusBadge from '../components/StatusBadge.vue'
 const api = useApi()
 const stats = ref({})
 const agreementExpiries = ref([])
+const documentExpiries = ref([])
 const recentShifts = ref([])
 const incidents = ref([])
 const integrity = ref(null)
@@ -14,9 +15,10 @@ const upcoming = ref([])
 const activeShift = ref(null)
 
 onMounted(async () => {
-  const [s, p, sh, inc, audit, sched] = await Promise.all([
+  const [s, p, doc, sh, inc, audit, sched] = await Promise.all([
     api.get('/dashboard/stats'),
     api.get('/dashboard/agreement-expiries'),
+    api.get('/dashboard/document-expiries'),
     api.get('/shifts', { per_page: 5 }),
     api.get('/shifts', { incident: 'true', per_page: 5 }),
     api.get('/audit/verify'),
@@ -24,6 +26,7 @@ onMounted(async () => {
   ])
   stats.value = s.data
   agreementExpiries.value = p.data
+  documentExpiries.value = doc.data
   recentShifts.value = sh.data
   incidents.value = inc.data
   integrity.value = audit.data
@@ -37,6 +40,7 @@ const tiles = [
   { key: 'shifts_this_month', label: 'Shifts this month' },
   { key: 'unbilled_shifts', label: 'Unbilled shifts' },
   { key: 'agreements_expiring', label: 'Agreements expiring (90d)' },
+  { key: 'documents_expiring', label: 'Consents/docs expiring (90d)' },
   { key: 'open_incidents', label: 'Incidents needing follow-up' }
 ]
 </script>
@@ -88,6 +92,23 @@ const tiles = [
           <span class="text-xs text-mid whitespace-nowrap">{{ s.start_time || '' }}<template v-if="s.status === 'in_progress'"> · on shift</template></span>
         </li>
       </ul>
+    </div>
+
+    <div class="grid lg:grid-cols-2 gap-6">
+      <div class="card" :class="documentExpiries.some(d => d.expiry_status === 'expired') ? 'border-danger/40' : ''">
+        <h3 class="font-semibold mb-3">Consents &amp; documents expiring</h3>
+        <p v-if="!documentExpiries.length" class="text-sm text-mid">No consent forms or documents expiring in the next 90 days.</p>
+        <ul class="space-y-2">
+          <li v-for="d in documentExpiries" :key="d.id" class="text-sm flex items-center justify-between gap-2">
+            <router-link :to="`/clients/${d.client_id}`" class="text-accent hover:underline truncate">{{ d.client_display_name }} — {{ d.title }}</router-link>
+            <span class="flex items-center gap-2 whitespace-nowrap">
+              <span class="text-mid">{{ d.expiry_date }}</span>
+              <StatusBadge v-if="d.expiry_status === 'expired'" status="expired" />
+              <StatusBadge v-else-if="d.expiry_status === 'expiring'" status="expiring" />
+            </span>
+          </li>
+        </ul>
+      </div>
     </div>
 
     <div class="grid lg:grid-cols-2 gap-6">

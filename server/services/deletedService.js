@@ -7,6 +7,8 @@ import { restoreScheduled } from './scheduleService.js'
 import { restoreReport } from './reportService.js'
 import { restoreTemplate } from './templateService.js'
 import { reactivateBillingCode } from './billingService.js'
+import { restoreClientDocument } from './clientDocumentService.js'
+import { restoreGoal } from './goalService.js'
 
 /**
  * Build a single "deleted item" descriptor for the recycle-bin view. Labels are
@@ -61,6 +63,18 @@ export function listDeleted () {
     out.push(item({ entity_type: 'scheduled_shift', id: r.id, label: `Scheduled ${r.scheduled_date}`, sub_label: clientDisplayName(r), removed_at: r.deleted_at }))
   }
 
+  for (const r of sqlite.prepare(`SELECT d.id, d.title, d.doc_type, d.deleted_at, d.client_id,
+      c.preferred_name AS client_preferred_name, c.first_name AS client_first_name, c.last_name AS client_last_name
+    FROM client_documents d JOIN clients c ON c.id = d.client_id WHERE d.deleted_at IS NOT NULL`).all()) {
+    out.push(item({ entity_type: 'client_document', id: r.id, label: r.title, sub_label: clientDisplayName(r), removed_at: r.deleted_at }))
+  }
+
+  for (const r of sqlite.prepare(`SELECT g.id, g.title, g.deleted_at, g.client_id,
+      c.preferred_name AS client_preferred_name, c.first_name AS client_first_name, c.last_name AS client_last_name
+    FROM client_goals g JOIN clients c ON c.id = g.client_id WHERE g.deleted_at IS NOT NULL`).all()) {
+    out.push(item({ entity_type: 'goal', id: r.id, label: r.title, sub_label: clientDisplayName(r), removed_at: r.deleted_at }))
+  }
+
   // Billing codes are deactivated (history kept), not soft-deleted — surface them
   // here too so operators have one place to bring removed items back.
   for (const r of sqlite.prepare('SELECT id, code, name, updated_at FROM billing_codes WHERE active = 0').all()) {
@@ -79,6 +93,8 @@ const RESTORERS = {
   scheduled_shift: { restore: restoreScheduled, action: 'restored' },
   report: { restore: restoreReport, action: 'restored' },
   template: { restore: restoreTemplate, action: 'restored' },
+  client_document: { restore: restoreClientDocument, action: 'restored' },
+  goal: { restore: restoreGoal, action: 'restored' },
   billing_code: { restore: reactivateBillingCode, action: 'status_changed', details: { active: true } }
 }
 

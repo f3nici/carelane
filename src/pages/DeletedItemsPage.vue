@@ -33,6 +33,8 @@ const TYPE_LABELS = {
   shift: 'Shift note',
   report: 'Report',
   template: 'Template',
+  client_document: 'Document',
+  goal: 'Goal',
   billing_code: 'Billing code'
 }
 
