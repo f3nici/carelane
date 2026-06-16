@@ -60,7 +60,14 @@ router.post('/logo', requireAdmin, upload.single('logo'), (req, res, next) => {
 router.get('/logo', (req, res, next) => {
   const filename = getSetting('logo_filename')
   if (!filename) return next(new ApiError(404, 'NOT_FOUND', 'No logo uploaded'))
-  res.sendFile(path.resolve(LOGO_DIR, path.basename(filename)))
+  // The logo may be an SVG. SVGs don't execute script when loaded via <img>, but
+  // a direct navigation to this URL could; lock the response down so an uploaded
+  // SVG can never run script regardless of how it's loaded.
+  res.set('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:")
+  res.set('X-Content-Type-Options', 'nosniff')
+  res.sendFile(path.resolve(LOGO_DIR, path.basename(filename)), err => {
+    if (err && !res.headersSent) next(new ApiError(404, 'NOT_FOUND', 'Logo file is unavailable'))
+  })
 })
 
 /**

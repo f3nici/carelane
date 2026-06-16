@@ -1,5 +1,6 @@
 import { sqlite, vecAvailable } from '../db/connection.js'
 import { scorePassages } from './rerankService.js'
+import { escapeLike } from '../utils/sql.js'
 import config from '../config.js'
 
 let embedderPromise = null
@@ -235,8 +236,8 @@ export function keywordSearch (query, k = 5) {
   // Last-resort substring match (e.g. before the FTS index is populated).
   return sqlite.prepare(`SELECT dc.document_id, d.title, dc.page, dc.content, 0 AS score
     FROM document_chunks dc JOIN documents d ON d.id = dc.document_id
-    WHERE dc.content LIKE ? ORDER BY dc.document_id, dc.chunk_index LIMIT ?`)
-    .all(`%${query}%`, k)
+    WHERE dc.content LIKE ? ESCAPE '\\' ORDER BY dc.document_id, dc.chunk_index LIMIT ?`)
+    .all(`%${escapeLike(query)}%`, k)
 }
 
 /**

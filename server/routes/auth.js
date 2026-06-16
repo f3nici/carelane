@@ -12,11 +12,22 @@ import { requireAuth, ensureCsrfToken } from '../middleware/auth.js'
 import { logActivity } from '../services/activityService.js'
 import * as twoFactor from '../services/twoFactorService.js'
 import * as passkeys from '../services/passkeyService.js'
-import { changePassword } from '../services/accountService.js'
-import { throttleKey, checkLockout, recordFailure, clearAttempts } from '../services/loginThrottle.js'
+import { changePassword, destroyOtherSessions } from '../services/accountService.js'
+import { throttleKey, globalThrottleKey, checkLockout, recordFailure, clearAttempts } from '../services/loginThrottle.js'
 import { ok } from '../utils/pagination.js'
+import config from '../config.js'
 
 const router = Router()
+
+// A precomputed bcrypt hash compared against when the username does not exist,
+// so a missing user takes the same time as a wrong password — closing the login
+// timing oracle that would otherwise reveal valid usernames.
+const DUMMY_HASH = bcrypt.hashSync('carelane-timing-equaliser', 12)
+
+// The username-only throttle tolerates more failures than the per-IP one (it is
+// shared across every source IP) so genuine operator typos never lock the
+// account, while still catching large distributed credential-stuffing runs.
+const GLOBAL_MAX_ATTEMPTS = config.loginMaxAttempts * 5
 
 /**
  * Regenerate the session, mark it authenticated and return the user envelope
@@ -52,14 +63,21 @@ function rpContext (req) {
  */
 router.post('/login', validate(loginSchema), (req, res, next) => {
   const key = throttleKey(req.ip, req.body.username)
+  const userKey = globalThrottleKey(req.body.username)
   const lock = checkLockout(key)
-  if (lock.locked) {
-    return next(new ApiError(429, 'TOO_MANY_ATTEMPTS', `Too many failed attempts. Try again in ${Math.ceil(lock.retryAfter / 60)} minute(s).`))
+  const userLock = checkLockout(userKey)
+  if (lock.locked || userLock.locked) {
+    const retryAfter = Math.max(lock.retryAfter, userLock.retryAfter)
+    return next(new ApiError(429, 'TOO_MANY_ATTEMPTS', `Too many failed attempts. Try again in ${Math.ceil(retryAfter / 60)} minute(s).`))
   }
 
   const user = sqlite.prepare('SELECT * FROM users WHERE username = ?').get(req.body.username)
-  if (!user || !bcrypt.compareSync(req.body.password, user.password_hash)) {
+  // Always run a bcrypt compare (against a dummy hash when the user is absent)
+  // so response time does not reveal whether the username exists.
+  const passwordOk = bcrypt.compareSync(req.body.password, user ? user.password_hash : DUMMY_HASH)
+  if (!user || !passwordOk) {
     recordFailure(key)
+    recordFailure(userKey, GLOBAL_MAX_ATTEMPTS)
     logActivity('auth', user?.id ?? null, user?.id ?? null, 'login_failed', { reason: 'credentials' })
     return next(new ApiError(401, 'INVALID_CREDENTIALS', 'Invalid username or password'))
   }
@@ -72,12 +90,14 @@ router.post('/login', validate(loginSchema), (req, res, next) => {
     }
     if (!twoFactor.verifyLogin(user, req.body.token)) {
       recordFailure(key)
+      recordFailure(userKey, GLOBAL_MAX_ATTEMPTS)
       logActivity('auth', user.id, user.id, 'login_failed', { reason: '2fa' })
       return next(new ApiError(401, 'INVALID_2FA', 'Invalid or expired authentication code'))
     }
   }
 
   clearAttempts(key)
+  clearAttempts(userKey)
   establishSession(req, res, user, next)
 })
 
@@ -163,6 +183,10 @@ router.post('/2fa/disable', requireAuth, validate(totpDisableSchema), (req, res,
 router.post('/change-password', requireAuth, validate(changePasswordSchema), (req, res, next) => {
   try {
     changePassword(req.session.userId, req.body.current_password, req.body.new_password)
+    // Invalidate every other session for this user so a password change (often
+    // prompted by suspected compromise) revokes any attacker session too. The
+    // caller's own session is preserved so they stay logged in.
+    destroyOtherSessions(req.session.userId, req.sessionID)
     logActivity('auth', req.session.userId, req.session.userId, 'password_changed')
     res.json(ok({ changed: true }))
   } catch (err) { next(err) }
@@ -185,6 +209,12 @@ router.get('/passkeys', requireAuth, (req, res) => {
 router.post('/passkeys/register/options', requireAuth, async (req, res, next) => {
   try {
     const user = sqlite.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId)
+    // Re-authenticate before issuing a new passwordless login factor: a hijacked
+    // session must not be able to silently enrol an attacker's authenticator.
+    // 403 (not 401) so the API client shows the error instead of logging out.
+    if (!req.body?.password || !bcrypt.compareSync(req.body.password, user.password_hash)) {
+      return next(new ApiError(403, 'REAUTH_REQUIRED', 'Enter your current password to add a passkey'))
+    }
     const options = await passkeys.beginRegistration(req.session.userId, user, rpContext(req))
     req.session.webauthnChallenge = options.challenge
     res.json(ok(options))
@@ -258,6 +288,12 @@ router.post('/passkeys/login/options', async (req, res, next) => {
  *   post: { tags: [Auth], summary: Complete a passwordless passkey login and start a session }
  */
 router.post('/passkeys/login/verify', validate(passkeyLoginSchema), async (req, res, next) => {
+  // Rate-limit the unauthenticated passkey assertion path by IP, mirroring the
+  // password login throttle, so the unknown-credential lookup cannot be hammered.
+  const key = throttleKey(req.ip, 'passkey')
+  if (checkLockout(key).locked) {
+    return next(new ApiError(429, 'TOO_MANY_ATTEMPTS', 'Too many passkey attempts. Try again later.'))
+  }
   try {
     const expectedChallenge = req.session.webauthnChallenge
     if (!expectedChallenge) throw new ApiError(400, 'NO_CHALLENGE', 'No passkey login in progress')
@@ -268,8 +304,12 @@ router.post('/passkeys/login/verify', validate(passkeyLoginSchema), async (req, 
       expectedOrigin: rp.origin,
       expectedRPID: rp.rpID
     })
+    clearAttempts(key)
     establishSession(req, res, user, next, { method: 'passkey' })
-  } catch (err) { next(err) }
+  } catch (err) {
+    recordFailure(key)
+    next(err)
+  }
 })
 
 export default router

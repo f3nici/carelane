@@ -1,4 +1,5 @@
 import { sqlite } from '../db/connection.js'
+import { escapeLike } from '../utils/sql.js'
 import { ApiError } from '../middleware/errorHandler.js'
 
 const now = () => new Date().toISOString()
@@ -23,8 +24,8 @@ export function listBillingCodes (pg, filters = {}) {
   const params = []
   if (filters.active === 'true') where.push('active = 1')
   if (filters.q) {
-    where.push('(code LIKE ? OR name LIKE ? OR support_category LIKE ?)')
-    const q = `%${filters.q}%`
+    where.push("(code LIKE ? ESCAPE '\\' OR name LIKE ? ESCAPE '\\' OR support_category LIKE ? ESCAPE '\\')")
+    const q = `%${escapeLike(filters.q)}%`
     params.push(q, q, q)
   }
   const whereSql = 'WHERE ' + where.join(' AND ')

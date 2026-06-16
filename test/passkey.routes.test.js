@@ -41,11 +41,18 @@ describe('passkey routes', () => {
     expect(list.status).toBe(200)
     expect(list.body.data.passkeys).toEqual([])
 
-    const opts = await agent.post('/api/v1/auth/passkeys/register/options').set('x-csrf-token', csrf).send({})
+    const opts = await agent.post('/api/v1/auth/passkeys/register/options').set('x-csrf-token', csrf).send({ password: 'changeme' })
     expect(opts.status).toBe(200)
     expect(opts.body.data.challenge).toBeTruthy()
     expect(opts.body.data.rp.id).toBeTruthy()
     expect(opts.body.data.user.name).toBe('admin')
+  })
+
+  it('requires the current password to begin registration', async () => {
+    const { agent, csrf } = await loginAgent()
+    const res = await agent.post('/api/v1/auth/passkeys/register/options').set('x-csrf-token', csrf).send({ password: 'wrong' })
+    expect(res.status).toBe(403)
+    expect(res.body.error.code).toBe('REAUTH_REQUIRED')
   })
 
   it('rejects a verify with no challenge in progress', async () => {

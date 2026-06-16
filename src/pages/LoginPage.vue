@@ -18,6 +18,17 @@ const supportsPasskeys = ref(false)
 
 onMounted(() => { supportsPasskeys.value = auth.supportsPasskeys() })
 
+/**
+ * Resolve the post-login redirect target safely. Only same-site, single-slash
+ * absolute paths are allowed; anything else (a protocol-relative `//evil.com`,
+ * an absolute URL, a non-string) falls back to the dashboard — closing the
+ * open-redirect via a crafted `?redirect=` link.
+ */
+function safeRedirect () {
+  const r = route.query.redirect
+  return typeof r === 'string' && /^\/(?!\/)/.test(r) ? r : '/'
+}
+
 async function submit () {
   busy.value = true
   error.value = ''
@@ -31,7 +42,7 @@ async function submit () {
       tokenInput.value?.focus()
       return
     }
-    router.push(route.query.redirect || '/')
+    router.push(safeRedirect())
   } catch (err) {
     error.value = err.response?.data?.error?.message || 'Login failed'
   } finally {
@@ -44,7 +55,7 @@ async function signInWithPasskey () {
   error.value = ''
   try {
     await auth.loginWithPasskey()
-    router.push(route.query.redirect || '/')
+    router.push(safeRedirect())
   } catch (err) {
     // A user cancelling the prompt is not an error worth shouting about.
     if (err.name === 'NotAllowedError' || err.name === 'AbortError') return

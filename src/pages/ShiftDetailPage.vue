@@ -174,7 +174,7 @@ async function draft () {
           · {{ invoice.currency }} {{ Number(invoice.amount).toFixed(2) }}
           · created {{ (invoice.created_at || '').slice(0, 10) }}
         </p>
-        <a v-if="invoice.public_url" :href="invoice.public_url" target="_blank" class="text-accent text-sm hover:underline">Open in Square →</a>
+        <a v-if="invoice.public_url" :href="invoice.public_url" target="_blank" rel="noopener noreferrer" class="text-accent text-sm hover:underline">Open in Square →</a>
         <p v-else class="text-xs text-mid">This draft lives in your Square account — open Square to review and send it.</p>
       </template>
       <template v-else>

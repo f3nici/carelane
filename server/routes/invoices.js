@@ -2,11 +2,14 @@ import { Router } from 'express'
 import { validate } from '../middleware/validate.js'
 import { squareSettingsSchema } from '../utils/validators.js'
 import * as square from '../services/squareService.js'
+import { rateLimit } from '../middleware/rateLimit.js'
 import { updateSettings } from '../services/settingsService.js'
 import { logActivity } from '../services/activityService.js'
 import { ok } from '../utils/pagination.js'
 
 const router = Router()
+// Cap on-demand outbound calls to Square (connection tests, invoice creation).
+const outboundLimiter = rateLimit({ name: 'square-out', max: 15, windowMs: 60 * 1000 })
 
 /**
  * @openapi
@@ -18,7 +21,7 @@ router.get('/square/status', (req, res) => {
 })
 
 /** Live health check: confirm the Square token reaches the account + location. */
-router.post('/square/test', async (req, res) => {
+router.post('/square/test', outboundLimiter, async (req, res) => {
   const result = await square.testConnection()
   logActivity('square', null, req.session.userId, 'tested', { ok: result.ok })
   res.json(ok(result))
@@ -54,7 +57,7 @@ router.get('/', (req, res) => {
  * /invoices/from-shift/{shiftId}:
  *   post: { tags: [Invoices], summary: Create a draft Square invoice from a shift note }
  */
-router.post('/from-shift/:shiftId', async (req, res) => {
+router.post('/from-shift/:shiftId', outboundLimiter, async (req, res) => {
   const result = await square.createDraftInvoiceFromShift(Number(req.params.shiftId), req.session.userId)
   res.status(201).json(ok(result))
 })

@@ -362,6 +362,9 @@ CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_log (created_at);
   addColumnIfMissing('users', 'totp_secret', 'TEXT')
   addColumnIfMissing('users', 'totp_enabled', 'INTEGER NOT NULL DEFAULT 0')
   addColumnIfMissing('users', 'totp_recovery_codes', 'TEXT')
+  // Highest TOTP time-step already accepted at login — prevents replay of a
+  // still-valid code within its ~90s window (see twoFactorService.verifyLogin).
+  addColumnIfMissing('users', 'totp_last_counter', 'INTEGER')
 
   // Passkeys / WebAuthn (added post-launch). One row per registered authenticator;
   // a passkey is a passwordless login factor. The public key is non-secret so it
@@ -441,6 +444,29 @@ CREATE INDEX IF NOT EXISTS idx_square_invoices_shift ON square_invoices (shift_n
   addColumnIfMissing('client_documents', 'expiry_date', 'TEXT')
   addColumnIfMissing('client_documents', 'updated_at', 'TEXT')
   sqlite.exec('CREATE INDEX IF NOT EXISTS idx_client_documents_expiry ON client_documents (expiry_date)')
+
+  // Performance indexes for the largest / fastest-growing query paths. All are
+  // additive and idempotent. shift_notes and activity_log dominate over years of
+  // a single worker's data; the dashboard fires several of these counts on every
+  // app open. Partial `WHERE deleted_at IS NOT NULL` indexes keep the Deleted
+  // Items page (which scans every soft-delete table) cheap without bloating the
+  // common active-row queries.
+  sqlite.exec(`
+    CREATE INDEX IF NOT EXISTS idx_shift_notes_active ON shift_notes (deleted_at, archived_at, shift_date DESC);
+    CREATE INDEX IF NOT EXISTS idx_shift_notes_deleted ON shift_notes (deleted_at) WHERE deleted_at IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_reports_updated ON reports (deleted_at, archived_at, updated_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_reports_deleted ON reports (deleted_at) WHERE deleted_at IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_agreements_client ON service_agreements (client_id);
+    CREATE INDEX IF NOT EXISTS idx_agreements_status ON service_agreements (deleted_at, archived_at, status, end_date);
+    CREATE INDEX IF NOT EXISTS idx_agreements_deleted ON service_agreements (deleted_at) WHERE deleted_at IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_clients_deleted ON clients (deleted_at) WHERE deleted_at IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_templates_deleted ON templates (deleted_at) WHERE deleted_at IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_scheduled_shifts_deleted ON scheduled_shifts (deleted_at) WHERE deleted_at IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_client_documents_deleted ON client_documents (deleted_at) WHERE deleted_at IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_client_goals_deleted ON client_goals (deleted_at) WHERE deleted_at IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_activity_action ON activity_log (action);
+    CREATE INDEX IF NOT EXISTS idx_activity_user ON activity_log (user_id);
+  `)
 
   // Retire the NDIS plan start/end dates (removed post-launch). Independent
   // support workers track service-agreement expiry, not plan-manager plan

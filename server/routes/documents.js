@@ -4,6 +4,8 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import multer from 'multer'
 import { validate } from '../middleware/validate.js'
+import { requireAdmin } from '../middleware/auth.js'
+import { rateLimit } from '../middleware/rateLimit.js'
 import { askSchema } from '../utils/validators.js'
 import * as documentService from '../services/documentService.js'
 import { searchChunks, keywordSearch } from '../services/ragService.js'
@@ -24,9 +26,12 @@ const upload = multer({
     },
     filename: (req, file, cb) => cb(null, crypto.randomBytes(16).toString('hex') + '.pdf')
   }),
-  limits: { fileSize: Math.max(config.maxUploadSize, 50 * 1024 * 1024) },
+  limits: { fileSize: config.uploadLimitFor(50 * 1024 * 1024) },
   fileFilter: (req, file, cb) => cb(null, file.mimetype === 'application/pdf')
 })
+
+// Knowledge-base Q&A spends Claude tokens; cap per-operator call rate.
+const askLimiter = rateLimit({ name: 'ask', max: 20, windowMs: 60 * 1000 })
 
 /**
  * @openapi
@@ -38,7 +43,7 @@ router.get('/', (req, res) => {
   res.json(ok(documentService.listDocuments()))
 })
 
-router.post('/', upload.single('file'), (req, res, next) => {
+router.post('/', requireAdmin, upload.single('file'), (req, res, next) => {
   if (!req.file) return next(new ApiError(400, 'UPLOAD_ERROR', 'Upload a PDF file'))
   const doc = documentService.createDocument(req.file, req.body)
   logActivity('document', doc.id, req.session.userId, 'created', { category: doc.category })
@@ -52,7 +57,7 @@ router.post('/', upload.single('file'), (req, res, next) => {
  */
 router.get('/search', async (req, res, next) => {
   try {
-    const q = String(req.query.q || '').trim()
+    const q = String(req.query.q || '').trim().slice(0, 2000)
     if (!q) throw new ApiError(400, 'VALIDATION_ERROR', 'Provide a search query ?q=')
     const mode = req.query.mode === 'keyword' ? 'keyword' : 'semantic'
     const results = mode === 'keyword' ? keywordSearch(q, 10) : await searchChunks(q, 10)
@@ -65,7 +70,7 @@ router.get('/search', async (req, res, next) => {
  * /documents/ask:
  *   post: { tags: [Knowledge], summary: Grounded Q&A — retrieve top-k chunks locally, answer via Claude with citations }
  */
-router.post('/ask', validate(askSchema), async (req, res, next) => {
+router.post('/ask', askLimiter, validate(askSchema), async (req, res, next) => {
   try {
     const result = await askGuidelines(req.body.question, req.session.userId)
     res.json(ok(result))
@@ -84,7 +89,7 @@ router.get('/:id/file', (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-router.post('/:id/reindex', async (req, res, next) => {
+router.post('/:id/reindex', requireAdmin, async (req, res, next) => {
   try {
     const chunks = await documentService.reindexDocument(Number(req.params.id))
     logActivity('document', Number(req.params.id), req.session.userId, 'updated', { reindexed: true, chunks })
@@ -92,7 +97,7 @@ router.post('/:id/reindex', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-router.delete('/:id', (req, res) => {
+router.delete('/:id', requireAdmin, (req, res) => {
   documentService.deleteDocument(Number(req.params.id))
   logActivity('document', Number(req.params.id), req.session.userId, 'deleted')
   res.json(ok({ deleted: true }))

@@ -247,7 +247,28 @@ export const templateSchema = z.object({
   active: bool01.default(1)
 })
 
-export const settingsSchema = z.record(z.string(), z.any())
+// Explicit allow-list of operator-editable settings. Zod strips unknown keys by
+// default, so the Settings page can keep POSTing the whole settings object back
+// while any key not listed here (e.g. logo_filename, enc_canary,
+// google_refresh_token_enc, integration status fields) is silently dropped
+// rather than written. Logo is set only via the dedicated upload endpoint;
+// integration toggles only via their dedicated settings endpoints.
+const hexColor = z.string().trim().regex(/^#[0-9a-fA-F]{3,8}$/, 'must be a hex colour')
+export const settingsSchema = z.object({
+  business_name: z.string().trim().max(200),
+  abn: z.string().trim().max(50),
+  business_address: z.string().trim().max(500),
+  business_phone: z.string().trim().max(50),
+  business_email: z.string().trim().max(200),
+  brand_primary_color: hexColor,
+  brand_accent_color: hexColor,
+  default_price_region: z.string().trim().max(50),
+  public_api_enabled: bool01,
+  claude_model_cheap: z.string().trim().max(120),
+  claude_model_quality: z.string().trim().max(120),
+  ai_tone: z.string().trim().max(500),
+  disclaimer: z.string().trim().max(4000)
+}).partial()
 
 export const askSchema = z.object({
   question: z.string().trim().min(3).max(2000)

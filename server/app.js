@@ -1,5 +1,6 @@
 import express from 'express'
 import session from 'express-session'
+import helmet from 'helmet'
 import BetterSqlite3SessionStore from 'better-sqlite3-session-store'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -34,6 +35,46 @@ export function createApp () {
   const app = express()
   app.set('trust proxy', 1)
   app.disable('x-powered-by')
+
+  // Security headers. CSP allows Google Fonts (used by index.html) and inline
+  // styles (vue-cal positions events with inline styles; :style bindings). The
+  // Swagger UI page at /api/docs needs inline script/style + data: images to
+  // bootstrap, so it gets a relaxed policy; everything else is locked down.
+  const strictCsp = helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+        fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+        imgSrc: ["'self'", 'data:'],
+        connectSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        upgradeInsecureRequests: config.isProduction ? [] : null
+      }
+    },
+    frameguard: { action: 'deny' },
+    crossOriginEmbedderPolicy: false
+  })
+  const swaggerCsp = helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:'],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'none'"]
+      }
+    },
+    crossOriginEmbedderPolicy: false
+  })
+  app.use((req, res, next) =>
+    (req.path.startsWith('/api/docs') ? swaggerCsp : strictCsp)(req, res, next))
+
   app.use(express.json({ limit: '2mb' }))
 
   // CORS for the dev frontend only (prod is same-origin)
@@ -59,7 +100,10 @@ export function createApp () {
     cookie: {
       httpOnly: true,
       sameSite: 'lax',
-      secure: config.isProduction ? 'auto' : false,
+      // HTTPS-only in production (the app is expected to run behind a
+      // TLS-terminating proxy — see `trust proxy`). A hard `true` prevents the
+      // session cookie being sent or injected over plain HTTP.
+      secure: config.isProduction,
       maxAge: 12 * 60 * 60 * 1000
     }
   }))

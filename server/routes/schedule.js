@@ -5,6 +5,7 @@ import { scheduledShiftSchema, recurrenceSchema, scheduleNoteSchema, googleSetti
 import * as scheduleService from '../services/scheduleService.js'
 import * as recurrenceService from '../services/recurrenceService.js'
 import * as googleCalendar from '../services/googleCalendarService.js'
+import { rateLimit } from '../middleware/rateLimit.js'
 import { updateSettings } from '../services/settingsService.js'
 import { logActivity, diffChanges } from '../services/activityService.js'
 import { ok } from '../utils/pagination.js'
@@ -12,6 +13,8 @@ import { ApiError } from '../middleware/errorHandler.js'
 
 const router = Router()
 const id = req => Number(req.params.id)
+// Cap on-demand outbound calls to Google so they can't be hammered.
+const outboundLimiter = rateLimit({ name: 'google-out', max: 15, windowMs: 60 * 1000 })
 
 /**
  * @openapi
@@ -108,14 +111,14 @@ router.get('/google/callback', async (req, res) => {
 })
 
 /** Live health check: confirm the stored credentials can reach the calendar. */
-router.post('/google/test', async (req, res) => {
+router.post('/google/test', outboundLimiter, async (req, res) => {
   const result = await googleCalendar.testConnection()
   logActivity('google_calendar', null, req.session.userId, 'tested', { ok: result.ok })
   res.json(ok(result))
 })
 
 /** Re-sync every active scheduled shift to Google Calendar (manual backfill). */
-router.post('/google/sync-all', async (req, res) => {
+router.post('/google/sync-all', outboundLimiter, async (req, res) => {
   const result = await googleCalendar.syncAll()
   logActivity('google_calendar', null, req.session.userId, 'sync_all', { synced: result.synced, failed: result.failed })
   res.json(ok(result))
