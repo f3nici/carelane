@@ -17,7 +17,7 @@ defineProps({
     </div>
     <dl class="mt-3 grid grid-cols-2 gap-2 text-xs">
       <div><dt class="text-mid">NDIS no.</dt><dd>{{ client.ndis_number || '—' }}</dd></div>
-      <div><dt class="text-mid">Plan ends</dt><dd>{{ client.plan_end || '—' }}</dd></div>
+      <div><dt class="text-mid">Plan mgmt</dt><dd>{{ (client.plan_management_type || '—').replace('_', ' ') }}</dd></div>
     </dl>
   </router-link>
 </template>

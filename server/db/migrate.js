@@ -16,6 +16,21 @@ function addColumnIfMissing (table, column, definition) {
 }
 
 /**
+ * Drop a column only if it still exists. SQLite has no `DROP COLUMN IF EXISTS`,
+ * so we inspect the table info first. Keeps the migration idempotent and safe to
+ * run on every boot. Used to retire columns (e.g. NDIS plan dates) that the app
+ * no longer tracks — the data is non-regulated scheduling metadata, so dropping
+ * it does not breach the never-hard-delete rule for regulated records.
+ * @param {string} table
+ * @param {string} column
+ */
+function dropColumnIfExists (table, column) {
+  const cols = sqlite.prepare(`PRAGMA table_info(${table})`).all()
+  if (!cols.some(c => c.name === column)) return
+  sqlite.exec(`ALTER TABLE ${table} DROP COLUMN ${column}`)
+}
+
+/**
  * Idempotent SQL migrations. Creates all tables, indexes and the append-only
  * triggers on activity_log. Safe to run on every boot.
  */
@@ -45,8 +60,6 @@ CREATE TABLE IF NOT EXISTS clients (
   suburb TEXT,
   state TEXT DEFAULT 'WA',
   postcode TEXT,
-  plan_start TEXT,
-  plan_end TEXT,
   plan_management_type TEXT,
   plan_manager_name TEXT,
   plan_manager_contact TEXT,
@@ -385,6 +398,13 @@ CREATE INDEX IF NOT EXISTS idx_square_invoices_shift ON square_invoices (shift_n
   // Track which embedding model a document's vectors were built with, so a
   // model change can warn (and clear) per document as each is re-indexed.
   addColumnIfMissing('documents', 'embedding_model', 'TEXT')
+
+  // Retire the NDIS plan start/end dates (removed post-launch). Independent
+  // support workers track service-agreement expiry, not plan-manager plan
+  // periods, so these columns are dropped from existing databases.
+  dropColumnIfExists('clients', 'plan_start')
+  dropColumnIfExists('clients', 'plan_end')
+
   migrateChunkFts()
 }
 

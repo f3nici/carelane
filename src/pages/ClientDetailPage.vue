@@ -145,7 +145,6 @@ function exportData () {
       <div class="card">
         <h3 class="font-semibold mb-3">Plan</h3>
         <dl class="space-y-2 text-sm">
-          <div class="flex justify-between"><dt class="text-mid">Plan period</dt><dd>{{ client.plan_start || '—' }} → {{ client.plan_end || '—' }}</dd></div>
           <div class="flex justify-between"><dt class="text-mid">Management</dt><dd>{{ client.plan_management_type || '—' }}</dd></div>
           <div class="flex justify-between"><dt class="text-mid">Plan manager</dt><dd>{{ client.plan_manager_name || '—' }}</dd></div>
           <div class="flex justify-between"><dt class="text-mid">Invoice due</dt><dd>{{ (client.invoice_due_days ?? 45) }} days</dd></div>

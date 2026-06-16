@@ -14,7 +14,7 @@ const api = useApi()
 let lastAutoFill = ''
 
 const q = reactive({
-  participant_name: '', ndis_number: '', plan_start: '', plan_end: '',
+  participant_name: '', ndis_number: '',
   plan_management_type: '', supports: '', frequency_hours: '', rates_invoicing: '',
   goals: '', cancellation_policy: '48 hours notice for cancellations; late cancellations may be charged per the NDIS Pricing Arrangements.',
   consent_privacy: 'The participant consents to the collection and secure storage of their information for service delivery. Information is only shared with their consent or as required by law.',
@@ -46,8 +46,6 @@ watch(() => props.client, c => {
   if (!c) return
   q.participant_name = q.participant_name || c.preferred_name || `${c.first_name} ${c.last_name}`
   q.ndis_number = q.ndis_number || c.ndis_number || ''
-  q.plan_start = q.plan_start || c.plan_start || ''
-  q.plan_end = q.plan_end || c.plan_end || ''
   q.plan_management_type = q.plan_management_type || c.plan_management_type || ''
   q.goals = q.goals || c.support_goals || ''
   populateSupports(c.id)

@@ -4,12 +4,19 @@ import { useRouter, useRoute } from 'vue-router'
 import { useApi } from '../composables/useApi.js'
 import { useAuthStore } from '../stores/auth.js'
 
+const emit = defineEmits(['open-search'])
+
 const api = useApi()
 const auth = useAuthStore()
 const router = useRouter()
 const route = useRoute()
 const stats = ref({})
 const mobileOpen = ref(false)
+
+function openSearch () {
+  mobileOpen.value = false
+  emit('open-search')
+}
 
 const nav = [
   { name: 'dashboard', to: '/', label: 'Dashboard', icon: 'M3 12l9-9 9 9M5 10v10h5v-6h4v6h5V10', count: null },
@@ -74,6 +81,16 @@ async function logout () {
         @click="mobileOpen = false"
       >
         <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6L6 18" /></svg>
+      </button>
+    </div>
+    <div class="px-3 pb-2">
+      <button
+        class="w-full flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-mid bg-white/5 hover:bg-white/10 hover:text-white transition-colors"
+        @click="openSearch"
+      >
+        <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.3-4.3M11 18a7 7 0 110-14 7 7 0 010 14z" /></svg>
+        <span class="flex-1 text-left">Search clients</span>
+        <span class="pill bg-white/10 text-mid hidden md:inline">⌘K</span>
       </button>
     </div>
     <nav class="flex-1 overflow-y-auto flex flex-col px-3 gap-1">
