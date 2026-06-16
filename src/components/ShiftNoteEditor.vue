@@ -18,8 +18,9 @@ const form = reactive({
 })
 
 // Duration is always derived from the start/end times (overnight-safe), never
-// hand-edited — e.g. 2h15m is 2.25 hours, not 2.15. Mirrors the server's
-// computeDuration so the displayed value matches what gets persisted.
+// hand-edited, and rounded to the nearest quarter hour — e.g. 2h15m is 2.25
+// hours, not 2.15. Mirrors the server's computeDuration so the displayed value
+// matches what gets persisted.
 const durationHours = computed(() => {
   const { start_time: start, end_time: end } = form
   if (!start || !end) return null
@@ -27,7 +28,7 @@ const durationHours = computed(() => {
   const [eh, em] = end.split(':').map(Number)
   let mins = (eh * 60 + em) - (sh * 60 + sm)
   if (mins <= 0) mins += 24 * 60
-  return Math.round((mins / 60) * 100) / 100
+  return Math.round((mins / 60) * 4) / 4
 })
 
 watch(() => props.modelValue, value => {

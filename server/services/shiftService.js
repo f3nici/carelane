@@ -27,7 +27,8 @@ function toShiftListRow (row) {
 }
 
 /**
- * Compute duration in hours from HH:MM start/end times (overnight-safe).
+ * Compute duration in hours from HH:MM start/end times (overnight-safe),
+ * rounded to the nearest quarter hour (0.25).
  */
 function computeDuration (start, end) {
   if (!start || !end) return null
@@ -35,7 +36,7 @@ function computeDuration (start, end) {
   const [eh, em] = end.split(':').map(Number)
   let mins = (eh * 60 + em) - (sh * 60 + sm)
   if (mins <= 0) mins += 24 * 60
-  return Math.round((mins / 60) * 100) / 100
+  return Math.round((mins / 60) * 4) / 4
 }
 
 /**

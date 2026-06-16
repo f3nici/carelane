@@ -44,6 +44,13 @@ describe('shiftService business rules', () => {
     expect(updated.duration_hours).toBe(2.75)
   })
 
+  it('rounds odd durations to the nearest quarter hour', () => {
+    // 2h10m -> 2.1667 rounds up to 2.25
+    expect(shiftService.createShift(baseShift({ start_time: '09:00', end_time: '11:10' }), workerId).duration_hours).toBe(2.25)
+    // 2h05m -> 2.0833 rounds down to 2.0
+    expect(shiftService.createShift(baseShift({ start_time: '09:00', end_time: '11:05' }), workerId).duration_hours).toBe(2)
+  })
+
   it('refuses to delete an incident-flagged note', () => {
     const shift = shiftService.createShift(baseShift({ incident_flag: 1, incident_details: 'Fall, no injury.' }), workerId)
     expect(() => shiftService.deleteShift(shift.id)).toThrow(/incident/i)
