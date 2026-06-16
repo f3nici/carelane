@@ -1,0 +1,59 @@
+# Dependabot keeps dependencies patched — important for an app that stores
+# sensitive health data. Grouped, weekly updates to keep PR noise manageable.
+# https://docs.github.com/code-security/dependabot/dependabot-version-updates
+version: 2
+updates:
+  # npm dependencies (package.json / package-lock.json)
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Australia/Perth
+    open-pull-requests-limit: 10
+    labels:
+      - dependencies
+    commit-message:
+      prefix: 'deps'
+      prefix-development: 'deps-dev'
+    groups:
+      # Batch low-risk patch/minor bumps into a single PR per group.
+      production-dependencies:
+        dependency-type: production
+        update-types:
+          - minor
+          - patch
+      development-dependencies:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+
+  # GitHub Actions used in workflows (.github/workflows/*)
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Australia/Perth
+    labels:
+      - dependencies
+      - github-actions
+    commit-message:
+      prefix: 'ci'
+
+  # Base image used in the Dockerfile
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Australia/Perth
+    labels:
+      - dependencies
+      - docker
+    commit-message:
+      prefix: 'docker'

@@ -178,6 +178,46 @@ for:
 - Verifying scheduled backups.
 - Reviewing all AI-generated drafts before finalising any document.
 
+## Third-party services & their terms
+
+CareLane runs fully self-hosted, but several **optional** features call out to
+third-party services. Each is disabled until you configure it. When you enable
+one, you are using that provider under **their** terms — review them before
+sending any data, and remember CareLane only ever sends minimised inputs (see
+[Data & privacy](#data--privacy)):
+
+| Service | Used for | Required? | Terms / policies |
+|---------|----------|-----------|------------------|
+| **Anthropic (Claude API)** | AI drafting of agreements, reports, note cleanup and Q&A | Optional (no AI features without `ANTHROPIC_API_KEY`) | [Commercial Terms](https://www.anthropic.com/legal/commercial-terms) · [Usage Policy](https://www.anthropic.com/legal/aup) · [Privacy Policy](https://www.anthropic.com/legal/privacy) |
+| **Hugging Face** | Downloading the local embedding & reranker models (`@xenova/transformers`) on first run | Effectively required for the knowledge base (models cached locally after download; inference runs on your own machine) | [Terms of Service](https://huggingface.co/terms-of-service) · [Privacy Policy](https://huggingface.co/privacy) |
+| **Google Calendar** | One-way push of scheduled shifts to your calendar | Optional ([setup guide](docs/google-calendar-setup.md)) | [Google Terms of Service](https://policies.google.com/terms) · [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy) · [Privacy Policy](https://policies.google.com/privacy) |
+| **Square** | Creating draft invoices from completed shifts | Optional ([setup guide](docs/square-invoicing-setup.md)) | [Developer Terms of Service](https://developer.squareup.com/us/en/terms) · [General Terms](https://squareup.com/au/en/legal/general/ua) · [Privacy Notice](https://squareup.com/au/en/legal/general/privacy) |
+| **Docker Hub** | Pulling/publishing the container image (deployment only) | Optional (only if you use the published image) | [Terms of Service](https://www.docker.com/legal/docker-terms-service/) · [Privacy Policy](https://www.docker.com/legal/docker-privacy-policy/) |
+
+As the operator you are the data controller for the participant information you
+hold. Confirm each provider's terms are compatible with your NDIS and Australian
+privacy obligations before enabling an integration.
+
+## Security
+
+Found a vulnerability? Please report it privately — see
+[`SECURITY.md`](SECURITY.md). Do not open a public issue for security reports.
+
+## Changelog
+
+Notable changes are recorded in [`CHANGELOG.md`](CHANGELOG.md).
+
 ## License
 
-ISC.
+Licensed under the **[PolyForm Noncommercial License 1.0.0](LICENSE)**.
+
+CareLane is source-available and free to use, modify and self-host for **any
+noncommercial purpose** — personal use, hobby projects, study, and use by
+charities, public-health/government bodies and other noncommercial
+organisations (see the license for the exact terms). **Commercial use — selling
+the software or a hosted version of it, or using it to make money — is not
+permitted** without a separate licence from the author.
+
+> Note: because it forbids commercial use, this is a *source-available*
+> (non-commercial) licence rather than an OSI-approved open-source one. If you
+> want to use CareLane commercially, contact <admin@fenici.com.au>.

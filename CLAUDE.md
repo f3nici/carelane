@@ -4,6 +4,11 @@ Self-hosted management tool for an independent NDIS support worker (Australia).
 Single-operator by default; users table + roles exist so more worker logins can
 be added later. NOT multi-tenant SaaS. All data is sensitive health information.
 
+Licensed under PolyForm Noncommercial 1.0.0 (source-available, no commercial
+use) — see `LICENSE`. Optional outbound integrations (Anthropic, Google, Square,
+Hugging Face) are each governed by the provider's own terms; the README lists
+them. Security disclosures: `SECURITY.md`. Changes: `CHANGELOG.md`.
+
 ## Stack
 Vue 3 (`<script setup>` only) + Vite + Tailwind + Pinia · Express + better-sqlite3
 + Drizzle schema · sqlite-vec (JS cosine fallback) · transformers.js local

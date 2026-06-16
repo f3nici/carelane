@@ -21,11 +21,15 @@
   },
   "repository": {
     "type": "git",
-    "url": "http://local_proxy@127.0.0.1:34725/git/f3nici/carelane"
+    "url": "git+https://github.com/f3nici/carelane.git"
   },
+  "bugs": {
+    "url": "https://github.com/f3nici/carelane/issues"
+  },
+  "homepage": "https://github.com/f3nici/carelane#readme",
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",
