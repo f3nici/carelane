@@ -30,6 +30,20 @@ describe('shiftService business rules', () => {
     expect(shiftService.getShift(shift.id).body).toBe('Supported with shopping.')
   })
 
+  it('derives the duration from the times and ignores any client value', () => {
+    // 2h15m rounds to 2.25 hours, and a bogus client-supplied duration is ignored.
+    const shift = shiftService.createShift(baseShift({ start_time: '09:00', end_time: '11:15', duration_hours: 2.15 }), workerId)
+    expect(shift.duration_hours).toBe(2.25)
+  })
+
+  it('recalculates the duration whenever the times change on update', () => {
+    const shift = shiftService.createShift(baseShift({ start_time: '09:00', end_time: '11:00' }), workerId)
+    expect(shift.duration_hours).toBe(2)
+    const updated = shiftService.updateShift(shift.id, { end_time: '11:45' })
+    expect(updated.end_time).toBe('11:45')
+    expect(updated.duration_hours).toBe(2.75)
+  })
+
   it('refuses to delete an incident-flagged note', () => {
     const shift = shiftService.createShift(baseShift({ incident_flag: 1, incident_details: 'Fall, no injury.' }), workerId)
     expect(() => shiftService.deleteShift(shift.id)).toThrow(/incident/i)

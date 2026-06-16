@@ -185,9 +185,11 @@ export function createNoteFromShift (id, noteData, workerId) {
   const prefill = notePrefill(id)
   const note = createShift({
     client_id: prefill.client_id,
-    shift_date: prefill.shift_date,
-    start_time: prefill.start_time,
-    end_time: prefill.end_time,
+    // The operator may correct the date/times before saving — honour their
+    // values, falling back to the clocked (prefilled) ones.
+    shift_date: noteData.shift_date ?? prefill.shift_date,
+    start_time: noteData.start_time ?? prefill.start_time,
+    end_time: noteData.end_time ?? prefill.end_time,
     billing_code_id: noteData.billing_code_id ?? prefill.billing_code_id,
     location: noteData.location ?? prefill.location,
     support_provided: noteData.support_provided ?? null,
