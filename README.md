@@ -203,9 +203,13 @@ privacy obligations before enabling an integration.
 Found a vulnerability? Please report it privately — see
 [`SECURITY.md`](SECURITY.md). Do not open a public issue for security reports.
 
-## Changelog
+## Releases & changelog
 
-Notable changes are recorded in [`CHANGELOG.md`](CHANGELOG.md).
+Releases are tracked on
+[GitHub Releases](https://github.com/f3nici/carelane/releases), each with a
+version tag you can pull (e.g. `git checkout 0.5.2`) and auto-generated notes.
+See [`CHANGELOG.md`](CHANGELOG.md) for unreleased changes and where to find the
+full history.
 
 ## License
 
