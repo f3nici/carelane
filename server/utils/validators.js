@@ -202,6 +202,34 @@ export const billingImportCommitSchema = z.object({
   deactivate_missing: bool01.default(0)
 })
 
+// Editable metadata for a completed/consent document. issue_date/expiry_date
+// drive the expiry surfacing; the file itself is uploaded separately (multipart).
+export const clientDocumentMetaSchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  doc_type: z.enum(['media_consent', 'consent_to_share', 'consent_general', 'service_agreement',
+    'behaviour_support_plan', 'risk_assessment', 'insurance', 'identification', 'other']).default('other'),
+  issue_date: isoDate.nullish(),
+  expiry_date: isoDate.nullish()
+})
+
+// Structured participant goal. The free-text description is plain text (like
+// support_goals / supports_summary); detailed progress observations live in
+// encrypted progress notes.
+export const goalSchema = z.object({
+  title: z.string().trim().min(1).max(300),
+  description: z.string().trim().max(10000).nullish().transform(v => v || null),
+  category: z.string().trim().max(100).nullish().transform(v => v || null),
+  status: z.enum(['active', 'achieved', 'on_hold', 'discontinued']).default('active'),
+  target_date: isoDate.nullish(),
+  sort_order: z.coerce.number().int().min(0).max(9999).default(0)
+})
+
+export const goalProgressSchema = z.object({
+  note_date: isoDate.nullish(),
+  progress_rating: z.coerce.number().int().min(1).max(5).nullish(),
+  body: z.string().trim().max(20000).nullish().transform(v => v || null)
+})
+
 export const clientBillingCodesSchema = z.object({
   codes: z.array(z.object({
     billing_code_id: z.number().int().positive(),

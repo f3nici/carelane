@@ -5,6 +5,7 @@ import { reportSchema, reportDraftSchema } from '../utils/validators.js'
 import * as reportService from '../services/reportService.js'
 import * as shiftService from '../services/shiftService.js'
 import * as clientService from '../services/clientService.js'
+import { buildGoalsSummary } from '../services/goalService.js'
 import { resolveTemplateForDraft } from '../services/templateService.js'
 import { condenseShift, draftReport, estimateReportTokens } from '../services/aiService.js'
 import { renderPdf, pdfPath, safeFilename } from '../utils/pdfRenderer.js'
@@ -111,7 +112,8 @@ router.post('/:id/draft', validate(reportDraftSchema), async (req, res, next) =>
       reportType: report.report_type,
       periodStart: report.period_start || '',
       periodEnd: report.period_end || '',
-      goals: client.support_goals,
+      // Prefer structured goals + progress notes; fall back to the free-text field.
+      goals: buildGoalsSummary(report.client_id) || client.support_goals,
       shiftSummaries: summaries,
       template
     }, req.session.userId)
@@ -153,7 +155,7 @@ router.post('/:id/draft/estimate', (req, res, next) => {
       reportType: report.report_type,
       periodStart,
       periodEnd,
-      goals: client.support_goals,
+      goals: buildGoalsSummary(report.client_id) || client.support_goals,
       shiftSummaries,
       template
     })

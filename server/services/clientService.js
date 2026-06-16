@@ -145,7 +145,19 @@ export function exportClient (id) {
   const shifts = sqlite.prepare('SELECT * FROM shift_notes WHERE client_id = ? AND deleted_at IS NULL').all(id)
     .map(s => decryptFields(s, ['body', 'incident_details']))
   const reportRows = sqlite.prepare('SELECT * FROM reports WHERE client_id = ? AND deleted_at IS NULL').all(id)
-  return { client, agreements, shifts, reports: reportRows, exported_at: now() }
+  // Consent forms & other completed documents (on-disk filename omitted — files
+  // are reached only through the auth-gated download route).
+  const documents = sqlite.prepare(`SELECT id, title, doc_type, source_type, issue_date, expiry_date,
+      original_name, mime_type, size_bytes, created_at FROM client_documents
+    WHERE client_id = ? AND deleted_at IS NULL ORDER BY (expiry_date IS NULL), expiry_date`).all(id)
+  // Structured goals with their decrypted progress notes.
+  const goals = sqlite.prepare('SELECT * FROM client_goals WHERE client_id = ? AND deleted_at IS NULL ORDER BY sort_order, created_at').all(id)
+    .map(g => ({
+      ...g,
+      progress: sqlite.prepare('SELECT id, note_date, progress_rating, body FROM goal_progress_notes WHERE goal_id = ? AND deleted_at IS NULL ORDER BY note_date DESC, id DESC').all(g.id)
+        .map(p => decryptFields(p, ['body']))
+    }))
+  return { client, agreements, shifts, reports: reportRows, documents, goals, exported_at: now() }
 }
 
 /**
@@ -179,6 +191,28 @@ export function buildClientExportMarkdown (data) {
 
   lines.push('', `## Service agreements (${data.agreements.length})`)
   for (const a of data.agreements) lines.push(`- ${a.title} — ${a.status}${a.start_date ? ` (${a.start_date} → ${a.end_date || '—'})` : ''}`)
+
+  if (data.goals?.length) {
+    lines.push('', `## Goals (${data.goals.length})`)
+    for (const g of data.goals) {
+      lines.push(`### ${g.title} — ${g.status}${g.target_date ? ` (target ${g.target_date})` : ''}`)
+      if (g.description) lines.push(g.description)
+      for (const p of g.progress || []) {
+        const rating = p.progress_rating ? ` · progress ${p.progress_rating}/5` : ''
+        lines.push(`- ${p.note_date}${rating}${p.body ? `: ${p.body}` : ''}`)
+      }
+      lines.push('')
+    }
+  }
+
+  if (data.documents?.length) {
+    lines.push('', `## Documents & consents (${data.documents.length})`)
+    for (const d of data.documents) {
+      const type = String(d.doc_type || 'other').replace(/_/g, ' ')
+      const dates = [d.issue_date && `issued ${d.issue_date}`, d.expiry_date && `expires ${d.expiry_date}`].filter(Boolean).join(', ')
+      lines.push(`- ${d.title} — ${type}${dates ? ` (${dates})` : ''}`)
+    }
+  }
 
   lines.push('', `## Shift notes (${data.shifts.length})`)
   for (const s of data.shifts) {

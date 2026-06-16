@@ -14,10 +14,20 @@ const styles = {
   billed: 'bg-accent/15 text-accent',
   unbilled: 'bg-warning/15 text-warning',
   indexed: 'bg-success/15 text-success',
-  indexing: 'bg-warning/15 text-warning'
+  indexing: 'bg-warning/15 text-warning',
+  // Goal lifecycle
+  achieved: 'bg-success/15 text-success',
+  on_hold: 'bg-warning/15 text-warning',
+  discontinued: 'bg-mid/20 text-mid',
+  // Document expiry ('expired' is defined above, reused here)
+  expiring: 'bg-warning/15 text-warning'
+}
+
+const LABELS = {
+  on_hold: 'on hold'
 }
 </script>
 
 <template>
-  <span class="pill" :class="styles[status] || 'bg-white/10 text-mid'">{{ status }}</span>
+  <span class="pill" :class="styles[status] || 'bg-white/10 text-mid'">{{ LABELS[status] || status }}</span>
 </template>

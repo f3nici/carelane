@@ -78,7 +78,7 @@ function submit () {
       <h3 class="font-semibold mb-4">Support</h3>
       <div class="space-y-4">
         <div><label class="label">Communication needs</label><textarea v-model="form.communication_needs" class="input" rows="2" /></div>
-        <div><label class="label">Support goals (drives reports)</label><textarea v-model="form.support_goals" class="input" rows="3" /></div>
+        <div><label class="label">Support goals (free-text summary)</label><textarea v-model="form.support_goals" class="input" rows="3" placeholder="Quick summary — add trackable goals with progress notes on the participant's Goals tab." /></div>
         <div><label class="label">Internal notes</label><textarea v-model="form.notes" class="input" rows="3" /></div>
         <label class="flex items-center gap-2 text-sm"><input v-model="form.active" type="checkbox" :true-value="1" :false-value="0" class="accent-primary" /> Active client</label>
       </div>
