@@ -203,7 +203,6 @@ CREATE TABLE IF NOT EXISTS client_documents (
   deleted_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_client_documents_client ON client_documents (client_id);
-CREATE INDEX IF NOT EXISTS idx_client_documents_expiry ON client_documents (expiry_date);
 
 -- Structured participant goals + dated progress notes (replaces the free-text
 -- support_goals blob; progress note bodies are encrypted in the service layer).
