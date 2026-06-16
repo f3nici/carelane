@@ -45,30 +45,75 @@ encrypted at rest.
 | Docs/API   | swagger-jsdoc + swagger-ui (`/api/docs`) |
 | Runtime    | Node.js (ESM), Docker, port `3778` |
 
-## Quick start
+## Quick start (Docker Compose)
+
+The recommended way to self-host CareLane is with the published image and the
+provided [`docker-compose.yml`](docker-compose.yml). All you need is Docker with
+the Compose plugin.
 
 ```bash
-# 1. Install dependencies
-npm install
+# 1. Get the deployment files (or just copy docker-compose.yml + .env.example)
+git clone https://github.com/f3nici/carelane.git
+cd carelane
 
-# 2. Configure environment
+# 2. Create your environment file from the template
 cp .env.example .env
-#    Edit .env — at minimum set SESSION_SECRET, ENCRYPTION_SECRET and
-#    (optionally) ANTHROPIC_API_KEY for AI features.
 
-# 3. Set up the database
-npm run migrate     # apply idempotent SQL migrations
-npm run seed        # create admin user + default settings + starter billing codes
+# 3. Edit .env and set, at minimum, strong unique values for:
+#      SESSION_SECRET      — session signing key
+#      ENCRYPTION_SECRET   — PII encryption key (BACK IT UP; cannot be rotated)
+#      DEFAULT_PASSWORD    — seeded admin password (must not stay 'changeme')
+#    Optionally set ANTHROPIC_API_KEY (AI features) and the Google/Square vars.
 
-# 4. Run in development (Express :3778 + Vite :5173 proxying /api)
-npm run dev
+# 4. Start it (pulls the image; applies migrations + seeds on first boot)
+docker compose up -d
 ```
 
-Open <http://localhost:5173> and log in with `DEFAULT_USERNAME` /
-`DEFAULT_PASSWORD` (default `admin` / `changeme` — change these).
+Compose automatically reads the `.env` file sitting next to
+`docker-compose.yml`, so the values you set there are passed into the container
+— there's no need to copy `.env` inside the image. On startup the container
+applies database migrations and seeds the admin user, default settings and
+starter billing codes, so **no manual `migrate`/`seed` step is required.**
 
-- API documentation: <http://localhost:3778/api/docs>
-- Health check: <http://localhost:3778/healthz>
+Open <http://localhost:8000> and log in with your `DEFAULT_USERNAME` /
+`DEFAULT_PASSWORD` (default username `admin`).
+
+- API documentation: <http://localhost:8000/api/docs>
+- Health check: <http://localhost:8000/healthz>
+
+The compose file publishes the app on host port **8000** (mapped to the
+container's internal `3778`) and persists data in two bind-mounted directories
+next to the compose file:
+
+- `./data` — the SQLite database and scheduled backups
+- `./uploads` — photos, documents and generated PDFs
+
+Keep those directories (and your `ENCRYPTION_SECRET`) backed up — they hold all
+your data. To update later, pull a newer image and recreate the container:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+> The compose file pins `f3nici/carelane:latest`. For a reproducible deployment,
+> pin a specific version tag instead (e.g. `image: f3nici/carelane:0.5.2`) — see
+> [Releases](https://github.com/f3nici/carelane/releases).
+
+## Running from source (development)
+
+For local development (hot-reloading frontend, running tests, hacking on the
+code) you can run it directly with Node instead of Docker:
+
+```bash
+npm install
+cp .env.example .env     # set SESSION_SECRET, ENCRYPTION_SECRET, optionally ANTHROPIC_API_KEY
+npm run dev              # Express :3778 + Vite :5173 (proxies /api)
+```
+
+Migrations and seeding run automatically when the server starts. Open
+<http://localhost:5173> and log in with `DEFAULT_USERNAME` / `DEFAULT_PASSWORD`
+(default `admin` / `changeme` — change these).
 
 ## Scripts
 
@@ -84,15 +129,15 @@ npm run lint       # ESLint (no-semicolons / single-quote / 2-space style)
 npm run lint:fix   # auto-fix lint issues
 ```
 
-## Production / Docker
+## Production from source
+
+Docker Compose (see [Quick start](#quick-start-docker-compose)) is the
+recommended way to run CareLane in production. To run it directly from source
+instead, build the frontend and start the production server:
 
 ```bash
-# Build the frontend then start the production server
-npm run build
-npm start
-
-# …or with Docker
-docker compose up -d        # serves on port 3778
+npm run build      # build the frontend to dist/
+npm start          # serve dist/ + the API on port 3778
 ```
 
 In production the server serves the built frontend from `dist/` and exposes the
