@@ -9,6 +9,7 @@ import { buildGoalsSummary } from '../services/goalService.js'
 import { resolveTemplateForDraft } from '../services/templateService.js'
 import { condenseShift, draftReport, estimateReportTokens } from '../services/aiService.js'
 import { rateLimit } from '../middleware/rateLimit.js'
+import { mapLimit } from '../utils/async.js'
 import { renderPdf, pdfPath, safeFilename } from '../utils/pdfRenderer.js'
 import { logActivity, diffChanges } from '../services/activityService.js'
 import { parsePagination, paginationMeta, ok } from '../utils/pagination.js'
@@ -99,15 +100,17 @@ router.post('/:id/draft', aiLimiter, validate(reportDraftSchema), async (req, re
     }
     if (!shiftIds.length) throw new ApiError(409, 'NO_SHIFTS', 'No shift notes found in the report period')
 
-    // token optimisation: condense each note (Haiku) before the single Sonnet draft
-    const summaries = []
+    // token optimisation: condense each note (Haiku) before the single Sonnet
+    // draft. Gather the notes first (sync decrypt), then condense with bounded
+    // concurrency so a long report period isn't dozens of serial round-trips.
+    const notes = []
     for (const id of shiftIds.slice(0, 60)) {
       const shift = shiftService.getShift(id)
       const note = shift.body || shift.support_provided
-      if (!note) continue
-      summaries.push(await condenseShift({ date: shift.shift_date, note }, req.session.userId))
+      if (note) notes.push({ date: shift.shift_date, note })
     }
-    if (!summaries.length) throw new ApiError(409, 'NO_CONTENT', 'Selected shifts have no notes to summarise')
+    if (!notes.length) throw new ApiError(409, 'NO_CONTENT', 'Selected shifts have no notes to summarise')
+    const summaries = await mapLimit(notes, 5, n => condenseShift(n, req.session.userId))
 
     const template = resolveTemplateForDraft('report', { templateId: req.body.template_id, reportType: report.report_type })
     const body = await draftReport({

@@ -73,17 +73,25 @@ export async function renderPdf (doc) {
  * @param {string} [logoFilename]
  * @returns {Promise<Buffer|null>}
  */
+// Cache the rasterised logo keyed by filename+mtime so we don't re-run sharp on
+// every PDF render (the logo changes rarely; rasterising an SVG is non-trivial).
+let logoCache = null
 async function loadLogo (logoFilename) {
   if (!logoFilename) return null
   // basename guards against a traversal value ever reaching the filesystem,
   // even though logo_filename is only ever set via the upload endpoint.
   const logoPath = path.join(config.uploadPath, 'logos', path.basename(logoFilename))
-  if (!fs.existsSync(logoPath)) return null
+  let stat
+  try { stat = fs.statSync(logoPath) } catch { return null }
+  const cacheKey = `${logoPath}:${stat.mtimeMs}`
+  if (logoCache?.key === cacheKey) return logoCache.buffer
   try {
-    return await sharp(logoPath, { density: 288 })
+    const buffer = await sharp(logoPath, { density: 288 })
       .resize({ width: 600, height: 160, fit: 'inside', withoutEnlargement: true })
       .png()
       .toBuffer()
+    logoCache = { key: cacheKey, buffer }
+    return buffer
   } catch {
     return null
   }
