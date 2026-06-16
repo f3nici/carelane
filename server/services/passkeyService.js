@@ -61,11 +61,6 @@ export function listCredentials (userId) {
   ).all(userId).map(r => ({ ...r, backed_up: !!r.backed_up }))
 }
 
-/** Whether the user has at least one passkey registered. */
-export function hasCredentials (userId) {
-  return sqlite.prepare('SELECT 1 FROM webauthn_credentials WHERE user_id = ? LIMIT 1').get(userId) != null
-}
-
 /**
  * Build registration options for enrolling a new passkey. Existing credentials
  * are excluded so the same authenticator cannot be registered twice. The
