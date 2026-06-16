@@ -209,19 +209,20 @@ Notable changes are recorded in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## License
 
-Licensed under the **[PolyForm Internal Use License 1.0.0](LICENSE)**.
+Licensed under the **[MIT License with the Commons Clause](LICENSE)**.
 
-CareLane is source-available and free to use, modify and self-host for the
-**internal business operations of you and your organisation** — including
-running your own (paid) support-work practice with it: tracking participants,
-keeping notes, and sending invoices. That is exactly what it's for.
+CareLane is source-available and free to **use, modify, self-host and fork** —
+including running your own (paid) support-work practice with it: tracking
+participants, keeping notes, and sending invoices. Fork it, change it, share
+your changes — all fine.
 
-What the license does **not** allow is turning CareLane itself into a product
-for others: you may **not redistribute it, resell it, or host it as a service /
-SaaS for third parties** (e.g. running it for other support workers for a fee).
+The one thing the Commons Clause forbids is **selling the software itself** —
+which it explicitly defines to include **hosting it as a paid service / SaaS for
+others** or charging fees whose value derives substantially from CareLane's
+functionality. In short: build on it and run your own business with it, but
+don't turn CareLane into a product you sell or rent to other people.
 
-> Note: because it restricts redistribution and offering the software to others,
+> Note: the Commons Clause removes the right to "Sell", so strictly speaking
 > this is a *source-available* licence rather than an OSI-approved open-source
-> one. Want to use CareLane beyond your own internal operations (resell, host it
-> for others, redistribute a fork)? Contact <admin@fenici.com.au> for a separate
-> licence.
+> one. Want to offer CareLane commercially (host it for others, sell it)? Contact
+> <admin@fenici.com.au> for a separate licence.

@@ -8,8 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Housekeeping for self-hosters: `LICENSE` (PolyForm Internal Use 1.0.0 —
-  source-available, free for your own internal business use, no resale/SaaS),
+- Housekeeping for self-hosters: `LICENSE` (MIT with the Commons Clause —
+  source-available; free to use, modify, fork and self-host, including for your
+  own paid practice, but no reselling or hosting it as a service for others),
   `SECURITY.md` disclosure policy, this changelog, and Dependabot configuration
   for npm and GitHub Actions updates.
 - Documented the terms of service for every optional outbound integration
