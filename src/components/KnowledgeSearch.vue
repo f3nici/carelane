@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useApi } from '../composables/useApi.js'
-import { marked } from 'marked'
+import { renderMarkdown } from '../composables/useMarkdown.js'
 
 const api = useApi()
 const q = ref('')
@@ -45,7 +45,7 @@ async function run () {
     <p v-if="mode === 'ask'" class="text-xs text-mid">Only the top matching excerpts are sent to Claude; answers cite document and page.</p>
 
     <div v-if="answer" class="space-y-3">
-      <div class="text-sm space-y-2" v-html="marked.parse(answer)" />
+      <div class="text-sm space-y-2" v-html="renderMarkdown(answer)" />
       <div v-if="sources.length">
         <h4 class="text-xs font-semibold text-mid uppercase mb-1">Sources</h4>
         <ul class="space-y-1 text-xs text-mid">

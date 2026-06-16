@@ -75,7 +75,9 @@ export async function renderPdf (doc) {
  */
 async function loadLogo (logoFilename) {
   if (!logoFilename) return null
-  const logoPath = path.join(config.uploadPath, 'logos', logoFilename)
+  // basename guards against a traversal value ever reaching the filesystem,
+  // even though logo_filename is only ever set via the upload endpoint.
+  const logoPath = path.join(config.uploadPath, 'logos', path.basename(logoFilename))
   if (!fs.existsSync(logoPath)) return null
   try {
     return await sharp(logoPath, { density: 288 })

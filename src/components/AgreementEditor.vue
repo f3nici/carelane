@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { marked } from 'marked'
+import { renderMarkdown } from '../composables/useMarkdown.js'
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -9,7 +9,7 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue'])
 
 const preview = ref(false)
-const html = computed(() => marked.parse(props.modelValue || ''))
+const html = computed(() => renderMarkdown(props.modelValue))
 </script>
 
 <template>
