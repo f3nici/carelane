@@ -145,9 +145,13 @@ export const recurrenceSchema = z.object({
   active: bool01.default(1)
 })
 
-// Note fields supplied at clock-out. client_id / date / times are taken from the
-// scheduled shift, so they are not accepted here.
+// Note fields supplied at clock-out. client_id is taken from the scheduled
+// shift; the date/times default to the clocked values but may be overridden
+// when the operator corrects them before saving.
 export const scheduleNoteSchema = z.object({
+  shift_date: isoDate.nullish(),
+  start_time: time.nullish(),
+  end_time: time.nullish(),
   billing_code_id: z.number().int().positive().nullish(),
   location: optStr,
   support_provided: z.string().max(20000).nullish().transform(v => v || null),

@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, watch } from 'vue'
+import { reactive, computed, watch } from 'vue'
 import BillingCodePicker from './BillingCodePicker.vue'
 
 const props = defineProps({
@@ -12,9 +12,23 @@ const emit = defineEmits(['submit', 'reopen'])
 
 const form = reactive({
   client_id: null, shift_date: new Date().toISOString().slice(0, 10), start_time: '', end_time: '',
-  duration_hours: null, billing_code_id: null, location: '', support_provided: '', body: '',
+  billing_code_id: null, location: '', support_provided: '', body: '',
   participant_response: '', incident_flag: 0, incident_details: '', follow_up_required: 0,
   billed: 0, finalised: 0
+})
+
+// Duration is always derived from the start/end times (overnight-safe), never
+// hand-edited, and rounded to the nearest quarter hour — e.g. 2h15m is 2.25
+// hours, not 2.15. Mirrors the server's computeDuration so the displayed value
+// matches what gets persisted.
+const durationHours = computed(() => {
+  const { start_time: start, end_time: end } = form
+  if (!start || !end) return null
+  const [sh, sm] = start.split(':').map(Number)
+  const [eh, em] = end.split(':').map(Number)
+  let mins = (eh * 60 + em) - (sh * 60 + sm)
+  if (mins <= 0) mins += 24 * 60
+  return Math.round((mins / 60) * 4) / 4
 })
 
 watch(() => props.modelValue, value => {
@@ -29,7 +43,7 @@ function submit (finalise = false) {
   for (const k of ['start_time', 'end_time', 'location', 'support_provided', 'body', 'participant_response', 'incident_details']) {
     if (payload[k] === '') payload[k] = null
   }
-  payload.duration_hours = payload.duration_hours ? Number(payload.duration_hours) : null
+  // Duration is computed server-side from the times; don't send a stale value.
   payload.billing_code_id = payload.billing_code_id ? Number(payload.billing_code_id) : null
   payload.client_id = Number(payload.client_id)
   if (finalise) payload.finalised = 1
@@ -54,7 +68,7 @@ defineExpose({ form })
         <div><label class="label">Location</label><input v-model="form.location" class="input" :disabled="locked" /></div>
         <div><label class="label">Start</label><input v-model="form.start_time" type="time" class="input" :disabled="locked" /></div>
         <div><label class="label">End</label><input v-model="form.end_time" type="time" class="input" :disabled="locked" /></div>
-        <div><label class="label">Duration (hours)</label><input v-model="form.duration_hours" type="number" step="0.25" min="0" class="input" :disabled="locked" placeholder="auto from times" /></div>
+        <div><label class="label">Duration (hours)</label><input :value="durationHours ?? '—'" type="text" class="input opacity-70 cursor-not-allowed" readonly title="Calculated automatically from the start and end times" /></div>
         <div class="lg:col-span-3">
           <label class="label">Support item delivered</label>
           <BillingCodePicker v-model="form.billing_code_id" :client-id="form.client_id" :disabled="locked" />

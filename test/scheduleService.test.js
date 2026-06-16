@@ -61,6 +61,21 @@ describe('scheduleService roster lifecycle', () => {
     expect(() => scheduleService.createNoteFromShift(s.id, { body: 'dup' }, workerId)).toThrow(/already/i)
   })
 
+  it('honours operator-corrected times on the note and derives the duration', () => {
+    const s = scheduleService.createScheduled(base(), workerId)
+    scheduleService.clockIn(s.id)
+    scheduleService.clockOut(s.id)
+    const { note } = scheduleService.createNoteFromShift(
+      s.id,
+      { body: 'Park visit.', start_time: '09:00', end_time: '11:15' },
+      workerId
+    )
+    expect(note.start_time).toBe('09:00')
+    expect(note.end_time).toBe('11:15')
+    // 2h15m is 2.25 hours, not 2.15.
+    expect(note.duration_hours).toBe(2.25)
+  })
+
   it('cancels a shift and blocks editing afterwards', () => {
     const s = scheduleService.createScheduled(base(), workerId)
     const cancelled = scheduleService.cancelScheduled(s.id)

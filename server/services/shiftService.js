@@ -27,7 +27,8 @@ function toShiftListRow (row) {
 }
 
 /**
- * Compute duration in hours from HH:MM start/end times (overnight-safe).
+ * Compute duration in hours from HH:MM start/end times (overnight-safe),
+ * rounded to the nearest quarter hour (0.25).
  */
 function computeDuration (start, end) {
   if (!start || !end) return null
@@ -35,7 +36,7 @@ function computeDuration (start, end) {
   const [eh, em] = end.split(':').map(Number)
   let mins = (eh * 60 + em) - (sh * 60 + sm)
   if (mins <= 0) mins += 24 * 60
-  return Math.round((mins / 60) * 100) / 100
+  return Math.round((mins / 60) * 4) / 4
 }
 
 /**
@@ -84,7 +85,8 @@ export function getShift (id) {
  */
 export function createShift (data, workerId) {
   const ts = now()
-  const duration = data.duration_hours ?? computeDuration(data.start_time, data.end_time)
+  // Duration is purely derived from the times — never taken from the client.
+  const duration = computeDuration(data.start_time, data.end_time)
   const cols = [...COLUMNS, 'worker_id', 'created_at', 'updated_at']
   const values = COLUMNS.map(c => {
     if (c === 'duration_hours') return duration
@@ -109,12 +111,22 @@ export function updateShift (id, data) {
     data = Object.fromEntries(Object.entries(data).filter(([k]) => allowed.has(k)))
     if (!Object.keys(data).length) throw new ApiError(409, 'FINALISED', 'Shift note is finalised; only billing status can change')
   }
+  // Duration is always derived from the times, never client-supplied.
+  delete data.duration_hours
   const sets = []
   const params = []
   for (const col of COLUMNS) {
     if (!(col in data) || col === 'client_id') continue
     sets.push(`${col} = ?`)
     params.push(ENCRYPTED.includes(col) ? encrypt(data[col] ?? null) : (data[col] ?? null))
+  }
+  // Recalculate the duration whenever either time changes, using the new value
+  // where supplied and falling back to the existing one otherwise.
+  if ('start_time' in data || 'end_time' in data) {
+    const start = 'start_time' in data ? data.start_time : existing.start_time
+    const end = 'end_time' in data ? data.end_time : existing.end_time
+    sets.push('duration_hours = ?')
+    params.push(computeDuration(start, end))
   }
   if (!sets.length) return existing
   sets.push('updated_at = ?')
