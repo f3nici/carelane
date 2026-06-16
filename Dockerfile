@@ -1,5 +1,5 @@
 # ---- builder: install deps (incl. native builds) and build frontend ----
-FROM node:22-bookworm-slim AS builder
+FROM node:26-bookworm-slim AS builder
 RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY package.json package-lock.json ./
@@ -8,7 +8,7 @@ COPY . .
 RUN npm run build
 
 # ---- runtime ----
-FROM node:22-bookworm-slim
+FROM node:26-bookworm-slim
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=builder /app/node_modules ./node_modules
