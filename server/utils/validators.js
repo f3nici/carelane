@@ -19,6 +19,28 @@ export const totpDisableSchema = z.object({
   password: z.string().min(1)
 })
 
+export const changePasswordSchema = z.object({
+  current_password: z.string().min(1),
+  // A self-hosted single-operator admin account — favour length over composition rules.
+  new_password: z.string().min(10, 'must be at least 10 characters').max(200)
+})
+
+// Passkey (WebAuthn) ceremony bodies. The `response` object is the raw
+// attestation/assertion produced by the browser; @simplewebauthn validates its
+// internal structure, so here we only assert it is present.
+export const passkeyRegisterSchema = z.object({
+  response: z.object({}).passthrough(),
+  name: z.string().trim().max(60).nullish()
+})
+
+export const passkeyLoginSchema = z.object({
+  response: z.object({}).passthrough()
+})
+
+export const passkeyRenameSchema = z.object({
+  name: z.string().trim().min(1).max(60)
+})
+
 export const activityQuerySchema = z.object({
   entity_type: z.string().trim().max(40).nullish(),
   entity_id: z.coerce.number().int().positive().nullish(),

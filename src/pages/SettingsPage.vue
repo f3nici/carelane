@@ -4,7 +4,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { useApi } from '../composables/useApi.js'
 import { useToastStore } from '../stores/toast.js'
 import BrandingSettings from '../components/BrandingSettings.vue'
+import PasswordSettings from '../components/PasswordSettings.vue'
 import TwoFactorSettings from '../components/TwoFactorSettings.vue'
+import PasskeySettings from '../components/PasskeySettings.vue'
 import BackupSettings from '../components/BackupSettings.vue'
 import GoogleCalendarSettings from '../components/GoogleCalendarSettings.vue'
 import SquareInvoicingSettings from '../components/SquareInvoicingSettings.vue'
@@ -57,7 +59,11 @@ async function save () {
 
     <BrandingSettings :settings="settings" @save="save" />
 
+    <PasswordSettings />
+
     <TwoFactorSettings />
+
+    <PasskeySettings />
 
     <GoogleCalendarSettings />
 

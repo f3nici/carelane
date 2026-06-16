@@ -317,6 +317,27 @@ CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_log (created_at);
   addColumnIfMissing('users', 'totp_enabled', 'INTEGER NOT NULL DEFAULT 0')
   addColumnIfMissing('users', 'totp_recovery_codes', 'TEXT')
 
+  // Passkeys / WebAuthn (added post-launch). One row per registered authenticator;
+  // a passkey is a passwordless login factor. The public key is non-secret so it
+  // is stored as-is (the matching private key never leaves the authenticator);
+  // counter is the replay-defence signature counter, bumped on each login.
+  sqlite.exec(`
+CREATE TABLE IF NOT EXISTS webauthn_credentials (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  credential_id TEXT NOT NULL UNIQUE,
+  public_key BLOB NOT NULL,
+  counter INTEGER NOT NULL DEFAULT 0,
+  transports TEXT,
+  device_type TEXT,
+  backed_up INTEGER NOT NULL DEFAULT 0,
+  name TEXT,
+  created_at TEXT,
+  last_used_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_webauthn_user ON webauthn_credentials (user_id);
+`)
+
   // Tamper-evident hash chain on activity_log (added post-launch). Add the
   // columns on existing databases, then seal any legacy rows into the chain.
   addColumnIfMissing('activity_log', 'prev_hash', 'TEXT')

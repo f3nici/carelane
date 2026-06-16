@@ -26,6 +26,9 @@ export function requireAdmin (req, res, next) {
 export function csrfProtect (req, res, next) {
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next()
   if (req.path === '/auth/login') return next()
+  // Passkey login happens before any session/CSRF token exists; the WebAuthn
+  // challenge bound to the session is itself the anti-forgery guard here.
+  if (req.path.startsWith('/auth/passkeys/login/')) return next()
   const token = req.get('x-csrf-token')
   if (req.session?.csrfToken && token === req.session.csrfToken) return next()
   next(new ApiError(403, 'CSRF_ERROR', 'Missing or invalid CSRF token'))
