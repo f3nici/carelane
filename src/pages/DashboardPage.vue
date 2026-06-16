@@ -6,7 +6,7 @@ import StatusBadge from '../components/StatusBadge.vue'
 
 const api = useApi()
 const stats = ref({})
-const planReviews = ref([])
+const agreementExpiries = ref([])
 const recentShifts = ref([])
 const incidents = ref([])
 const integrity = ref(null)
@@ -16,14 +16,14 @@ const activeShift = ref(null)
 onMounted(async () => {
   const [s, p, sh, inc, audit, sched] = await Promise.all([
     api.get('/dashboard/stats'),
-    api.get('/dashboard/plan-reviews'),
+    api.get('/dashboard/agreement-expiries'),
     api.get('/shifts', { per_page: 5 }),
     api.get('/shifts', { incident: 'true', per_page: 5 }),
     api.get('/audit/verify'),
     api.get('/schedule/upcoming', { days: 14 })
   ])
   stats.value = s.data
-  planReviews.value = p.data
+  agreementExpiries.value = p.data
   recentShifts.value = sh.data
   incidents.value = inc.data
   integrity.value = audit.data
@@ -36,7 +36,7 @@ const tiles = [
   { key: 'upcoming_shifts', label: 'Upcoming shifts' },
   { key: 'shifts_this_month', label: 'Shifts this month' },
   { key: 'unbilled_shifts', label: 'Unbilled shifts' },
-  { key: 'plan_reviews_due', label: 'Plan reviews due (60d)' },
+  { key: 'agreements_expiring', label: 'Agreements expiring (90d)' },
   { key: 'open_incidents', label: 'Incidents needing follow-up' }
 ]
 </script>
@@ -92,12 +92,12 @@ const tiles = [
 
     <div class="grid lg:grid-cols-2 gap-6">
       <div class="card">
-        <h3 class="font-semibold mb-3">Upcoming plan reviews</h3>
-        <p v-if="!planReviews.length" class="text-sm text-mid">Nothing due in the next 60 days.</p>
+        <h3 class="font-semibold mb-3">Agreements expiring soon</h3>
+        <p v-if="!agreementExpiries.length" class="text-sm text-mid">No agreements expiring in the next 90 days.</p>
         <ul class="space-y-2">
-          <li v-for="c in planReviews" :key="c.id" class="text-sm flex justify-between">
-            <router-link :to="`/clients/${c.id}`" class="text-accent hover:underline">{{ c.client_display_name }}</router-link>
-            <span class="text-mid">{{ c.plan_end }}</span>
+          <li v-for="a in agreementExpiries" :key="a.id" class="text-sm flex items-center justify-between gap-2">
+            <router-link :to="`/agreements/${a.id}`" class="text-accent hover:underline truncate">{{ a.client_display_name }} — {{ a.title }}</router-link>
+            <span class="text-mid whitespace-nowrap">{{ a.end_date }}</span>
           </li>
         </ul>
       </div>

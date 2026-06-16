@@ -8,7 +8,7 @@ const ENCRYPTED = ['first_name', 'last_name', 'ndis_number', 'date_of_birth', 'p
   'emergency_contact_phone', 'notes']
 
 const COLUMNS = ['first_name', 'last_name', 'preferred_name', 'ndis_number', 'date_of_birth',
-  'phone', 'email', 'address', 'suburb', 'state', 'postcode', 'plan_start', 'plan_end',
+  'phone', 'email', 'address', 'suburb', 'state', 'postcode',
   'plan_management_type', 'plan_manager_name', 'plan_manager_contact', 'primary_disability',
   'communication_needs', 'support_goals', 'emergency_contact_name', 'emergency_contact_phone',
   'notes', 'invoice_due_days', 'active']
@@ -170,7 +170,6 @@ export function buildClientExportMarkdown (data) {
     ['Phone', c.phone],
     ['Email', c.email],
     ['Address', [c.address, c.suburb, c.state, c.postcode].filter(Boolean).join(', ')],
-    ['Plan period', [c.plan_start, c.plan_end].filter(Boolean).join(' → ')],
     ['Plan management', c.plan_management_type],
     ['Plan manager', c.plan_manager_name],
     ['Primary disability', c.primary_disability],

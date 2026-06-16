@@ -64,8 +64,6 @@ export const clientSchema = z.object({
   suburb: optStr,
   state: z.string().trim().max(3).default('WA'),
   postcode: optStr,
-  plan_start: isoDate.nullish(),
-  plan_end: isoDate.nullish(),
   plan_management_type: z.enum(['self', 'plan_managed', 'ndia_managed']).nullish(),
   plan_manager_name: optStr,
   plan_manager_contact: optStr,

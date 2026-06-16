@@ -43,8 +43,6 @@ export const clients = sqliteTable('clients', {
   suburb: text('suburb'),
   state: text('state').default('WA'),
   postcode: text('postcode'),
-  planStart: text('plan_start'),
-  planEnd: text('plan_end'),
   planManagementType: text('plan_management_type'),
   planManagerName: text('plan_manager_name'), // 🔒
   planManagerContact: text('plan_manager_contact'), // 🔒
