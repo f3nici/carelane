@@ -38,6 +38,22 @@ export function changePassword (userId, currentPassword, newPassword) {
 }
 
 /**
+ * Destroy all persisted sessions belonging to a user except the one to keep.
+ * Used after a password change so other (possibly attacker) sessions are
+ * revoked. Operates directly on the better-sqlite3-session-store `sessions`
+ * table; `userId` is stored inside the JSON `sess` blob.
+ * @param {number} userId
+ * @param {string} [keepSid] session id to preserve (the current request's)
+ * @returns {number} number of sessions removed
+ */
+export function destroyOtherSessions (userId, keepSid = '') {
+  const res = sqlite.prepare(
+    "DELETE FROM sessions WHERE json_extract(sess, '$.userId') = ? AND sid != ?"
+  ).run(userId, keepSid)
+  return res.changes
+}
+
+/**
  * Force-set a user's password by username (offline CLI recovery only — there is
  * no current-password check). Returns the affected user id.
  * @param {string} username

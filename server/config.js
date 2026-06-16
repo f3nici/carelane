@@ -81,6 +81,9 @@ export function assertProductionSecrets () {
   if (!env.ENCRYPTION_SECRET || env.ENCRYPTION_SECRET === 'change-me') {
     problems.push('ENCRYPTION_SECRET is unset or left at default')
   }
+  if (!env.DEFAULT_PASSWORD || env.DEFAULT_PASSWORD === 'changeme') {
+    problems.push('DEFAULT_PASSWORD is unset or left at the insecure default (set it to a strong value before first run, or rotate the admin password)')
+  }
   if (problems.length) {
     console.error('Refusing to start in production:\n  - ' + problems.join('\n  - '))
     process.exit(1)

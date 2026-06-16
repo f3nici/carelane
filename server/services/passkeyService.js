@@ -89,8 +89,10 @@ export async function beginRegistration (userId, user, rp) {
       transports: c.transports ? JSON.parse(c.transports) : undefined
     })),
     // Passwordless: a discoverable (resident) credential so the operator can log
-    // in without first typing a username.
-    authenticatorSelection: { residentKey: 'required', userVerification: 'preferred' }
+    // in without first typing a username. userVerification is *required* so the
+    // passkey is genuine two-factor (possession of the device + a biometric/PIN),
+    // not possession alone.
+    authenticatorSelection: { residentKey: 'required', userVerification: 'required' }
   })
 }
 
@@ -113,7 +115,7 @@ export async function finishRegistration (userId, { response, expectedChallenge,
       expectedChallenge,
       expectedOrigin,
       expectedRPID,
-      requireUserVerification: false
+      requireUserVerification: true
     })
   } catch (err) {
     throw new ApiError(400, 'PASSKEY_INVALID', err.message || 'Could not verify passkey registration')
@@ -154,7 +156,7 @@ export async function finishRegistration (userId, { response, expectedChallenge,
 export async function beginLogin (rp) {
   return generateAuthenticationOptions({
     rpID: rp.rpID,
-    userVerification: 'preferred',
+    userVerification: 'required',
     allowCredentials: [] // discoverable credentials: let the authenticator choose
   })
 }
@@ -181,7 +183,7 @@ export async function finishLogin ({ response, expectedChallenge, expectedOrigin
       expectedOrigin,
       expectedRPID,
       credential: toCredential(row),
-      requireUserVerification: false
+      requireUserVerification: true
     })
   } catch (err) {
     throw new ApiError(401, 'PASSKEY_INVALID', err.message || 'Passkey verification failed')

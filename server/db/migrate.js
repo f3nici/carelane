@@ -362,6 +362,9 @@ CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_log (created_at);
   addColumnIfMissing('users', 'totp_secret', 'TEXT')
   addColumnIfMissing('users', 'totp_enabled', 'INTEGER NOT NULL DEFAULT 0')
   addColumnIfMissing('users', 'totp_recovery_codes', 'TEXT')
+  // Highest TOTP time-step already accepted at login — prevents replay of a
+  // still-valid code within its ~90s window (see twoFactorService.verifyLogin).
+  addColumnIfMissing('users', 'totp_last_counter', 'INTEGER')
 
   // Passkeys / WebAuthn (added post-launch). One row per registered authenticator;
   // a passkey is a passwordless login factor. The public key is non-secret so it

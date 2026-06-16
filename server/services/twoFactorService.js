@@ -2,7 +2,7 @@ import crypto from 'node:crypto'
 import bcrypt from 'bcryptjs'
 import { sqlite } from '../db/connection.js'
 import { encrypt, decrypt } from './cryptoService.js'
-import { generateSecret, otpauthUri, verifyToken } from './totpService.js'
+import { generateSecret, otpauthUri, verifyToken, verifyTokenCounter } from './totpService.js'
 import { getSetting } from './settingsService.js'
 import { ApiError } from '../middleware/errorHandler.js'
 
@@ -13,6 +13,11 @@ import { ApiError } from '../middleware/errorHandler.js'
  */
 
 const RECOVERY_CODE_COUNT = 10
+// Recovery codes are high-entropy (80-bit) random values, so a bcrypt work
+// factor of 10 is ample — and hashing/comparing ten of them synchronously at a
+// higher cost would block the event loop for seconds. Security comes from the
+// code entropy here, not the hash cost.
+const RECOVERY_CODE_COST = 10
 const now = () => new Date().toISOString()
 
 /** Fetch a user row by id or throw 404. */
@@ -65,7 +70,7 @@ export function confirmSetup (userId, token) {
   const secret = decrypt(user.totp_secret)
   if (!verifyToken(secret, token)) throw new ApiError(400, 'INVALID_TOTP', 'That code is incorrect or expired — try again')
   const codes = Array.from({ length: RECOVERY_CODE_COUNT }, generateRecoveryCode)
-  const hashes = codes.map(c => bcrypt.hashSync(normalise(c), 10))
+  const hashes = codes.map(c => bcrypt.hashSync(normalise(c), RECOVERY_CODE_COST))
   sqlite.prepare('UPDATE users SET totp_enabled = 1, totp_recovery_codes = ?, updated_at = ? WHERE id = ?')
     .run(encrypt(JSON.stringify(hashes)), now(), userId)
   return { recovery_codes: codes }
@@ -91,7 +96,15 @@ export function disable (userId) {
 export function verifyLogin (user, token) {
   if (!user?.totp_enabled || !token) return false
   const secret = decrypt(user.totp_secret)
-  if (verifyToken(secret, token)) return true
+  const matched = verifyTokenCounter(secret, token)
+  if (matched !== null) {
+    // Replay defence: reject a code at a time-step we've already accepted, then
+    // record this step as the new high-water mark.
+    if (user.totp_last_counter != null && matched <= user.totp_last_counter) return false
+    sqlite.prepare('UPDATE users SET totp_last_counter = ?, updated_at = ? WHERE id = ?')
+      .run(matched, now(), user.id)
+    return true
+  }
   return consumeRecoveryCode(user, token)
 }
 
@@ -120,10 +133,10 @@ function consumeRecoveryCode (user, token) {
   return true
 }
 
-/** A readable recovery code like `a1b2-c3d4-e5f6`. */
+/** A readable 80-bit recovery code like `a1b2-c3d4-e5f6-7a8b-9c0d`. */
 function generateRecoveryCode () {
-  const hex = crypto.randomBytes(6).toString('hex')
-  return `${hex.slice(0, 4)}-${hex.slice(4, 8)}-${hex.slice(8, 12)}`
+  const hex = crypto.randomBytes(10).toString('hex')
+  return hex.match(/.{4}/g).join('-')
 }
 
 /** Normalise a code for comparison (lower-case, strip spaces/dashes). */

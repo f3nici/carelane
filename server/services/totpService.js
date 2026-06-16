@@ -78,19 +78,32 @@ export function generateToken (secret, atMs = Date.now()) {
  * @returns {boolean}
  */
 export function verifyToken (secret, token, window = 1) {
-  if (!secret || !token) return false
+  return verifyTokenCounter(secret, token, window) !== null
+}
+
+/**
+ * Verify a submitted TOTP token and return the matching time-step counter (or
+ * null if invalid). Callers persist the counter to reject replay of a code that
+ * is still inside its validity window.
+ * @param {string} secret base32 secret
+ * @param {string} token user-supplied code
+ * @param {number} [window] steps of tolerance either side of now
+ * @returns {number|null} the matched counter, or null
+ */
+export function verifyTokenCounter (secret, token, window = 1) {
+  if (!secret || !token) return null
   const clean = String(token).replace(/\D/g, '')
-  if (clean.length !== DIGITS) return false
+  if (clean.length !== DIGITS) return null
   const key = base32Decode(secret)
-  if (!key.length) return false
+  if (!key.length) return null
   const counter = Math.floor(Date.now() / 1000 / STEP_SECONDS)
   for (let i = -window; i <= window; i++) {
     const candidate = hotp(key, counter + i)
     // constant-time compare to avoid leaking which step matched via timing
     if (candidate.length === clean.length &&
-      crypto.timingSafeEqual(Buffer.from(candidate), Buffer.from(clean))) return true
+      crypto.timingSafeEqual(Buffer.from(candidate), Buffer.from(clean))) return counter + i
   }
-  return false
+  return null
 }
 
 /**

@@ -10,6 +10,7 @@ const toast = useToastStore()
 const supported = ref(false)
 const passkeys = ref([])
 const newName = ref('')
+const password = ref('')
 const busy = ref(false)
 
 onMounted(async () => {
@@ -23,12 +24,19 @@ async function load () {
 }
 
 async function register () {
+  if (!password.value) {
+    toast.push('Enter your current password to add a passkey', 'error')
+    return
+  }
   busy.value = true
   try {
-    const optRes = await api.post('/auth/passkeys/register/options')
+    // Re-authenticate first; the password is verified server-side before any
+    // WebAuthn challenge is issued.
+    const optRes = await api.post('/auth/passkeys/register/options', { password: password.value })
     const attResp = await startRegistration({ optionsJSON: optRes.data })
     await api.post('/auth/passkeys/register/verify', { response: attResp, name: newName.value || undefined })
     newName.value = ''
+    password.value = ''
     toast.push('Passkey added', 'success')
     await load()
   } catch (err) {
@@ -82,6 +90,10 @@ function formatDate (iso) {
         <div class="flex-1">
           <label class="label">Name (optional)</label>
           <input v-model="newName" class="input" placeholder="e.g. My laptop" maxlength="60" />
+        </div>
+        <div class="flex-1">
+          <label class="label">Current password</label>
+          <input v-model="password" type="password" class="input" placeholder="Confirm it's you" autocomplete="current-password" />
         </div>
         <button class="btn-primary shrink-0" :disabled="busy" @click="register">{{ busy ? 'Waiting…' : 'Add a passkey' }}</button>
       </div>
