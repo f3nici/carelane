@@ -8,9 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Open-source housekeeping for self-hosters: `LICENSE` (PolyForm Noncommercial
-  1.0.0), `SECURITY.md` disclosure policy, this changelog, and Dependabot
-  configuration for npm and GitHub Actions updates.
+- Housekeeping for self-hosters: `LICENSE` (PolyForm Internal Use 1.0.0 —
+  source-available, free for your own internal business use, no resale/SaaS),
+  `SECURITY.md` disclosure policy, this changelog, and Dependabot configuration
+  for npm and GitHub Actions updates.
 - Documented the terms of service for every optional outbound integration
   (Anthropic, Google, Square, Hugging Face) in the README.
 

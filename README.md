@@ -209,15 +209,19 @@ Notable changes are recorded in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## License
 
-Licensed under the **[PolyForm Noncommercial License 1.0.0](LICENSE)**.
+Licensed under the **[PolyForm Internal Use License 1.0.0](LICENSE)**.
 
-CareLane is source-available and free to use, modify and self-host for **any
-noncommercial purpose** — personal use, hobby projects, study, and use by
-charities, public-health/government bodies and other noncommercial
-organisations (see the license for the exact terms). **Commercial use — selling
-the software or a hosted version of it, or using it to make money — is not
-permitted** without a separate licence from the author.
+CareLane is source-available and free to use, modify and self-host for the
+**internal business operations of you and your organisation** — including
+running your own (paid) support-work practice with it: tracking participants,
+keeping notes, and sending invoices. That is exactly what it's for.
 
-> Note: because it forbids commercial use, this is a *source-available*
-> (non-commercial) licence rather than an OSI-approved open-source one. If you
-> want to use CareLane commercially, contact <admin@fenici.com.au>.
+What the license does **not** allow is turning CareLane itself into a product
+for others: you may **not redistribute it, resell it, or host it as a service /
+SaaS for third parties** (e.g. running it for other support workers for a fee).
+
+> Note: because it restricts redistribution and offering the software to others,
+> this is a *source-available* licence rather than an OSI-approved open-source
+> one. Want to use CareLane beyond your own internal operations (resell, host it
+> for others, redistribute a fork)? Contact <admin@fenici.com.au> for a separate
+> licence.
