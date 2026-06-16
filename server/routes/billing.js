@@ -11,7 +11,9 @@ import { ApiError } from '../middleware/errorHandler.js'
 import config from '../config.js'
 
 const router = Router()
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: Math.max(config.maxUploadSize, 50 * 1024 * 1024) } })
+// Price-guide imports are buffered in memory then parsed (docx/pdf), so keep the
+// cap modest to bound memory use; a deliberately-lowered global limit wins.
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: config.uploadLimitFor(15 * 1024 * 1024) } })
 
 /**
  * @openapi

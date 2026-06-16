@@ -6,12 +6,14 @@ import * as agreementService from '../services/agreementService.js'
 import * as clientService from '../services/clientService.js'
 import { resolveTemplateForDraft } from '../services/templateService.js'
 import { draftAgreement, estimateAgreementTokens } from '../services/aiService.js'
+import { rateLimit } from '../middleware/rateLimit.js'
 import { renderPdf, pdfPath, safeFilename } from '../utils/pdfRenderer.js'
 import { logActivity, diffChanges } from '../services/activityService.js'
 import { parsePagination, paginationMeta, ok } from '../utils/pagination.js'
 import { ApiError } from '../middleware/errorHandler.js'
 
 const router = Router()
+const aiLimiter = rateLimit({ name: 'ai-agreement', max: 20, windowMs: 60 * 1000 })
 
 /**
  * @openapi
@@ -77,7 +79,7 @@ router.post('/:id/unarchive', (req, res) => {
  *     tags: [Agreements]
  *     summary: AI-draft the agreement body from the stored questionnaire (draft only — worker must review)
  */
-router.post('/:id/draft', validate(agreementDraftSchema), async (req, res, next) => {
+router.post('/:id/draft', aiLimiter, validate(agreementDraftSchema), async (req, res, next) => {
   try {
     const agreement = agreementService.getAgreement(Number(req.params.id))
     if (!agreement.questionnaire_json) throw new ApiError(409, 'NO_QUESTIONNAIRE', 'Complete the questionnaire before drafting')

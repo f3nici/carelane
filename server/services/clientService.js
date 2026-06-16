@@ -1,5 +1,6 @@
 import { sqlite } from '../db/connection.js'
 import { encrypt, decrypt, decryptFields, blindIndex } from './cryptoService.js'
+import { escapeLike } from '../utils/sql.js'
 import { ApiError } from '../middleware/errorHandler.js'
 
 /** Snake_case column names that are encrypted at rest. */
@@ -53,8 +54,8 @@ export function listClients (pg, filters = {}) {
   const params = []
   if (filters.active === 'true') { where.push('active = 1') }
   if (filters.q) {
-    const q = `%${filters.q}%`
-    where.push('(preferred_name LIKE ? OR suburb LIKE ? OR postcode LIKE ? OR ndis_number_hash = ?)')
+    const q = `%${escapeLike(filters.q)}%`
+    where.push("(preferred_name LIKE ? ESCAPE '\\' OR suburb LIKE ? ESCAPE '\\' OR postcode LIKE ? ESCAPE '\\' OR ndis_number_hash = ?)")
     params.push(q, q, q, blindIndex(filters.q))
   }
   const whereSql = 'WHERE ' + where.join(' AND ')

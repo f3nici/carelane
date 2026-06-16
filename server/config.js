@@ -4,6 +4,8 @@
  */
 const env = process.env
 
+const DEFAULT_MAX_UPLOAD = 10 * 1024 * 1024
+
 const config = {
   port: parseInt(env.PORT || '3778', 10),
   nodeEnv: env.NODE_ENV || 'development',
@@ -17,7 +19,7 @@ const config = {
   defaultPassword: env.DEFAULT_PASSWORD || 'changeme',
   dbPath: env.DB_PATH || './data/carelane.db',
   uploadPath: env.UPLOAD_PATH || './uploads',
-  maxUploadSize: parseInt(env.MAX_UPLOAD_SIZE || '10485760', 10),
+  maxUploadSize: parseInt(env.MAX_UPLOAD_SIZE || String(DEFAULT_MAX_UPLOAD), 10),
   embeddingModel: env.EMBEDDING_MODEL || 'Xenova/bge-small-en-v1.5',
   // bge-style retrieval models expect a short instruction prefixed to the
   // *query* (not the stored passages). Auto-applied for bge models unless an
@@ -67,6 +69,19 @@ const config = {
   squareEnvironment: env.SQUARE_ENVIRONMENT === 'production' ? 'production' : 'sandbox',
   squareLocationId: env.SQUARE_LOCATION_ID || ''
 }
+
+/**
+ * Effective per-route upload size limit. Some routes (knowledge PDFs, client
+ * documents) legitimately need more headroom than the global default, but a
+ * deliberately *lowered* MAX_UPLOAD_SIZE (e.g. to constrain a small host) must
+ * still be honoured everywhere. So: if the operator lowered the global limit
+ * below the default, that wins; otherwise the route's larger preferred cap
+ * applies.
+ * @param {number} preferred the route's preferred maximum in bytes
+ * @returns {number}
+ */
+config.uploadLimitFor = preferred =>
+  config.maxUploadSize < DEFAULT_MAX_UPLOAD ? config.maxUploadSize : Math.max(config.maxUploadSize, preferred)
 
 /**
  * Validate production-critical secrets. Exits the process when secrets are

@@ -30,7 +30,7 @@ const docUpload = multer({
     // non-guessable filename: completed documents hold PII and are served only behind auth
     filename: (req, file, cb) => cb(null, crypto.randomBytes(16).toString('hex') + path.extname(file.originalname).toLowerCase())
   }),
-  limits: { fileSize: Math.max(config.maxUploadSize, 25 * 1024 * 1024) },
+  limits: { fileSize: config.uploadLimitFor(25 * 1024 * 1024) },
   fileFilter: (req, file, cb) => cb(null, ALLOWED_DOC_TYPES.includes(file.mimetype))
 })
 
@@ -171,9 +171,13 @@ router.put('/:id/documents/:docId', validatePartial(clientDocumentMetaSchema), (
 })
 
 /** Auth-gated file serving — completed documents are never exposed as a public static path. */
-router.get('/:id/documents/:docId/file', (req, res) => {
+router.get('/:id/documents/:docId/file', (req, res, next) => {
   const doc = clientDocumentService.getClientDocument(Number(req.params.id), Number(req.params.docId))
-  res.download(path.resolve(CLIENT_DOC_DIR, doc.filename), doc.original_name || doc.filename)
+  // Forward filesystem errors (e.g. a row whose file is missing after a partial
+  // restore) to the handler instead of leaking a stack/path or hanging.
+  res.download(path.resolve(CLIENT_DOC_DIR, path.basename(doc.filename)), doc.original_name || doc.filename, err => {
+    if (err && !res.headersSent) next(new ApiError(404, 'FILE_NOT_FOUND', 'Document file is unavailable'))
+  })
 })
 
 router.delete('/:id/documents/:docId', (req, res) => {

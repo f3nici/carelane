@@ -8,6 +8,7 @@ import { shiftSchema, shiftDraftSchema } from '../utils/validators.js'
 import * as shiftService from '../services/shiftService.js'
 import * as clientService from '../services/clientService.js'
 import { draftShiftNote, estimateShiftNoteTokens } from '../services/aiService.js'
+import { rateLimit } from '../middleware/rateLimit.js'
 import { logActivity, diffChanges } from '../services/activityService.js'
 import { parsePagination, paginationMeta, ok } from '../utils/pagination.js'
 import { ApiError } from '../middleware/errorHandler.js'
@@ -101,7 +102,9 @@ router.post('/:id/unarchive', (req, res) => {
  *     tags: [Shifts]
  *     summary: AI clean-up of the worker's bullets into a draft note (Haiku; draft only)
  */
-router.post('/:id/draft', validate(shiftDraftSchema), async (req, res, next) => {
+const aiLimiter = rateLimit({ name: 'ai-draft', max: 20, windowMs: 60 * 1000 })
+
+router.post('/:id/draft', aiLimiter, validate(shiftDraftSchema), async (req, res, next) => {
   try {
     const shift = shiftService.getShift(Number(req.params.id))
     if (shift.finalised) throw new ApiError(409, 'FINALISED', 'Shift note is finalised')
@@ -158,9 +161,11 @@ router.post('/:id/photos', photoUpload.single('photo'), (req, res, next) => {
 })
 
 /** Auth-gated photo file serving — never exposed as a public static path. */
-router.get('/:id/photos/:photoId/file', (req, res) => {
+router.get('/:id/photos/:photoId/file', (req, res, next) => {
   const photo = shiftService.getPhoto(Number(req.params.id), Number(req.params.photoId))
-  res.sendFile(path.resolve(PHOTO_DIR, photo.filename))
+  res.sendFile(path.resolve(PHOTO_DIR, path.basename(photo.filename)), err => {
+    if (err && !res.headersSent) next(new ApiError(404, 'FILE_NOT_FOUND', 'Photo file is unavailable'))
+  })
 })
 
 router.delete('/:id/photos/:photoId', (req, res) => {

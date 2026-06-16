@@ -8,6 +8,7 @@ import * as clientService from '../services/clientService.js'
 import { buildGoalsSummary } from '../services/goalService.js'
 import { resolveTemplateForDraft } from '../services/templateService.js'
 import { condenseShift, draftReport, estimateReportTokens } from '../services/aiService.js'
+import { rateLimit } from '../middleware/rateLimit.js'
 import { renderPdf, pdfPath, safeFilename } from '../utils/pdfRenderer.js'
 import { logActivity, diffChanges } from '../services/activityService.js'
 import { parsePagination, paginationMeta, ok } from '../utils/pagination.js'
@@ -15,6 +16,8 @@ import { ApiError } from '../middleware/errorHandler.js'
 import { sqlite } from '../db/connection.js'
 
 const router = Router()
+// Report drafting fans out to many Haiku + one Sonnet call; cap per-operator.
+const aiLimiter = rateLimit({ name: 'ai-report', max: 10, windowMs: 60 * 1000 })
 
 /**
  * @openapi
@@ -81,7 +84,7 @@ router.post('/:id/unarchive', (req, res) => {
  *     tags: [Reports]
  *     summary: AI-draft the report (condense shifts with Haiku, draft with Sonnet; draft only)
  */
-router.post('/:id/draft', validate(reportDraftSchema), async (req, res, next) => {
+router.post('/:id/draft', aiLimiter, validate(reportDraftSchema), async (req, res, next) => {
   try {
     const report = reportService.getReport(Number(req.params.id))
     if (report.status === 'final') throw new ApiError(409, 'FINALISED', 'Final reports cannot be redrafted')
