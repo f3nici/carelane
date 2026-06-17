@@ -114,7 +114,10 @@ export function computeEntryHash (entry, prevHash) {
 }
 
 // Append one entry atomically: read the chain tail and insert in a single
-// transaction so concurrent writes can never fork the hash chain.
+// transaction so concurrent writes can never fork the hash chain. Runs as
+// BEGIN IMMEDIATE so the tail read takes the database write lock up front —
+// this also guards against a *second process* (e.g. a CLI script run while the
+// server is up) reading the same tail and forking the chain.
 const appendEntry = sqlite.transaction((entry) => {
   const last = sqlite.prepare(
     'SELECT hash FROM activity_log WHERE hash IS NOT NULL ORDER BY id DESC LIMIT 1'
@@ -126,7 +129,7 @@ const appendEntry = sqlite.transaction((entry) => {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(entry.entity_type, entry.entity_id, entry.user_id, entry.action, entry.details,
       entry.created_at, prevHash, hash)
-})
+}).immediate
 
 /**
  * Append an entry to the append-only audit log. PII is redacted from details

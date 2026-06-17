@@ -65,7 +65,14 @@ describe('passkey routes', () => {
 
   it('404s when removing a passkey that does not exist', async () => {
     const { agent, csrf } = await loginAgent()
-    const res = await agent.delete('/api/v1/auth/passkeys/999').set('x-csrf-token', csrf)
+    const res = await agent.delete('/api/v1/auth/passkeys/999').set('x-csrf-token', csrf).send({ password: 'changeme' })
     expect(res.status).toBe(404)
+  })
+
+  it('requires the current password to remove a passkey', async () => {
+    const { agent, csrf } = await loginAgent()
+    const res = await agent.delete('/api/v1/auth/passkeys/999').set('x-csrf-token', csrf).send({ password: 'wrong' })
+    expect(res.status).toBe(403)
+    expect(res.body.error.code).toBe('REAUTH_REQUIRED')
   })
 })

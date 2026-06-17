@@ -50,9 +50,16 @@ async function register () {
 }
 
 async function remove (passkey) {
+  // Removing a login factor requires password re-entry server-side; reuse the
+  // password field above rather than silently failing the request.
+  if (!password.value) {
+    toast.push('Enter your current password (below) to remove a passkey', 'error')
+    return
+  }
   if (!confirm(`Remove passkey "${passkey.name}"? You will no longer be able to sign in with it.`)) return
   try {
-    await api.del(`/auth/passkeys/${passkey.id}`)
+    await api.del(`/auth/passkeys/${passkey.id}`, { password: password.value })
+    password.value = ''
     toast.push('Passkey removed', 'success')
     await load()
   } catch { /* toast via interceptor */ }

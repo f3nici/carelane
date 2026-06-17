@@ -9,6 +9,7 @@ import * as shiftService from '../services/shiftService.js'
 import * as clientService from '../services/clientService.js'
 import { draftShiftNote, estimateShiftNoteTokens } from '../services/aiService.js'
 import { rateLimit } from '../middleware/rateLimit.js'
+import { sniffFileType } from '../utils/fileType.js'
 import { logActivity, diffChanges } from '../services/activityService.js'
 import { parsePagination, paginationMeta, ok } from '../utils/pagination.js'
 import { ApiError } from '../middleware/errorHandler.js'
@@ -153,8 +154,27 @@ router.post('/:id/draft/estimate', (req, res, next) => {
  * /shifts/{id}/photos:
  *   post: { tags: [Shifts], summary: Upload a shift photo (served auth-gated only) }
  */
+const PHOTO_EXT = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp' }
+
 router.post('/:id/photos', photoUpload.single('photo'), (req, res, next) => {
   if (!req.file) return next(new ApiError(400, 'UPLOAD_ERROR', 'No photo uploaded (jpeg/png/webp only)'))
+  // The fileFilter only sees the forgeable client Content-Type. Confirm the real
+  // type from magic bytes, and normalise the on-disk extension to the detected
+  // type — the photo is served inline, so a mislabelled .html/.svg extension
+  // taken from the original filename could otherwise be served as active content.
+  const detected = sniffFileType(req.file.path)
+  if (!detected || !PHOTO_EXT[detected]) {
+    fs.rm(req.file.path, () => {})
+    return next(new ApiError(400, 'UPLOAD_ERROR', 'File contents are not a supported image (jpeg/png/webp)'))
+  }
+  const safeExt = PHOTO_EXT[detected]
+  if (path.extname(req.file.filename).toLowerCase() !== safeExt) {
+    const renamed = path.basename(req.file.filename, path.extname(req.file.filename)) + safeExt
+    fs.renameSync(req.file.path, path.join(PHOTO_DIR, renamed))
+    req.file.filename = renamed
+    req.file.path = path.join(PHOTO_DIR, renamed)
+  }
+  req.file.mimetype = detected
   const photo = shiftService.addPhoto(Number(req.params.id), req.file, req.body.caption)
   logActivity('shift', Number(req.params.id), req.session.userId, 'updated', { photo_added: true })
   res.status(201).json(ok(photo))
