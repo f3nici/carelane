@@ -82,8 +82,8 @@ const tiles = [
       </div>
       <ul class="space-y-2">
         <li v-for="i in incidentFollowups" :key="i.id" class="text-sm flex items-center justify-between gap-2">
-          <router-link :to="`/incidents/${i.id}`" class="text-accent hover:underline truncate">{{ i.incident_date }} — {{ i.client_display_name }}</router-link>
-          <span class="flex items-center gap-1 whitespace-nowrap">
+          <router-link :to="`/incidents/${i.id}`" class="text-accent hover:underline truncate min-w-0">{{ i.incident_date }} — {{ i.client_display_name }}</router-link>
+          <span class="flex items-center gap-1 whitespace-nowrap shrink-0">
             <span v-if="i.follow_up_due_date" class="text-xs text-mid">due {{ i.follow_up_due_date }}</span>
             <StatusBadge :status="i.status" />
             <StatusBadge v-if="i.reportable && !i.reported_to_ndis" status="reportable" />
@@ -109,8 +109,8 @@ const tiles = [
       <p v-if="!upcoming.length" class="text-sm text-mid">Nothing scheduled in the next 14 days.</p>
       <ul class="grid sm:grid-cols-2 gap-2">
         <li v-for="s in upcoming" :key="s.id" class="text-sm flex items-center justify-between gap-2">
-          <span class="truncate">{{ s.scheduled_date }} — {{ s.client_display_name }}</span>
-          <span class="text-xs text-mid whitespace-nowrap">{{ s.start_time || '' }}<template v-if="s.status === 'in_progress'"> · on shift</template></span>
+          <span class="truncate min-w-0">{{ s.scheduled_date }} — {{ s.client_display_name }}</span>
+          <span class="text-xs text-mid whitespace-nowrap shrink-0">{{ s.start_time || '' }}<template v-if="s.status === 'in_progress'"> · on shift</template></span>
         </li>
       </ul>
     </div>
@@ -121,8 +121,8 @@ const tiles = [
         <p v-if="!documentExpiries.length" class="text-sm text-mid">No consent forms or documents expiring in the next 90 days.</p>
         <ul class="space-y-2">
           <li v-for="d in documentExpiries" :key="d.id" class="text-sm flex items-center justify-between gap-2">
-            <router-link :to="`/clients/${d.client_id}`" class="text-accent hover:underline truncate">{{ d.client_display_name }} — {{ d.title }}</router-link>
-            <span class="flex items-center gap-2 whitespace-nowrap">
+            <router-link :to="`/clients/${d.client_id}`" class="text-accent hover:underline truncate min-w-0">{{ d.client_display_name }} — {{ d.title }}</router-link>
+            <span class="flex items-center gap-2 whitespace-nowrap shrink-0">
               <span class="text-mid">{{ d.expiry_date }}</span>
               <StatusBadge v-if="d.expiry_status === 'expired'" status="expired" />
               <StatusBadge v-else-if="d.expiry_status === 'expiring'" status="expiring" />
@@ -138,8 +138,8 @@ const tiles = [
         <p v-if="!agreementExpiries.length" class="text-sm text-mid">No agreements expiring in the next 90 days.</p>
         <ul class="space-y-2">
           <li v-for="a in agreementExpiries" :key="a.id" class="text-sm flex items-center justify-between gap-2">
-            <router-link :to="`/agreements/${a.id}`" class="text-accent hover:underline truncate">{{ a.client_display_name }} — {{ a.title }}</router-link>
-            <span class="text-mid whitespace-nowrap">{{ a.end_date }}</span>
+            <router-link :to="`/agreements/${a.id}`" class="text-accent hover:underline truncate min-w-0">{{ a.client_display_name }} — {{ a.title }}</router-link>
+            <span class="text-mid whitespace-nowrap shrink-0">{{ a.end_date }}</span>
           </li>
         </ul>
       </div>
@@ -148,8 +148,8 @@ const tiles = [
         <p v-if="!recentShifts.length" class="text-sm text-mid">No shift notes yet.</p>
         <ul class="space-y-2">
           <li v-for="s in recentShifts" :key="s.id" class="text-sm flex items-center justify-between gap-2">
-            <router-link :to="`/shifts/${s.id}`" class="text-accent hover:underline truncate">{{ s.shift_date }} — {{ s.client_display_name }}</router-link>
-            <StatusBadge :status="s.finalised ? 'finalised' : 'draft'" />
+            <router-link :to="`/shifts/${s.id}`" class="text-accent hover:underline truncate min-w-0">{{ s.shift_date }} — {{ s.client_display_name }}</router-link>
+            <StatusBadge class="shrink-0" :status="s.finalised ? 'finalised' : 'draft'" />
           </li>
         </ul>
       </div>
