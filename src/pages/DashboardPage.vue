@@ -10,19 +10,21 @@ const agreementExpiries = ref([])
 const documentExpiries = ref([])
 const recentShifts = ref([])
 const incidents = ref([])
+const incidentFollowups = ref([])
 const integrity = ref(null)
 const upcoming = ref([])
 const activeShift = ref(null)
 
 onMounted(async () => {
-  const [s, p, doc, sh, inc, audit, sched] = await Promise.all([
+  const [s, p, doc, sh, inc, audit, sched, ifu] = await Promise.all([
     api.get('/dashboard/stats'),
     api.get('/dashboard/agreement-expiries'),
     api.get('/dashboard/document-expiries'),
     api.get('/shifts', { per_page: 5 }),
     api.get('/shifts', { incident: 'true', per_page: 5 }),
     api.get('/audit/verify'),
-    api.get('/schedule/upcoming', { days: 14 })
+    api.get('/schedule/upcoming', { days: 14 }),
+    api.get('/dashboard/incident-followups')
   ])
   stats.value = s.data
   agreementExpiries.value = p.data
@@ -32,6 +34,7 @@ onMounted(async () => {
   integrity.value = audit.data
   upcoming.value = sched.data.upcoming
   activeShift.value = sched.data.active
+  incidentFollowups.value = ifu.data
 })
 
 const tiles = [
@@ -41,7 +44,8 @@ const tiles = [
   { key: 'unbilled_shifts', label: 'Unbilled shifts' },
   { key: 'agreements_expiring', label: 'Agreements expiring (90d)' },
   { key: 'documents_expiring', label: 'Consents/docs expiring (90d)' },
-  { key: 'open_incidents', label: 'Incidents needing follow-up' }
+  { key: 'open_incident_reports', label: 'Incident reports open', danger: true },
+  { key: 'reportable_unreported', label: 'Reportable not yet reported', danger: true }
 ]
 </script>
 
@@ -66,13 +70,30 @@ const tiles = [
 
     <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
       <div v-for="tile in tiles" :key="tile.key" class="card !p-4">
-        <p class="text-2xl font-semibold" :class="tile.key === 'open_incidents' && stats[tile.key] ? 'text-danger' : ''">{{ stats[tile.key] ?? '—' }}</p>
+        <p class="text-2xl font-semibold" :class="tile.danger && stats[tile.key] ? 'text-danger' : ''">{{ stats[tile.key] ?? '—' }}</p>
         <p class="text-xs text-mid mt-1">{{ tile.label }}</p>
       </div>
     </div>
 
+    <div v-if="incidentFollowups.length" class="card border-danger/40">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-semibold text-danger">Incident reports needing follow-up</h3>
+        <router-link to="/incidents" class="text-xs text-accent hover:underline">All incidents →</router-link>
+      </div>
+      <ul class="space-y-2">
+        <li v-for="i in incidentFollowups" :key="i.id" class="text-sm flex items-center justify-between gap-2">
+          <router-link :to="`/incidents/${i.id}`" class="text-accent hover:underline truncate">{{ i.incident_date }} — {{ i.client_display_name }}</router-link>
+          <span class="flex items-center gap-1 whitespace-nowrap">
+            <span v-if="i.follow_up_due_date" class="text-xs text-mid">due {{ i.follow_up_due_date }}</span>
+            <StatusBadge :status="i.status" />
+            <StatusBadge v-if="i.reportable && !i.reported_to_ndis" status="reportable" />
+          </span>
+        </li>
+      </ul>
+    </div>
+
     <div v-if="incidents.length" class="card border-danger/40">
-      <h3 class="font-semibold mb-3 text-danger">Flagged incidents</h3>
+      <h3 class="font-semibold mb-3 text-danger">Flagged shift notes</h3>
       <ul class="space-y-2">
         <li v-for="s in incidents" :key="s.id" class="text-sm">
           <router-link :to="`/shifts/${s.id}`" class="text-accent hover:underline">{{ s.shift_date }} — {{ s.client_display_name }}</router-link>

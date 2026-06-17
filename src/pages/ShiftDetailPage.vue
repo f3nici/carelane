@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useApi } from '../composables/useApi.js'
 import { useToastStore } from '../stores/toast.js'
+import { useOfflineStore } from '../stores/offline.js'
 import ShiftNoteEditor from '../components/ShiftNoteEditor.vue'
 import AiDraftPanel from '../components/AiDraftPanel.vue'
 import PhotoUploader from '../components/PhotoUploader.vue'
@@ -13,6 +14,7 @@ const api = useApi()
 const route = useRoute()
 const router = useRouter()
 const toast = useToastStore()
+const offline = useOfflineStore()
 const id = computed(() => route.params.id)
 
 const shift = ref({})
@@ -23,6 +25,8 @@ const editor = ref(null)
 const squareStatus = ref(null)
 const invoice = ref(null)
 const invoicing = ref(false)
+const incidentReport = ref(null)
+const promoting = ref(false)
 // Set when this note is being written for a clocked-out scheduled shift.
 const fromSchedule = computed(() => route.query.from_schedule ? Number(route.query.from_schedule) : null)
 
@@ -33,6 +37,7 @@ onMounted(async () => {
     const res = await api.get(`/shifts/${id.value}`)
     shift.value = res.data
     loadSquare()
+    loadIncident()
   } else if (fromSchedule.value) {
     // Prefill participant, date and the actual clocked times from the roster.
     const res = await api.get(`/schedule/${fromSchedule.value}/note-prefill`)
@@ -48,12 +53,19 @@ async function save (payload) {
     let res
     if (id.value) {
       res = await api.put(`/shifts/${id.value}`, payload)
-    } else if (fromSchedule.value) {
-      // Create the note against the scheduled shift so the two stay linked.
-      const created = await api.post(`/schedule/${fromSchedule.value}/note`, payload)
-      res = { data: created.data.note }
     } else {
-      res = await api.post('/shifts', payload)
+      // New note. Editing the schedule-linked endpoint keeps the two in step.
+      const endpoint = fromSchedule.value ? `/schedule/${fromSchedule.value}/note` : '/shifts'
+      // Offline field capture: park new notes in IndexedDB and sync on reconnect.
+      if (offline.supported && !navigator.onLine) return queueOffline(endpoint, payload)
+      try {
+        const created = await api.post(endpoint, payload)
+        res = { data: fromSchedule.value ? created.data.note : created.data }
+      } catch (err) {
+        // Lost connectivity mid-save → fall back to the offline queue.
+        if (!err.response && offline.supported) return queueOffline(endpoint, payload)
+        throw err
+      }
     }
     shift.value = res.data
     toast.push(payload.finalised ? 'Shift note finalised' : 'Shift note saved', 'success')
@@ -64,6 +76,16 @@ async function save (payload) {
   } catch { /* toast via interceptor */ } finally {
     busy.value = false
   }
+}
+
+/** Park a new note in the offline queue and return to the notes list. */
+async function queueOffline (endpoint, payload) {
+  // A draft finalisation makes no sense offline — it is stored as a draft.
+  const draft = { ...payload, finalised: 0 }
+  await offline.enqueue({ endpoint, payload: draft, shiftDate: payload.shift_date })
+  busy.value = false
+  toast.push('Saved offline — it will sync automatically when you reconnect', 'success')
+  router.push('/shifts')
 }
 
 async function reopen () {
@@ -119,6 +141,29 @@ async function generateInvoice () {
   }
 }
 
+/** Load any structured incident report already linked to this shift note. */
+async function loadIncident () {
+  const shiftId = id.value || shift.value.id
+  if (!shiftId) return
+  try {
+    const res = await api.get('/incidents', { shift_note_id: shiftId, per_page: 1 })
+    incidentReport.value = res.data[0] || null
+  } catch { /* best-effort */ }
+}
+
+/** Promote this incident-flagged note into a structured incident report. */
+async function promoteIncident () {
+  if (!id.value) return
+  promoting.value = true
+  try {
+    const res = await api.post(`/incidents/from-shift/${id.value}`, {})
+    toast.push('Incident report created — add the structured details', 'success')
+    router.push(`/incidents/${res.data.id}`)
+  } catch { /* toast via interceptor */ } finally {
+    promoting.value = false
+  }
+}
+
 async function draft () {
   if (!id.value) {
     toast.push('Save the shift first, then generate the draft', 'warning')
@@ -162,6 +207,24 @@ async function draft () {
     />
 
     <ShiftNoteEditor ref="editor" :model-value="shift" :clients="clients" :busy="busy" :locked="!!shift.finalised" @submit="save" @reopen="reopen" />
+
+    <div v-if="id && shift.incident_flag" class="card border-danger/40 space-y-3">
+      <div class="flex items-center justify-between gap-3">
+        <h3 class="font-semibold text-danger">Incident report</h3>
+        <StatusBadge v-if="incidentReport" :status="incidentReport.status" />
+      </div>
+      <template v-if="incidentReport">
+        <p class="text-sm text-mid">A structured incident report is linked to this note.</p>
+        <router-link :to="`/incidents/${incidentReport.id}`" class="btn-primary inline-block">Open incident report →</router-link>
+      </template>
+      <template v-else>
+        <p class="text-sm text-mid">
+          This note is flagged as an incident. Promote it to a structured incident report with NDIS
+          reportable-incident fields and a follow-up status — the description is seeded from the note.
+        </p>
+        <button class="btn-primary" :disabled="promoting" @click="promoteIncident">{{ promoting ? 'Creating…' : 'Create incident report' }}</button>
+      </template>
+    </div>
 
     <div v-if="id && shift.finalised && squareStatus && squareStatus.configured" class="card space-y-3">
       <div class="flex items-center justify-between gap-3">

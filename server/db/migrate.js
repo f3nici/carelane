@@ -445,6 +445,98 @@ CREATE INDEX IF NOT EXISTS idx_square_invoices_shift ON square_invoices (shift_n
   addColumnIfMissing('client_documents', 'updated_at', 'TEXT')
   sqlite.exec('CREATE INDEX IF NOT EXISTS idx_client_documents_expiry ON client_documents (expiry_date)')
 
+  // Structured incident reports (added post-launch). A shift note's free-text
+  // incident flag/details can be promoted into a structured, exportable NDIS
+  // reportable-incident record with a follow-up lifecycle. The narrative fields
+  // (description / immediate actions / people / injuries / etc.) are encrypted in
+  // the service layer like shift bodies; the short categorical fields stay plain
+  // so the register can be listed and filtered. shift_note_id links back to the
+  // originating note (nullable for incidents logged directly).
+  sqlite.exec(`
+CREATE TABLE IF NOT EXISTS incident_reports (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  client_id INTEGER NOT NULL REFERENCES clients(id),
+  shift_note_id INTEGER REFERENCES shift_notes(id),
+  worker_id INTEGER NOT NULL REFERENCES users(id),
+  reference_no TEXT,
+  incident_date TEXT NOT NULL,
+  incident_time TEXT,
+  location TEXT,
+  incident_type TEXT NOT NULL DEFAULT 'other',
+  severity TEXT NOT NULL DEFAULT 'minor',
+  reportable INTEGER NOT NULL DEFAULT 0,
+  reportable_category TEXT,
+  description TEXT,
+  immediate_actions TEXT,
+  persons_involved TEXT,
+  witnesses TEXT,
+  injuries TEXT,
+  contributing_factors TEXT,
+  reported_to_ndis INTEGER NOT NULL DEFAULT 0,
+  reported_to_ndis_date TEXT,
+  notified_parties TEXT,
+  follow_up_actions TEXT,
+  follow_up_due_date TEXT,
+  status TEXT NOT NULL DEFAULT 'open',
+  closed_at TEXT,
+  created_at TEXT,
+  updated_at TEXT,
+  deleted_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_incident_reports_client ON incident_reports (client_id, incident_date);
+CREATE INDEX IF NOT EXISTS idx_incident_reports_status ON incident_reports (status, follow_up_due_date);
+CREATE INDEX IF NOT EXISTS idx_incident_reports_shift ON incident_reports (shift_note_id);
+
+-- Restrictive-practice register (added post-launch). NDIS-regulated record of
+-- any restrictive practice used; narrative fields encrypted in the service
+-- layer. Tracks authorisation (behaviour-support plan) and Commission reporting.
+CREATE TABLE IF NOT EXISTS restrictive_practice_records (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  client_id INTEGER NOT NULL REFERENCES clients(id),
+  worker_id INTEGER NOT NULL REFERENCES users(id),
+  shift_note_id INTEGER REFERENCES shift_notes(id),
+  practice_type TEXT NOT NULL DEFAULT 'environmental',
+  used_at_date TEXT NOT NULL,
+  used_at_time TEXT,
+  duration_minutes INTEGER,
+  authorised INTEGER NOT NULL DEFAULT 0,
+  authorisation_ref TEXT,
+  reported_to_commission INTEGER NOT NULL DEFAULT 0,
+  description TEXT,
+  antecedent TEXT,
+  alternatives_tried TEXT,
+  outcome TEXT,
+  created_at TEXT,
+  updated_at TEXT,
+  deleted_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_rp_client ON restrictive_practice_records (client_id, used_at_date);
+
+-- Medication administration record / MAR (added post-launch). Each row is one
+-- administration event. The medication name/dose are kept plain so the log is
+-- listable; the reason (PRN/refusal) and free-text notes are encrypted.
+CREATE TABLE IF NOT EXISTS medication_records (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  client_id INTEGER NOT NULL REFERENCES clients(id),
+  worker_id INTEGER NOT NULL REFERENCES users(id),
+  shift_note_id INTEGER REFERENCES shift_notes(id),
+  medication_name TEXT NOT NULL,
+  dose TEXT,
+  route TEXT,
+  administered_date TEXT NOT NULL,
+  administered_time TEXT,
+  prn INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'administered',
+  reason TEXT,
+  notes TEXT,
+  witnessed_by TEXT,
+  created_at TEXT,
+  updated_at TEXT,
+  deleted_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_med_client ON medication_records (client_id, administered_date);
+`)
+
   // Performance indexes for the largest / fastest-growing query paths. All are
   // additive and idempotent. shift_notes and activity_log dominate over years of
   // a single worker's data; the dashboard fires several of these counts on every
@@ -464,6 +556,9 @@ CREATE INDEX IF NOT EXISTS idx_square_invoices_shift ON square_invoices (shift_n
     CREATE INDEX IF NOT EXISTS idx_scheduled_shifts_deleted ON scheduled_shifts (deleted_at) WHERE deleted_at IS NOT NULL;
     CREATE INDEX IF NOT EXISTS idx_client_documents_deleted ON client_documents (deleted_at) WHERE deleted_at IS NOT NULL;
     CREATE INDEX IF NOT EXISTS idx_client_goals_deleted ON client_goals (deleted_at) WHERE deleted_at IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_incident_reports_deleted ON incident_reports (deleted_at) WHERE deleted_at IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_rp_deleted ON restrictive_practice_records (deleted_at) WHERE deleted_at IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_med_deleted ON medication_records (deleted_at) WHERE deleted_at IS NOT NULL;
     CREATE INDEX IF NOT EXISTS idx_activity_action ON activity_log (action);
     CREATE INDEX IF NOT EXISTS idx_activity_user ON activity_log (user_id);
   `)

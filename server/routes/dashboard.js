@@ -3,6 +3,7 @@ import { sqlite } from '../db/connection.js'
 import { recentActivity } from '../services/activityService.js'
 import { clientDisplayName } from '../services/clientService.js'
 import { listExpiringDocuments, countExpiringDocuments } from '../services/clientDocumentService.js'
+import { countOpenIncidents, countUnreportedReportable, listOpenIncidents } from '../services/incidentService.js'
 import { ok } from '../utils/pagination.js'
 
 const router = Router()
@@ -28,8 +29,19 @@ router.get('/stats', (req, res) => {
     upcoming_shifts: sqlite.prepare("SELECT COUNT(*) AS c FROM scheduled_shifts WHERE deleted_at IS NULL AND status IN ('scheduled','in_progress') AND scheduled_date >= ?").get(today).c,
     draft_reports: get('SELECT COUNT(*) AS c FROM reports WHERE deleted_at IS NULL AND archived_at IS NULL AND status = \'draft\'').c,
     documents_indexed: get('SELECT COUNT(*) AS c FROM documents WHERE indexed = 1').c,
-    documents_expiring: countExpiringDocuments(90)
+    documents_expiring: countExpiringDocuments(90),
+    open_incident_reports: countOpenIncidents(),
+    reportable_unreported: countUnreportedReportable()
   }))
+})
+
+/**
+ * @openapi
+ * /dashboard/incident-followups:
+ *   get: { tags: [Dashboard], summary: Incident reports still needing follow-up }
+ */
+router.get('/incident-followups', (req, res) => {
+  res.json(ok(listOpenIncidents()))
 })
 
 /**

@@ -230,6 +230,69 @@ export const goalProgressSchema = z.object({
   body: z.string().trim().max(20000).nullish().transform(v => v || null)
 })
 
+// Structured incident report. The categorical fields (type/severity/reportable
+// category) drive the register and dashboard; the narrative fields are encrypted
+// at rest in the service layer. NDIS reportable categories follow the five
+// classes of reportable incident under the NDIS Commission rules.
+export const incidentReportSchema = z.object({
+  client_id: z.number().int().positive(),
+  shift_note_id: z.number().int().positive().nullish(),
+  reference_no: z.string().trim().max(60).nullish().transform(v => v || null),
+  incident_date: isoDate,
+  incident_time: time.nullish(),
+  location: optStr,
+  incident_type: z.enum(['injury', 'illness', 'medication_error', 'behaviour',
+    'property_damage', 'abuse_neglect', 'restrictive_practice', 'death', 'absconding', 'other']).default('other'),
+  severity: z.enum(['minor', 'moderate', 'major', 'critical']).default('minor'),
+  reportable: bool01.default(0),
+  reportable_category: z.enum(['death', 'serious_injury', 'abuse_or_neglect',
+    'unlawful_contact', 'sexual_misconduct', 'unauthorised_restrictive_practice']).nullish(),
+  description: z.string().max(50000).nullish().transform(v => v || null),
+  immediate_actions: z.string().max(50000).nullish().transform(v => v || null),
+  persons_involved: z.string().max(20000).nullish().transform(v => v || null),
+  witnesses: z.string().max(20000).nullish().transform(v => v || null),
+  injuries: z.string().max(20000).nullish().transform(v => v || null),
+  contributing_factors: z.string().max(20000).nullish().transform(v => v || null),
+  reported_to_ndis: bool01.default(0),
+  reported_to_ndis_date: isoDate.nullish(),
+  notified_parties: z.string().max(20000).nullish().transform(v => v || null),
+  follow_up_actions: z.string().max(50000).nullish().transform(v => v || null),
+  follow_up_due_date: isoDate.nullish(),
+  status: z.enum(['open', 'in_progress', 'closed']).default('open')
+})
+
+// Restrictive-practice use record (NDIS-regulated). Narrative fields encrypted.
+export const restrictivePracticeSchema = z.object({
+  practice_type: z.enum(['chemical', 'physical', 'mechanical', 'environmental', 'seclusion']).default('environmental'),
+  used_at_date: isoDate,
+  used_at_time: time.nullish(),
+  duration_minutes: z.coerce.number().int().min(0).max(10000).nullish(),
+  authorised: bool01.default(0),
+  authorisation_ref: z.string().trim().max(120).nullish().transform(v => v || null),
+  reported_to_commission: bool01.default(0),
+  shift_note_id: z.number().int().positive().nullish(),
+  description: z.string().max(20000).nullish().transform(v => v || null),
+  antecedent: z.string().max(20000).nullish().transform(v => v || null),
+  alternatives_tried: z.string().max(20000).nullish().transform(v => v || null),
+  outcome: z.string().max(20000).nullish().transform(v => v || null)
+})
+
+// Medication administration record (MAR). Name/dose plain (listable); the PRN /
+// refusal reason and notes are encrypted at rest.
+export const medicationRecordSchema = z.object({
+  medication_name: z.string().trim().min(1).max(200),
+  dose: z.string().trim().max(120).nullish().transform(v => v || null),
+  route: z.enum(['oral', 'topical', 'inhaled', 'injection', 'sublingual', 'other']).nullish(),
+  administered_date: isoDate,
+  administered_time: time.nullish(),
+  prn: bool01.default(0),
+  status: z.enum(['administered', 'refused', 'missed', 'withheld', 'self_administered']).default('administered'),
+  shift_note_id: z.number().int().positive().nullish(),
+  reason: z.string().max(20000).nullish().transform(v => v || null),
+  notes: z.string().max(20000).nullish().transform(v => v || null),
+  witnessed_by: z.string().trim().max(120).nullish().transform(v => v || null)
+})
+
 export const clientBillingCodesSchema = z.object({
   codes: z.array(z.object({
     billing_code_id: z.number().int().positive(),

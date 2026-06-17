@@ -14,6 +14,7 @@ import authRoutes from './routes/auth.js'
 import clientRoutes from './routes/clients.js'
 import agreementRoutes from './routes/agreements.js'
 import shiftRoutes from './routes/shifts.js'
+import incidentRoutes from './routes/incidents.js'
 import scheduleRoutes from './routes/schedule.js'
 import reportRoutes from './routes/reports.js'
 import billingRoutes from './routes/billing.js'
@@ -124,6 +125,7 @@ export function createApp () {
   api.use('/clients', requireAuth, clientRoutes)
   api.use('/agreements', requireAuth, agreementRoutes)
   api.use('/shifts', requireAuth, shiftRoutes)
+  api.use('/incidents', requireAuth, incidentRoutes)
   api.use('/schedule', requireAuth, scheduleRoutes)
   api.use('/reports', requireAuth, reportRoutes)
   api.use('/billing-codes', requireAuth, billingRoutes)

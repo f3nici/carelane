@@ -18,7 +18,14 @@ encrypted at rest.
 - **Service agreements** — questionnaire → AI-drafted agreement → human review →
   explicit finalisation / client sign-off.
 - **Shift notes** — encrypted note body and incident details, photo attachments,
-  incident flagging.
+  incident flagging. Draft notes **offline in the field** (PWA) and they sync
+  automatically when you reconnect.
+- **Incident reports** — promote an incident-flagged shift note into a
+  structured, exportable record with NDIS reportable-incident fields and a
+  follow-up status; download as a branded PDF.
+- **Restrictive-practice & medication logs** — regulated registers per
+  participant (restrictive-practice use with authorisation/Commission reporting,
+  and a medication administration record), encrypted at rest.
 - **Billing codes** — importable NDIS price-guide codes, deactivate (never delete).
 - **Reports** — AI-assisted progress/summary reports rendered to PDF.
 - **Knowledge base (RAG)** — upload PDFs/DOCX, search them with local embeddings

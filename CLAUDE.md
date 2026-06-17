@@ -84,6 +84,32 @@ API docs at `/api/docs`, health at `/healthz`.
   (`GET /dashboard/document-expiries`, `documents_expiring` stat) before they
   lapse. Metadata is editable without re-uploading (`PUT
   /clients/:id/documents/:docId`). Files stay served auth-gated only.
+- Incident reports: `incident_reports` promote a shift note's free-text incident
+  flag into a structured, exportable record — NDIS reportable-incident fields
+  (type, severity, the five reportable categories, reported-to-Commission status)
+  plus a follow-up lifecycle (`open`→`in_progress`→`closed`, `closed_at` set on
+  close). Narrative fields (description, immediate_actions, persons, witnesses,
+  injuries, contributing_factors, notified_parties, follow_up_actions) are
+  encrypted like shift bodies. `POST /incidents/from-shift/:shiftId` promotes an
+  incident-flagged note (one report per note, seeded from `incident_details`);
+  CRUD lives at `/incidents`. `GET /incidents/:id/export.pdf` renders a branded,
+  auth-gated PDF. Dashboard surfaces `open_incident_reports` +
+  `reportable_unreported` stats and an `incident-followups` list. Soft-deleted +
+  restorable (`incident` type) like other regulated records.
+- Restrictive-practice & medication logs: `restrictive_practice_records` (NDIS
+  restrictive-practice register — type, authorisation/BSP ref, Commission
+  reporting; narrative encrypted) and `medication_records` (a MAR — one row per
+  administration, name/dose plain so the log is listable, reason/notes encrypted)
+  are regulated record types nested under a participant
+  (`clients/:id/restrictive-practices`, `clients/:id/medications`). Both
+  soft-delete + restore (`restrictive_practice` / `medication` types) and log to
+  the audit trail; UI lives in client-detail tabs.
+- Offline shift-note capture (PWA): new notes saved while offline (or when a save
+  hits a network error) are parked in IndexedDB (`composables/offlineDrafts.js`,
+  store `stores/offline.js`) and flushed automatically on reconnect — the one
+  place participant data is stored client-side, deleted the instant it syncs. The
+  service worker still caches nothing sensitive; the queue is plain same-origin
+  IndexedDB. `OfflineIndicator` shows status + pending count + a manual "sync now".
 - Structured goals: `client_goals` are discrete, trackable participant outcomes
   (status active/achieved/on_hold/discontinued, optional target date) that
   supersede the free-text `clients.support_goals` blob (kept as a quick-notes

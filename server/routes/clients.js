@@ -5,12 +5,14 @@ import crypto from 'node:crypto'
 import multer from 'multer'
 import { ZipArchive } from 'archiver'
 import { validate, validatePartial } from '../middleware/validate.js'
-import { clientSchema, clientBillingCodesSchema, clientDocumentMetaSchema, goalSchema, goalProgressSchema } from '../utils/validators.js'
+import { clientSchema, clientBillingCodesSchema, clientDocumentMetaSchema, goalSchema, goalProgressSchema, restrictivePracticeSchema, medicationRecordSchema } from '../utils/validators.js'
 import * as clientService from '../services/clientService.js'
 import * as agreementService from '../services/agreementService.js'
 import * as shiftService from '../services/shiftService.js'
 import * as clientDocumentService from '../services/clientDocumentService.js'
 import * as goalService from '../services/goalService.js'
+import * as restrictivePracticeService from '../services/restrictivePracticeService.js'
+import * as medicationService from '../services/medicationService.js'
 import { CLIENT_DOC_DIR } from '../services/clientDocumentService.js'
 import { logActivity, diffChanges } from '../services/activityService.js'
 import { renderPdf, pdfPath } from '../utils/pdfRenderer.js'
@@ -252,6 +254,76 @@ router.delete('/:id/goals/:goalId/progress/:noteId', (req, res) => {
   const goal = goalService.deleteProgressNote(Number(req.params.id), Number(req.params.goalId), Number(req.params.noteId))
   logActivity('goal', goal.id, req.session.userId, 'updated', { progress_removed: true })
   res.json(ok(goal))
+})
+
+/**
+ * @openapi
+ * /clients/{id}/restrictive-practices:
+ *   get: { tags: [Clients], summary: List a participant's restrictive-practice records }
+ *   post: { tags: [Clients], summary: Log a restrictive-practice use (narrative encrypted at rest) }
+ */
+router.get('/:id/restrictive-practices', (req, res) => {
+  res.json(ok(restrictivePracticeService.listRestrictivePractices(Number(req.params.id), req.query)))
+})
+
+router.post('/:id/restrictive-practices', validate(restrictivePracticeSchema), (req, res) => {
+  const record = restrictivePracticeService.createRestrictivePractice(Number(req.params.id), req.body, req.session.userId)
+  logActivity('restrictive_practice', record.id, req.session.userId, 'created', { client_id: Number(req.params.id), authorised: !!record.authorised })
+  res.status(201).json(ok(record))
+})
+
+/**
+ * @openapi
+ * /clients/{id}/restrictive-practices/{recordId}:
+ *   put: { tags: [Clients], summary: Update a restrictive-practice record }
+ *   delete: { tags: [Clients], summary: Soft-delete a restrictive-practice record (record retention) }
+ */
+router.put('/:id/restrictive-practices/:recordId', validatePartial(restrictivePracticeSchema), (req, res) => {
+  const before = restrictivePracticeService.getRestrictivePractice(Number(req.params.id), Number(req.params.recordId))
+  const record = restrictivePracticeService.updateRestrictivePractice(Number(req.params.id), Number(req.params.recordId), req.body)
+  logActivity('restrictive_practice', record.id, req.session.userId, 'updated', { changes: diffChanges(before, record, Object.keys(req.body)) })
+  res.json(ok(record))
+})
+
+router.delete('/:id/restrictive-practices/:recordId', (req, res) => {
+  restrictivePracticeService.deleteRestrictivePractice(Number(req.params.id), Number(req.params.recordId))
+  logActivity('restrictive_practice', Number(req.params.recordId), req.session.userId, 'deleted')
+  res.json(ok({ deleted: true }))
+})
+
+/**
+ * @openapi
+ * /clients/{id}/medications:
+ *   get: { tags: [Clients], summary: List a participant's medication administration records }
+ *   post: { tags: [Clients], summary: Log a medication administration (reason/notes encrypted at rest) }
+ */
+router.get('/:id/medications', (req, res) => {
+  res.json(ok(medicationService.listMedicationRecords(Number(req.params.id), req.query)))
+})
+
+router.post('/:id/medications', validate(medicationRecordSchema), (req, res) => {
+  const record = medicationService.createMedicationRecord(Number(req.params.id), req.body, req.session.userId)
+  logActivity('medication', record.id, req.session.userId, 'created', { client_id: Number(req.params.id), status: record.status })
+  res.status(201).json(ok(record))
+})
+
+/**
+ * @openapi
+ * /clients/{id}/medications/{recordId}:
+ *   put: { tags: [Clients], summary: Update a medication record }
+ *   delete: { tags: [Clients], summary: Soft-delete a medication record (record retention) }
+ */
+router.put('/:id/medications/:recordId', validatePartial(medicationRecordSchema), (req, res) => {
+  const before = medicationService.getMedicationRecord(Number(req.params.id), Number(req.params.recordId))
+  const record = medicationService.updateMedicationRecord(Number(req.params.id), Number(req.params.recordId), req.body)
+  logActivity('medication', record.id, req.session.userId, 'updated', { changes: diffChanges(before, record, Object.keys(req.body)) })
+  res.json(ok(record))
+})
+
+router.delete('/:id/medications/:recordId', (req, res) => {
+  medicationService.deleteMedicationRecord(Number(req.params.id), Number(req.params.recordId))
+  logActivity('medication', Number(req.params.recordId), req.session.userId, 'deleted')
+  res.json(ok({ deleted: true }))
 })
 
 export default router

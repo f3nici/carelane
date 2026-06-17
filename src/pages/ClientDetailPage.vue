@@ -7,6 +7,8 @@ import StatusBadge from '../components/StatusBadge.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import ClientGoals from '../components/ClientGoals.vue'
 import ClientDocuments from '../components/ClientDocuments.vue'
+import ClientRestrictivePractices from '../components/ClientRestrictivePractices.vue'
+import ClientMedications from '../components/ClientMedications.vue'
 
 const api = useApi()
 const route = useRoute()
@@ -21,6 +23,8 @@ const billingCodes = ref([])
 const allCodes = ref([])
 const goalCount = ref(0)
 const documentCount = ref(0)
+const restrictiveCount = ref(0)
+const medicationCount = ref(0)
 const confirmDelete = ref(false)
 const tab = ref('overview')
 
@@ -79,7 +83,9 @@ function exportData () {
 const tabs = [
   { key: 'overview', label: 'Overview' },
   { key: 'goals', label: 'Goals', count: goalCount },
-  { key: 'documents', label: 'Documents & consents', count: documentCount }
+  { key: 'documents', label: 'Documents & consents', count: documentCount },
+  { key: 'medications', label: 'Medications', count: medicationCount },
+  { key: 'restrictive', label: 'Restrictive practices', count: restrictiveCount }
 ]
 </script>
 
@@ -205,6 +211,14 @@ const tabs = [
 
     <div v-show="tab === 'documents'">
       <ClientDocuments :client-id="id" @count="documentCount = $event" />
+    </div>
+
+    <div v-show="tab === 'medications'">
+      <ClientMedications :client-id="id" @count="medicationCount = $event" />
+    </div>
+
+    <div v-show="tab === 'restrictive'">
+      <ClientRestrictivePractices :client-id="id" @count="restrictiveCount = $event" />
     </div>
 
     <ConfirmDialog
