@@ -30,8 +30,23 @@ export function csrfProtect (req, res, next) {
   // challenge bound to the session is itself the anti-forgery guard here.
   if (req.path.startsWith('/auth/passkeys/login/')) return next()
   const token = req.get('x-csrf-token')
-  if (req.session?.csrfToken && token === req.session.csrfToken) return next()
+  if (req.session?.csrfToken && token && timingSafeStrEqual(token, req.session.csrfToken)) return next()
   next(new ApiError(403, 'CSRF_ERROR', 'Missing or invalid CSRF token'))
+}
+
+/**
+ * Constant-time string comparison. A plain `===` short-circuits on the first
+ * differing byte, leaking how much of a secret (here the CSRF token) was
+ * guessed correctly via response timing; this does not.
+ * @param {string} a
+ * @param {string} b
+ * @returns {boolean}
+ */
+function timingSafeStrEqual (a, b) {
+  const ab = Buffer.from(String(a))
+  const bb = Buffer.from(String(b))
+  if (ab.length !== bb.length) return false
+  return crypto.timingSafeEqual(ab, bb)
 }
 
 /** Generate and store a CSRF token on the session if absent. */

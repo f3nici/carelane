@@ -55,11 +55,14 @@ export function listShifts (pg, filters = {}) {
   if (filters.incident === 'true') where.push('s.incident_flag = 1')
   if (filters.billed === 'false') where.push('s.billed = 0')
   const whereSql = 'WHERE ' + where.join(' AND ')
-  const total = sqlite.prepare(`SELECT COUNT(*) AS c FROM shift_notes s ${whereSql}`).get(...params).c
+  // Join clients (excluding soft-deleted ones) so the count matches the listed
+  // rows — a soft-deleted participant's shifts drop out of active lists.
+  const total = sqlite.prepare(`SELECT COUNT(*) AS c FROM shift_notes s
+    JOIN clients c ON c.id = s.client_id AND c.deleted_at IS NULL ${whereSql}`).get(...params).c
   const rows = sqlite.prepare(`SELECT s.*, c.preferred_name AS client_preferred_name,
       c.first_name AS client_first_name, c.last_name AS client_last_name, bc.code AS billing_code
     FROM shift_notes s
-    JOIN clients c ON c.id = s.client_id
+    JOIN clients c ON c.id = s.client_id AND c.deleted_at IS NULL
     LEFT JOIN billing_codes bc ON bc.id = s.billing_code_id
     ${whereSql} ORDER BY s.shift_date DESC, s.id DESC LIMIT ? OFFSET ?`)
     .all(...params, pg.perPage, pg.offset)

@@ -103,6 +103,13 @@ export function assertProductionSecrets () {
     console.error('Refusing to start in production:\n  - ' + problems.join('\n  - '))
     process.exit(1)
   }
+  // Non-fatal: when the relying-party id/origin are not pinned, passkey
+  // verification trusts the request's Origin/Host headers. That is correct for a
+  // plain same-origin deployment but weakens WebAuthn's origin binding behind a
+  // proxy that can rewrite Host. Warn so operators pin them where appropriate.
+  if (!env.WEBAUTHN_RP_ID || !env.WEBAUTHN_ORIGIN) {
+    console.warn('WEBAUTHN_RP_ID/WEBAUTHN_ORIGIN are not pinned — passkey origin is derived from request headers. Set both if the app runs behind a Host-rewriting proxy.')
+  }
 }
 
 export default config

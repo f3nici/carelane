@@ -9,6 +9,7 @@ import {
 } from '../utils/validators.js'
 import { ApiError } from '../middleware/errorHandler.js'
 import { requireAuth, ensureCsrfToken } from '../middleware/auth.js'
+import { rateLimit } from '../middleware/rateLimit.js'
 import { logActivity } from '../services/activityService.js'
 import * as twoFactor from '../services/twoFactorService.js'
 import * as passkeys from '../services/passkeyService.js'
@@ -28,6 +29,18 @@ const DUMMY_HASH = bcrypt.hashSync('carelane-timing-equaliser', 12)
 // shared across every source IP) so genuine operator typos never lock the
 // account, while still catching large distributed credential-stuffing runs.
 const GLOBAL_MAX_ATTEMPTS = config.loginMaxAttempts * 5
+
+// Passkey login is usernameless, so a per-account global key isn't possible;
+// instead a single shared counter caps total failed assertions across every
+// source IP (defeating a distributed attacker rotating IPs). Generous threshold
+// — a genuine operator only ever produces a handful of failures.
+const PASSKEY_GLOBAL_KEY = globalThrottleKey('__passkey_login__')
+const PASSKEY_GLOBAL_MAX = config.loginMaxAttempts * 10
+
+// Cap how often the unauthenticated passkey-login *options* endpoint can be hit
+// from one source, so it can't be hammered to churn the session store / issue
+// unlimited challenges.
+const passkeyOptionsLimiter = rateLimit({ name: 'passkey-options', max: 30, windowMs: 60 * 1000 })
 
 /**
  * Regenerate the session, mark it authenticated and return the user envelope
@@ -216,7 +229,9 @@ router.post('/passkeys/register/options', requireAuth, async (req, res, next) =>
       return next(new ApiError(403, 'REAUTH_REQUIRED', 'Enter your current password to add a passkey'))
     }
     const options = await passkeys.beginRegistration(req.session.userId, user, rpContext(req))
-    req.session.webauthnChallenge = options.challenge
+    // Registration and login ceremonies use distinct session keys so a
+    // concurrent login-options call cannot clobber an in-flight registration.
+    req.session.webauthnRegChallenge = options.challenge
     res.json(ok(options))
   } catch (err) { next(err) }
 })
@@ -228,7 +243,7 @@ router.post('/passkeys/register/options', requireAuth, async (req, res, next) =>
  */
 router.post('/passkeys/register/verify', requireAuth, validate(passkeyRegisterSchema), async (req, res, next) => {
   try {
-    const expectedChallenge = req.session.webauthnChallenge
+    const expectedChallenge = req.session.webauthnRegChallenge
     if (!expectedChallenge) throw new ApiError(400, 'NO_CHALLENGE', 'No passkey registration in progress')
     const rp = rpContext(req)
     const result = await passkeys.finishRegistration(req.session.userId, {
@@ -238,7 +253,7 @@ router.post('/passkeys/register/verify', requireAuth, validate(passkeyRegisterSc
       expectedRPID: rp.rpID,
       name: req.body.name
     })
-    req.session.webauthnChallenge = null
+    req.session.webauthnRegChallenge = null
     logActivity('auth', req.session.userId, req.session.userId, 'passkey_registered')
     res.json(ok(result))
   } catch (err) { next(err) }
@@ -263,6 +278,14 @@ router.put('/passkeys/:id', requireAuth, validate(passkeyRenameSchema), (req, re
  */
 router.delete('/passkeys/:id', requireAuth, (req, res, next) => {
   try {
+    // Removing a login factor is security-sensitive: require password re-entry so
+    // a hijacked session can't strip the legitimate user's passkeys. Mirrors the
+    // re-auth already enforced on passkey registration and 2FA disable. 403 (not
+    // 401) so the client surfaces the error instead of logging the user out.
+    const user = sqlite.prepare('SELECT password_hash FROM users WHERE id = ?').get(req.session.userId)
+    if (!req.body?.password || !user || !bcrypt.compareSync(req.body.password, user.password_hash)) {
+      return next(new ApiError(403, 'REAUTH_REQUIRED', 'Enter your current password to remove a passkey'))
+    }
     passkeys.deleteCredential(req.session.userId, Number(req.params.id))
     logActivity('auth', req.session.userId, req.session.userId, 'passkey_removed')
     res.json(ok({ removed: true }))
@@ -274,10 +297,10 @@ router.delete('/passkeys/:id', requireAuth, (req, res, next) => {
  * /auth/passkeys/login/options:
  *   post: { tags: [Auth], summary: Begin a passwordless passkey login (returns WebAuthn request options) }
  */
-router.post('/passkeys/login/options', async (req, res, next) => {
+router.post('/passkeys/login/options', passkeyOptionsLimiter, async (req, res, next) => {
   try {
     const options = await passkeys.beginLogin(rpContext(req))
-    req.session.webauthnChallenge = options.challenge
+    req.session.webauthnLoginChallenge = options.challenge
     res.json(ok(options))
   } catch (err) { next(err) }
 })
@@ -288,14 +311,15 @@ router.post('/passkeys/login/options', async (req, res, next) => {
  *   post: { tags: [Auth], summary: Complete a passwordless passkey login and start a session }
  */
 router.post('/passkeys/login/verify', validate(passkeyLoginSchema), async (req, res, next) => {
-  // Rate-limit the unauthenticated passkey assertion path by IP, mirroring the
-  // password login throttle, so the unknown-credential lookup cannot be hammered.
+  // Rate-limit the unauthenticated passkey assertion path: per-IP (mirroring the
+  // password login throttle) plus a shared global counter so a distributed
+  // attacker rotating source IPs still hits a ceiling on the credential lookup.
   const key = throttleKey(req.ip, 'passkey')
-  if (checkLockout(key).locked) {
+  if (checkLockout(key).locked || checkLockout(PASSKEY_GLOBAL_KEY).locked) {
     return next(new ApiError(429, 'TOO_MANY_ATTEMPTS', 'Too many passkey attempts. Try again later.'))
   }
   try {
-    const expectedChallenge = req.session.webauthnChallenge
+    const expectedChallenge = req.session.webauthnLoginChallenge
     if (!expectedChallenge) throw new ApiError(400, 'NO_CHALLENGE', 'No passkey login in progress')
     const rp = rpContext(req)
     const user = await passkeys.finishLogin({
@@ -304,10 +328,13 @@ router.post('/passkeys/login/verify', validate(passkeyLoginSchema), async (req, 
       expectedOrigin: rp.origin,
       expectedRPID: rp.rpID
     })
+    req.session.webauthnLoginChallenge = null
     clearAttempts(key)
+    clearAttempts(PASSKEY_GLOBAL_KEY)
     establishSession(req, res, user, next, { method: 'passkey' })
   } catch (err) {
     recordFailure(key)
+    recordFailure(PASSKEY_GLOBAL_KEY, PASSKEY_GLOBAL_MAX)
     next(err)
   }
 })

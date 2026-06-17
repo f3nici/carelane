@@ -44,7 +44,7 @@ export function useApi () {
     get: (url, params) => client.get(url, { params }).then(unwrap),
     post: (url, body, config) => client.post(url, body, config).then(unwrap),
     put: (url, body) => client.put(url, body).then(unwrap),
-    del: url => client.delete(url).then(unwrap),
+    del: (url, body) => client.delete(url, body ? { data: body } : undefined).then(unwrap),
     upload: (url, formData) => client.post(url, formData, { headers: { 'Content-Type': 'multipart/form-data' } }).then(unwrap)
   }
 }

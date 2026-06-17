@@ -60,7 +60,7 @@ export function listScheduled (filters = {}) {
   const rows = sqlite.prepare(`SELECT s.*, c.preferred_name AS client_preferred_name,
       c.first_name AS client_first_name, c.last_name AS client_last_name, bc.code AS billing_code
     FROM scheduled_shifts s
-    JOIN clients c ON c.id = s.client_id
+    JOIN clients c ON c.id = s.client_id AND c.deleted_at IS NULL
     LEFT JOIN billing_codes bc ON bc.id = s.billing_code_id
     WHERE ${where.join(' AND ')} ORDER BY s.scheduled_date, s.start_time, s.id`).all(...params)
   return rows.map(toScheduledListRow)

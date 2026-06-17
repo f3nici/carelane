@@ -14,6 +14,7 @@ import * as goalService from '../services/goalService.js'
 import { CLIENT_DOC_DIR } from '../services/clientDocumentService.js'
 import { logActivity, diffChanges } from '../services/activityService.js'
 import { renderPdf, pdfPath } from '../utils/pdfRenderer.js'
+import { sniffFileType, sanitizeDownloadName } from '../utils/fileType.js'
 import { parsePagination, paginationMeta, ok } from '../utils/pagination.js'
 import { ApiError } from '../middleware/errorHandler.js'
 import config from '../config.js'
@@ -153,6 +154,15 @@ router.get('/:id/documents', (req, res) => {
 
 router.post('/:id/documents', docUpload.single('file'), (req, res, next) => {
   if (!req.file) return next(new ApiError(400, 'UPLOAD_ERROR', 'Upload a PDF or image file'))
+  // The multer fileFilter only sees the client-declared Content-Type, which is
+  // forgeable. Verify the saved file's real type from its magic bytes and reject
+  // (deleting the upload) on a mismatch; store the detected type, not the claim.
+  const detected = sniffFileType(req.file.path)
+  if (!detected || !ALLOWED_DOC_TYPES.includes(detected)) {
+    fs.rm(req.file.path, () => {})
+    return next(new ApiError(400, 'UPLOAD_ERROR', 'File contents are not a supported PDF or image'))
+  }
+  req.file.mimetype = detected
   const doc = clientDocumentService.createClientDocument(Number(req.params.id), req.file, req.body)
   logActivity('client', Number(req.params.id), req.session.userId, 'updated', { document_added: doc.doc_type })
   res.status(201).json(ok(doc))
@@ -175,7 +185,7 @@ router.get('/:id/documents/:docId/file', (req, res, next) => {
   const doc = clientDocumentService.getClientDocument(Number(req.params.id), Number(req.params.docId))
   // Forward filesystem errors (e.g. a row whose file is missing after a partial
   // restore) to the handler instead of leaking a stack/path or hanging.
-  res.download(path.resolve(CLIENT_DOC_DIR, path.basename(doc.filename)), doc.original_name || doc.filename, err => {
+  res.download(path.resolve(CLIENT_DOC_DIR, path.basename(doc.filename)), sanitizeDownloadName(doc.original_name, doc.filename), err => {
     if (err && !res.headersSent) next(new ApiError(404, 'FILE_NOT_FOUND', 'Document file is unavailable'))
   })
 })

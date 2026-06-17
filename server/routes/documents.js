@@ -9,6 +9,7 @@ import { rateLimit } from '../middleware/rateLimit.js'
 import { askSchema } from '../utils/validators.js'
 import * as documentService from '../services/documentService.js'
 import { searchChunks, keywordSearch } from '../services/ragService.js'
+import { sniffFileType, sanitizeDownloadName } from '../utils/fileType.js'
 import { askGuidelines } from '../services/aiService.js'
 import { logActivity } from '../services/activityService.js'
 import { ok } from '../utils/pagination.js'
@@ -45,6 +46,12 @@ router.get('/', (req, res) => {
 
 router.post('/', requireAdmin, upload.single('file'), (req, res, next) => {
   if (!req.file) return next(new ApiError(400, 'UPLOAD_ERROR', 'Upload a PDF file'))
+  // Don't trust the client-declared Content-Type — confirm the saved file really
+  // is a PDF from its magic bytes, deleting it on a mismatch.
+  if (sniffFileType(req.file.path) !== 'application/pdf') {
+    fs.rm(req.file.path, () => {})
+    return next(new ApiError(400, 'UPLOAD_ERROR', 'File is not a valid PDF'))
+  }
   const doc = documentService.createDocument(req.file, req.body)
   logActivity('document', doc.id, req.session.userId, 'created', { category: doc.category })
   res.status(201).json(ok(doc))
@@ -85,7 +92,7 @@ router.post('/ask', askLimiter, validate(askSchema), async (req, res, next) => {
 router.get('/:id/file', (req, res, next) => {
   try {
     const doc = documentService.getDocument(Number(req.params.id))
-    res.download(path.join(DOC_DIR, doc.filename), doc.original_name || `${doc.title}.pdf`)
+    res.download(path.join(DOC_DIR, doc.filename), sanitizeDownloadName(doc.original_name, `${doc.title}.pdf`))
   } catch (err) { next(err) }
 })
 
