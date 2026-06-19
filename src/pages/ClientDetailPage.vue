@@ -7,6 +7,8 @@ import StatusBadge from '../components/StatusBadge.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import ClientGoals from '../components/ClientGoals.vue'
 import ClientDocuments from '../components/ClientDocuments.vue'
+import ClientRestrictivePractices from '../components/ClientRestrictivePractices.vue'
+import ClientMedications from '../components/ClientMedications.vue'
 
 const api = useApi()
 const route = useRoute()
@@ -21,6 +23,8 @@ const billingCodes = ref([])
 const allCodes = ref([])
 const goalCount = ref(0)
 const documentCount = ref(0)
+const restrictiveCount = ref(0)
+const medicationCount = ref(0)
 const confirmDelete = ref(false)
 const tab = ref('overview')
 
@@ -79,7 +83,9 @@ function exportData () {
 const tabs = [
   { key: 'overview', label: 'Overview' },
   { key: 'goals', label: 'Goals', count: goalCount },
-  { key: 'documents', label: 'Documents & consents', count: documentCount }
+  { key: 'documents', label: 'Documents & consents', count: documentCount },
+  { key: 'medications', label: 'Medications', count: medicationCount },
+  { key: 'restrictive', label: 'Restrictive practices', count: restrictiveCount }
 ]
 </script>
 
@@ -98,11 +104,11 @@ const tabs = [
       </div>
     </div>
 
-    <div class="flex gap-1 border-b border-white/10">
+    <div class="flex gap-1 border-b border-white/10 overflow-x-auto">
       <button
         v-for="t in tabs"
         :key="t.key"
-        class="px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors"
+        class="px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap shrink-0"
         :class="tab === t.key ? 'border-accent text-white' : 'border-transparent text-mid hover:text-white'"
         @click="tab = t.key"
       >{{ t.label }}<span v-if="t.count && t.count.value" class="ml-1 text-mid">({{ t.count.value }})</span></button>
@@ -178,8 +184,8 @@ const tabs = [
         <p v-if="!agreements.length" class="text-sm text-mid">No agreements yet.</p>
         <ul class="space-y-2">
           <li v-for="a in agreements" :key="a.id" class="text-sm flex items-center justify-between gap-2">
-            <router-link :to="`/agreements/${a.id}`" class="text-accent hover:underline truncate">{{ a.title }}</router-link>
-            <StatusBadge :status="a.status" />
+            <router-link :to="`/agreements/${a.id}`" class="text-accent hover:underline truncate min-w-0">{{ a.title }}</router-link>
+            <StatusBadge class="shrink-0" :status="a.status" />
           </li>
         </ul>
       </div>
@@ -188,8 +194,8 @@ const tabs = [
         <p v-if="!shifts.length" class="text-sm text-mid">No shift notes yet.</p>
         <ul class="space-y-2">
           <li v-for="s in shifts" :key="s.id" class="text-sm flex items-center justify-between gap-2">
-            <router-link :to="`/shifts/${s.id}`" class="text-accent hover:underline">{{ s.shift_date }} ({{ s.duration_hours || '?' }}h)</router-link>
-            <span class="flex gap-1">
+            <router-link :to="`/shifts/${s.id}`" class="text-accent hover:underline truncate min-w-0">{{ s.shift_date }} ({{ s.duration_hours || '?' }}h)</router-link>
+            <span class="flex gap-1 shrink-0">
               <StatusBadge v-if="s.incident_flag" status="incident" />
               <StatusBadge :status="s.billed ? 'billed' : 'unbilled'" />
             </span>
@@ -205,6 +211,14 @@ const tabs = [
 
     <div v-show="tab === 'documents'">
       <ClientDocuments :client-id="id" @count="documentCount = $event" />
+    </div>
+
+    <div v-show="tab === 'medications'">
+      <ClientMedications :client-id="id" @count="medicationCount = $event" />
+    </div>
+
+    <div v-show="tab === 'restrictive'">
+      <ClientRestrictivePractices :client-id="id" @count="restrictiveCount = $event" />
     </div>
 
     <ConfirmDialog

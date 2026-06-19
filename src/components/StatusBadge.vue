@@ -20,11 +20,29 @@ const styles = {
   on_hold: 'bg-warning/15 text-warning',
   discontinued: 'bg-mid/20 text-mid',
   // Document expiry ('expired' is defined above, reused here)
-  expiring: 'bg-warning/15 text-warning'
+  expiring: 'bg-warning/15 text-warning',
+  // Incident follow-up lifecycle
+  open: 'bg-warning/15 text-warning',
+  in_progress: 'bg-info/15 text-info',
+  closed: 'bg-mid/20 text-mid',
+  reportable: 'bg-danger/15 text-danger',
+  // Incident severity
+  minor: 'bg-mid/20 text-mid',
+  moderate: 'bg-warning/15 text-warning',
+  major: 'bg-danger/15 text-danger',
+  critical: 'bg-danger/15 text-danger',
+  // Medication administration outcome
+  administered: 'bg-success/15 text-success',
+  refused: 'bg-danger/15 text-danger',
+  missed: 'bg-warning/15 text-warning',
+  withheld: 'bg-mid/20 text-mid',
+  self_administered: 'bg-accent/15 text-accent'
 }
 
 const LABELS = {
-  on_hold: 'on hold'
+  on_hold: 'on hold',
+  in_progress: 'in progress',
+  self_administered: 'self-administered'
 }
 </script>
 

@@ -9,6 +9,9 @@ import { restoreTemplate } from './templateService.js'
 import { reactivateBillingCode } from './billingService.js'
 import { restoreClientDocument } from './clientDocumentService.js'
 import { restoreGoal } from './goalService.js'
+import { restoreIncident, incidentTypeLabel } from './incidentService.js'
+import { restoreRestrictivePractice } from './restrictivePracticeService.js'
+import { restoreMedicationRecord } from './medicationService.js'
 
 /**
  * Build a single "deleted item" descriptor for the recycle-bin view. Labels are
@@ -75,6 +78,24 @@ export function listDeleted () {
     out.push(item({ entity_type: 'goal', id: r.id, label: r.title, sub_label: clientDisplayName(r), removed_at: r.deleted_at }))
   }
 
+  for (const r of sqlite.prepare(`SELECT i.id, i.incident_date, i.incident_type, i.deleted_at, i.client_id,
+      c.preferred_name AS client_preferred_name, c.first_name AS client_first_name, c.last_name AS client_last_name
+    FROM incident_reports i JOIN clients c ON c.id = i.client_id WHERE i.deleted_at IS NOT NULL`).all()) {
+    out.push(item({ entity_type: 'incident', id: r.id, label: `${incidentTypeLabel(r.incident_type)} — ${r.incident_date}`, sub_label: clientDisplayName(r), removed_at: r.deleted_at }))
+  }
+
+  for (const r of sqlite.prepare(`SELECT rp.id, rp.practice_type, rp.used_at_date, rp.deleted_at, rp.client_id,
+      c.preferred_name AS client_preferred_name, c.first_name AS client_first_name, c.last_name AS client_last_name
+    FROM restrictive_practice_records rp JOIN clients c ON c.id = rp.client_id WHERE rp.deleted_at IS NOT NULL`).all()) {
+    out.push(item({ entity_type: 'restrictive_practice', id: r.id, label: `${r.practice_type} restrictive practice — ${r.used_at_date}`, sub_label: clientDisplayName(r), removed_at: r.deleted_at }))
+  }
+
+  for (const r of sqlite.prepare(`SELECT m.id, m.medication_name, m.administered_date, m.deleted_at, m.client_id,
+      c.preferred_name AS client_preferred_name, c.first_name AS client_first_name, c.last_name AS client_last_name
+    FROM medication_records m JOIN clients c ON c.id = m.client_id WHERE m.deleted_at IS NOT NULL`).all()) {
+    out.push(item({ entity_type: 'medication', id: r.id, label: `${r.medication_name} — ${r.administered_date}`, sub_label: clientDisplayName(r), removed_at: r.deleted_at }))
+  }
+
   // Billing codes are deactivated (history kept), not soft-deleted — surface them
   // here too so operators have one place to bring removed items back.
   for (const r of sqlite.prepare('SELECT id, code, name, updated_at FROM billing_codes WHERE active = 0').all()) {
@@ -95,6 +116,9 @@ const RESTORERS = {
   template: { restore: restoreTemplate, action: 'restored' },
   client_document: { restore: restoreClientDocument, action: 'restored' },
   goal: { restore: restoreGoal, action: 'restored' },
+  incident: { restore: restoreIncident, action: 'restored' },
+  restrictive_practice: { restore: restoreRestrictivePractice, action: 'restored' },
+  medication: { restore: restoreMedicationRecord, action: 'restored' },
   billing_code: { restore: reactivateBillingCode, action: 'status_changed', details: { active: true } }
 }
 

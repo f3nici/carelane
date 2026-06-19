@@ -12,7 +12,8 @@ const spec = swaggerJsdoc({
     servers: [{ url: '/api/v1' }],
     tags: [
       { name: 'Auth' }, { name: 'Clients' }, { name: 'Agreements' }, { name: 'Shifts' },
-      { name: 'Reports' }, { name: 'Billing' }, { name: 'Knowledge' }, { name: 'Dashboard' }, { name: 'Settings' }
+      { name: 'Incidents' }, { name: 'Reports' }, { name: 'Billing' }, { name: 'Knowledge' },
+      { name: 'Dashboard' }, { name: 'Settings' }
     ]
   },
   apis: ['./server/routes/*.js']
