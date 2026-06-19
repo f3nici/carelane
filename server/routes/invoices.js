@@ -62,4 +62,14 @@ router.post('/from-shift/:shiftId', outboundLimiter, async (req, res) => {
   res.status(201).json(ok(result))
 })
 
+/**
+ * @openapi
+ * /invoices/from-shift/{shiftId}/recreate:
+ *   post: { tags: [Invoices], summary: Cancel the existing Square invoice for a shift and create a replacement draft }
+ */
+router.post('/from-shift/:shiftId/recreate', outboundLimiter, async (req, res) => {
+  const result = await square.recreateDraftInvoiceFromShift(Number(req.params.shiftId), req.session.userId)
+  res.status(201).json(ok(result))
+})
+
 export default router

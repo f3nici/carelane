@@ -337,6 +337,49 @@ export async function createDraftInvoiceFromShift (shiftNoteId, userId) {
   }
 }
 
+/**
+ * Cancel the existing draft invoice for a shift in Square and create a
+ * replacement. Use when shift details (rate, billing code, hours) have changed
+ * after the first draft was generated. Cancels the existing invoice via the
+ * Square API, marks the local row CANCELED, then delegates to
+ * {@link createDraftInvoiceFromShift} for the fresh draft.
+ * @param {number} shiftNoteId
+ * @param {number} userId acting user (for the audit trail)
+ */
+export async function recreateDraftInvoiceFromShift (shiftNoteId, userId) {
+  const prior = existingInvoiceForShift(shiftNoteId)
+  // No active invoice — fall straight through to a normal create.
+  if (!prior || prior.status === 'CANCELED') {
+    return createDraftInvoiceFromShift(shiftNoteId, userId)
+  }
+
+  // Cancel the existing invoice in Square so it doesn't float as an orphan.
+  if (prior.square_invoice_id) {
+    try {
+      const squareInv = await squareFetch(`/v2/invoices/${prior.square_invoice_id}`)
+      await squareFetch(`/v2/invoices/${prior.square_invoice_id}/cancel`, {
+        method: 'POST',
+        body: { version: squareInv.invoice.version }
+      })
+    } catch (err) {
+      if (err.status !== 404) {
+        // 404 = already gone from Square; any other error surfaces to the operator.
+        const message = String(err.message || err).slice(0, 160)
+        recordError(message)
+        throw new ApiError(502, 'SQUARE_ERROR', `Could not cancel the existing Square invoice: ${message}`)
+      }
+    }
+  }
+
+  // Mark local row cancelled and audit the replacement.
+  const ts = new Date().toISOString()
+  sqlite.prepare('UPDATE square_invoices SET status = ?, updated_at = ? WHERE id = ?')
+    .run('CANCELED', ts, prior.id)
+  logActivity('square_invoice', prior.id, userId, 'cancelled', { shift_id: shiftNoteId, superseded: true })
+
+  return createDraftInvoiceFromShift(shiftNoteId, userId)
+}
+
 /** Fetch one tracked invoice row by local id. */
 export function getInvoice (id) {
   return sqlite.prepare('SELECT * FROM square_invoices WHERE id = ?').get(id) || null
