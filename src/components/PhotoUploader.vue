@@ -25,7 +25,7 @@ async function upload (event) {
     const res = await api.upload(`/shifts/${props.shiftId}/photos`, form)
     emit('uploaded', res.data)
     caption.value = ''
-    toast.push('Photo uploaded', 'success')
+    toast.push('File uploaded', 'success')
   } catch { /* toast via interceptor */ } finally {
     busy.value = false
     if (fileInput.value) fileInput.value.value = ''
@@ -37,8 +37,8 @@ async function upload (event) {
   <div class="flex flex-wrap items-center gap-2">
     <input v-model="caption" class="input max-w-xs" placeholder="Caption (optional)" />
     <label class="btn-ghost cursor-pointer">
-      <input ref="fileInput" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" class="hidden" @change="upload" />
-      {{ busy ? 'Uploading…' : '+ Add photo' }}
+      <input ref="fileInput" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm,video/3gpp" class="hidden" @change="upload" />
+      {{ busy ? 'Uploading…' : '+ Add photo / video' }}
     </label>
   </div>
 </template>

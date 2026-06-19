@@ -18,18 +18,19 @@ import config from '../config.js'
 const router = Router()
 
 const PHOTO_DIR = path.join(config.uploadPath, 'photos')
+const MEDIA_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'video/quicktime', 'video/webm', 'video/3gpp']
 const photoUpload = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => {
       fs.mkdirSync(PHOTO_DIR, { recursive: true })
       cb(null, PHOTO_DIR)
     },
-    // non-guessable filename: photos may contain PII and are served only behind auth
+    // non-guessable filename: photos/videos may contain PII and are served only behind auth
     filename: (req, file, cb) => cb(null, crypto.randomBytes(16).toString('hex') + path.extname(file.originalname).toLowerCase())
   }),
-  limits: { fileSize: config.maxUploadSize },
+  limits: { fileSize: config.uploadLimitFor(200 * 1024 * 1024) },
   fileFilter: (req, file, cb) => {
-    cb(null, ['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype))
+    cb(null, MEDIA_MIMES.includes(file.mimetype))
   }
 })
 
@@ -154,20 +155,23 @@ router.post('/:id/draft/estimate', (req, res, next) => {
  * /shifts/{id}/photos:
  *   post: { tags: [Shifts], summary: Upload a shift photo (served auth-gated only) }
  */
-const PHOTO_EXT = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp' }
+const MEDIA_EXT = {
+  'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp',
+  'video/mp4': '.mp4', 'video/quicktime': '.mov', 'video/webm': '.webm', 'video/3gpp': '.3gp'
+}
 
 router.post('/:id/photos', photoUpload.single('photo'), (req, res, next) => {
-  if (!req.file) return next(new ApiError(400, 'UPLOAD_ERROR', 'No photo uploaded (jpeg/png/webp only)'))
+  if (!req.file) return next(new ApiError(400, 'UPLOAD_ERROR', 'No file uploaded (jpeg/png/webp/mp4/mov/webm only)'))
   // The fileFilter only sees the forgeable client Content-Type. Confirm the real
   // type from magic bytes, and normalise the on-disk extension to the detected
-  // type — the photo is served inline, so a mislabelled .html/.svg extension
+  // type — the file is served inline, so a mislabelled .html/.svg extension
   // taken from the original filename could otherwise be served as active content.
   const detected = sniffFileType(req.file.path)
-  if (!detected || !PHOTO_EXT[detected]) {
+  if (!detected || !MEDIA_EXT[detected]) {
     fs.rm(req.file.path, () => {})
-    return next(new ApiError(400, 'UPLOAD_ERROR', 'File contents are not a supported image (jpeg/png/webp)'))
+    return next(new ApiError(400, 'UPLOAD_ERROR', 'File contents are not a supported image or video (jpeg/png/webp/mp4/mov/webm)'))
   }
-  const safeExt = PHOTO_EXT[detected]
+  const safeExt = MEDIA_EXT[detected]
   if (path.extname(req.file.filename).toLowerCase() !== safeExt) {
     const renamed = path.basename(req.file.filename, path.extname(req.file.filename)) + safeExt
     fs.renameSync(req.file.path, path.join(PHOTO_DIR, renamed))
