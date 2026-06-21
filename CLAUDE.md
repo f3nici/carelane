@@ -108,8 +108,17 @@ API docs at `/api/docs`, health at `/healthz`.
   hits a network error) are parked in IndexedDB (`composables/offlineDrafts.js`,
   store `stores/offline.js`) and flushed automatically on reconnect — the one
   place participant data is stored client-side, deleted the instant it syncs. The
-  service worker still caches nothing sensitive; the queue is plain same-origin
-  IndexedDB. `OfflineIndicator` shows status + pending count + a manual "sync now".
+  queue is plain same-origin IndexedDB. `OfflineIndicator` shows status + pending
+  count + a manual "sync now". The service worker (`public/sw.js`) caches the
+  **non-sensitive app shell** (built HTML/JS/CSS + branding) so the SPA boots with
+  no signal, but never caches API responses, uploads or anything with PII.
+  Offline UX is gated: a known prior session is kept signed in (`auth` persists
+  only the worker's own name/role to `localStorage`, never participant data), the
+  API interceptor suppresses "network error" toasts while offline, and the router
+  funnels every non-note route to a dedicated `/offline` page (`OfflinePage.vue`)
+  — the only things that work offline are the offline home and the new-note form,
+  which picks its participant from a cached roster (`offline.clients`, id+names
+  only, refreshed on each online load). Routes opt in via `meta.offlineReady`.
 - Structured goals: `client_goals` are discrete, trackable participant outcomes
   (status active/achieved/on_hold/discontinued, optional target date) that
   supersede the free-text `clients.support_goals` blob (kept as a quick-notes

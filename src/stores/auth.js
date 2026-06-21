@@ -2,11 +2,37 @@ import { defineStore } from 'pinia'
 import axios from 'axios'
 import { startAuthentication, browserSupportsWebAuthn } from '@simplewebauthn/browser'
 
+// Remembers that a session was established so the PWA can keep working offline
+// (where /auth/me is unreachable). Only the worker's own display name/role is
+// kept — no participant data — and it is cleared the moment we know we are
+// logged out (logout or a 401 from the server).
+const SESSION_KEY = 'carelane:session'
+
+/** Persist a minimal marker that this device has an authenticated session. */
+function rememberSession (user) {
+  try {
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ display_name: user.display_name, role: user.role }))
+  } catch { /* storage may be unavailable (private mode) */ }
+}
+
+/** Forget the persisted session marker. */
+function forgetSession () {
+  try { localStorage.removeItem(SESSION_KEY) } catch { /* ignore */ }
+}
+
+/** Read the persisted session marker, if any. */
+function readSession () {
+  try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null') } catch { return null }
+}
+
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     user: null,
     csrfToken: null,
-    checked: false
+    checked: false,
+    // True when `user` was restored from the offline marker rather than verified
+    // by the server — the UI runs in read-limited offline mode.
+    offlineSession: false
   }),
   getters: {
     isAuthenticated: state => !!state.user,
@@ -18,8 +44,21 @@ export const useAuthStore = defineStore('auth', {
         const res = await axios.get('/api/v1/auth/me', { withCredentials: true })
         this.user = res.data.data
         this.csrfToken = res.data.data.csrf_token
-      } catch {
-        this.user = null
+        this.offlineSession = false
+        rememberSession(this.user)
+      } catch (err) {
+        // Offline (no response) with a known prior session: keep the worker
+        // signed in so they can still capture notes. A real 401 means logged
+        // out — drop the marker and clear.
+        const session = readSession()
+        if (!err.response && typeof navigator !== 'undefined' && !navigator.onLine && session) {
+          this.user = session
+          this.offlineSession = true
+        } else {
+          this.user = null
+          this.offlineSession = false
+          if (err.response) forgetSession()
+        }
       } finally {
         this.checked = true
       }
@@ -38,6 +77,8 @@ export const useAuthStore = defineStore('auth', {
       this.user = res.data.data
       this.csrfToken = res.data.data.csrf_token
       this.checked = true
+      this.offlineSession = false
+      rememberSession(this.user)
       return { totpRequired: false }
     },
     /**
@@ -52,6 +93,8 @@ export const useAuthStore = defineStore('auth', {
       this.user = res.data.data
       this.csrfToken = res.data.data.csrf_token
       this.checked = true
+      this.offlineSession = false
+      rememberSession(this.user)
     },
     /** Whether this browser can do WebAuthn (gates the passkey UI). */
     supportsPasskeys () {
@@ -67,6 +110,8 @@ export const useAuthStore = defineStore('auth', {
     clear () {
       this.user = null
       this.csrfToken = null
+      this.offlineSession = false
+      forgetSession()
     }
   }
 })
