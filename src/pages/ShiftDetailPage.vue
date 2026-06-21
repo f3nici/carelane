@@ -141,6 +141,23 @@ async function generateInvoice () {
   }
 }
 
+/** Cancel the existing Square invoice and create a replacement draft. */
+async function recreateInvoice () {
+  if (!id.value) return
+  const confirmed = window.confirm(
+    'This will cancel the existing Square invoice and create a new draft. The old invoice will be voided in Square. Continue?'
+  )
+  if (!confirmed) return
+  invoicing.value = true
+  try {
+    const res = await api.post(`/invoices/from-shift/${id.value}/recreate`, {})
+    invoice.value = res.data.invoice
+    toast.push('Old invoice cancelled — new draft created in Square', 'success')
+  } catch { /* toast via interceptor */ } finally {
+    invoicing.value = false
+  }
+}
+
 /** Load any structured incident report already linked to this shift note. */
 async function loadIncident () {
   const shiftId = id.value || shift.value.id
@@ -237,8 +254,16 @@ async function draft () {
           · {{ invoice.currency }} {{ Number(invoice.amount).toFixed(2) }}
           · created {{ (invoice.created_at || '').slice(0, 10) }}
         </p>
-        <a v-if="invoice.public_url" :href="invoice.public_url" target="_blank" rel="noopener noreferrer" class="text-accent text-sm hover:underline">Open in Square →</a>
-        <p v-else class="text-xs text-mid">This draft lives in your Square account — open Square to review and send it.</p>
+        <div class="flex flex-wrap items-center gap-3">
+          <a v-if="invoice.public_url" :href="invoice.public_url" target="_blank" rel="noopener noreferrer" class="text-accent text-sm hover:underline">Open in Square →</a>
+          <p v-else class="text-xs text-mid">This draft lives in your Square account — open Square to review and send it.</p>
+          <button
+            v-if="invoice.status !== 'CANCELED' && squareStatus.enabled"
+            class="btn-ghost text-sm text-warning"
+            :disabled="invoicing"
+            @click="recreateInvoice"
+          >{{ invoicing ? 'Recreating…' : 'Recreate invoice' }}</button>
+        </div>
       </template>
       <template v-else>
         <p class="text-sm text-mid">

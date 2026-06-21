@@ -18,6 +18,15 @@ export function detectFileType (buf) {
   if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image/jpeg'
   // WEBP — "RIFF"...."WEBP"
   if (buf.length >= 12 && buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP') return 'image/webp'
+  // WebM — EBML header \x1A\x45\xDF\xA3
+  if (buf[0] === 0x1a && buf[1] === 0x45 && buf[2] === 0xdf && buf[3] === 0xa3) return 'video/webm'
+  // MP4 / MOV / 3GPP — ISO Base Media File Format: bytes 4-7 == 'ftyp'
+  if (buf.length >= 12 && buf[4] === 0x66 && buf[5] === 0x74 && buf[6] === 0x79 && buf[7] === 0x70) {
+    const brand = buf.toString('ascii', 8, 12)
+    if (brand.startsWith('qt ')) return 'video/quicktime'
+    if (brand.startsWith('3gp')) return 'video/3gpp'
+    return 'video/mp4'
+  }
   return null
 }
 
