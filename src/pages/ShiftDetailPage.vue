@@ -31,8 +31,20 @@ const promoting = ref(false)
 const fromSchedule = computed(() => route.query.from_schedule ? Number(route.query.from_schedule) : null)
 
 onMounted(async () => {
-  const c = await api.get('/clients', { active: 'true', per_page: 100 })
-  clients.value = c.data
+  // Offline note capture: the participant list comes from the offline cache when
+  // there's no signal (the server fetch would just fail).
+  if (offline.supported && !navigator.onLine) {
+    clients.value = offline.clients
+    return
+  }
+  try {
+    const c = await api.get('/clients', { active: 'true', per_page: 100 })
+    clients.value = c.data
+  } catch (err) {
+    // Lost connectivity loading the form → fall back to the cached roster.
+    if (!err.response && offline.supported) { clients.value = offline.clients; return }
+    throw err
+  }
   if (id.value) {
     const res = await api.get(`/shifts/${id.value}`)
     shift.value = res.data
@@ -85,7 +97,7 @@ async function queueOffline (endpoint, payload) {
   await offline.enqueue({ endpoint, payload: draft, shiftDate: payload.shift_date })
   busy.value = false
   toast.push('Saved offline — it will sync automatically when you reconnect', 'success')
-  router.push('/shifts')
+  router.push(navigator.onLine ? '/shifts' : { name: 'offline' })
 }
 
 async function reopen () {

@@ -94,9 +94,10 @@ export function deleteDraft (id) {
 
 /**
  * Flush queued drafts to the server. Each draft is POSTed to its endpoint and
- * removed on success. Stops on the first network failure (still offline) so the
- * remaining drafts are retried next time; a non-network error (e.g. validation)
- * drops that one draft so it can't wedge the queue forever.
+ * removed on success. Transient failures (still offline, auth lapsed, server
+ * error) keep the queue intact and stop the run so nothing is lost; only a
+ * genuine client rejection (a malformed payload that will never succeed) drops
+ * the offending draft so it can't wedge the queue forever.
  * @param {{post:Function}} api the useApi() helper
  * @returns {Promise<{synced:number, remaining:number}>}
  */
@@ -110,9 +111,13 @@ export async function syncDrafts (api) {
       await deleteDraft(draft.id)
       synced++
     } catch (err) {
-      // No response → still offline / unreachable: keep the queue and retry later.
-      if (!err.response) break
-      // The server rejected it (validation/auth): drop it so it can't block sync.
+      const status = err.response?.status
+      // No response → still offline / unreachable: keep the queue, retry later.
+      // 401/403 (session lapsed) or 5xx (server problem) are transient too —
+      // stop and keep every draft so a captured note is never lost.
+      if (!status || status === 401 || status === 403 || status >= 500) break
+      // A real client error (e.g. 400/422 validation) will never succeed: drop
+      // this one draft so it can't permanently block the rest of the queue.
       await deleteDraft(draft.id)
     }
   }
