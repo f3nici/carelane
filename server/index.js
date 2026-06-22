@@ -5,6 +5,8 @@ import { assertEncryptionCanary } from './services/cryptoService.js'
 import { checkEmbeddingModel } from './services/ragService.js'
 import { scheduleBackups, warnIfBackupsStale } from './services/backupService.js'
 import { scheduleMaterialisation } from './services/recurrenceService.js'
+import { purgeExpired } from './services/loginThrottle.js'
+import { logger } from './services/logger.js'
 import { createApp } from './app.js'
 
 assertProductionSecrets()
@@ -26,8 +28,12 @@ checkEmbeddingModel()
 const app = createApp()
 
 app.listen(config.port, () => {
-  console.log(`CareLane listening on :${config.port} (${config.nodeEnv})`)
+  logger.info('CareLane listening', { port: config.port, env: config.nodeEnv, metrics: config.metricsEnabled })
   scheduleBackups()
   warnIfBackupsStale()
   scheduleMaterialisation()
+  // Sweep stale throttle/rate-limit rows hourly so the DB-backed buckets don't
+  // accumulate. unref() so this timer never keeps the process alive on its own.
+  purgeExpired()
+  setInterval(purgeExpired, 60 * 60 * 1000).unref()
 })

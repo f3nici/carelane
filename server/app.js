@@ -9,6 +9,9 @@ import { sqlite } from './db/connection.js'
 import { requireAuth, csrfProtect } from './middleware/auth.js'
 import { errorHandler, notFound } from './middleware/errorHandler.js'
 import { mountSwagger } from './swagger.js'
+import { logger } from './services/logger.js'
+import { metricsMiddleware, metricsHandler } from './services/metrics.js'
+import { touchSession } from './services/sessionService.js'
 
 import authRoutes from './routes/auth.js'
 import clientRoutes from './routes/clients.js'
@@ -36,6 +39,23 @@ export function createApp () {
   const app = express()
   app.set('trust proxy', 1)
   app.disable('x-powered-by')
+
+  // Structured access log + latency metrics. Records method, route and status —
+  // never query strings or bodies, which may carry PII. /healthz and /metrics
+  // are skipped so a monitoring scrape does not flood the log or its own series.
+  app.use((req, res, next) => {
+    if (req.path === '/healthz' || req.path === '/metrics') return next()
+    const start = process.hrtime.bigint()
+    res.on('finish', () => {
+      const ms = Number(process.hrtime.bigint() - start) / 1e6
+      const fields = { method: req.method, path: req.path, status: res.statusCode, ms: Math.round(ms) }
+      if (res.statusCode >= 500) logger.error('request', fields)
+      else if (res.statusCode >= 400) logger.warn('request', fields)
+      else logger.info('request', fields)
+    })
+    next()
+  })
+  if (config.metricsEnabled) app.use(metricsMiddleware)
 
   // Security headers. CSP allows Google Fonts (used by index.html) and inline
   // styles (vue-cal positions events with inline styles; :style bindings). The
@@ -109,6 +129,11 @@ export function createApp () {
     }
   }))
 
+  // Refresh per-session device metadata (last-seen, IP, user-agent) so the
+  // active-sessions list stays current. Throttled internally to one write per
+  // session every few minutes.
+  app.use(touchSession)
+
   /** Unauthenticated DB connectivity check for Docker healthcheck / monitoring. */
   app.get('/healthz', (req, res) => {
     try {
@@ -118,6 +143,11 @@ export function createApp () {
       res.status(503).json({ status: 'degraded' })
     }
   })
+
+  // Prometheus metrics scrape (opt-in via METRICS_ENABLED). Mounted before the
+  // session/auth stack so a scraper needs no cookie; access is gated by
+  // METRICS_TOKEN when set (see metricsHandler).
+  if (config.metricsEnabled) app.get('/metrics', metricsHandler(config))
 
   const api = express.Router()
   api.use(csrfProtect)
@@ -144,7 +174,7 @@ export function createApp () {
   const distDir = path.resolve('dist')
   if (fs.existsSync(distDir)) {
     app.use(express.static(distDir))
-    app.get(/^(?!\/(api|healthz)).*/, (req, res) => res.sendFile(path.join(distDir, 'index.html')))
+    app.get(/^(?!\/(api|healthz|metrics)).*/, (req, res) => res.sendFile(path.join(distDir, 'index.html')))
   }
 
   app.use('/api', notFound)
