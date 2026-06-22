@@ -1,3 +1,4 @@
+import crypto from 'node:crypto'
 import { sqlite } from '../db/connection.js'
 import { logger } from './logger.js'
 
@@ -129,6 +130,21 @@ export function render () {
 }
 
 /**
+ * Constant-time string comparison (length-independent): hashes both sides so the
+ * compared buffers are always equal length, closing the timing side-channel that
+ * a raw `===`/`!==` (which returns early on the first differing byte, and on a
+ * length mismatch) would open on the metrics token.
+ * @param {string} a
+ * @param {string} b
+ * @returns {boolean}
+ */
+function timingSafeEqual (a, b) {
+  const ah = crypto.createHash('sha256').update(a).digest()
+  const bh = crypto.createHash('sha256').update(b).digest()
+  return crypto.timingSafeEqual(ah, bh) && a.length === b.length
+}
+
+/**
  * Express handler for `GET /metrics`. When `METRICS_TOKEN` is set, requires it
  * via `Authorization: Bearer <token>` or `?token=`; otherwise the endpoint is
  * open (intended for an internal-only scrape target, like `/healthz`).
@@ -139,7 +155,9 @@ export function metricsHandler (config) {
     if (config.metricsToken) {
       const bearer = (req.get('authorization') || '').replace(/^Bearer\s+/i, '')
       const provided = bearer || req.query.token
-      if (provided !== config.metricsToken) {
+      // Constant-time compare so the token can't be recovered byte-by-byte via
+      // response timing (mirrors the CSRF check in middleware/auth.js).
+      if (!timingSafeEqual(String(provided ?? ''), config.metricsToken)) {
         return res.status(401).type('text/plain').send('# unauthorized\n')
       }
     }
