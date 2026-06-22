@@ -1,3 +1,5 @@
+import { logger } from '../services/logger.js'
+
 /**
  * Application error with an API error code and HTTP status.
  */
@@ -38,7 +40,7 @@ export function errorHandler (err, req, res, next) { // eslint-disable-line no-u
       error: { code: 'UPLOAD_ERROR', message: err.message, details: [] }
     })
   }
-  console.error(err)
+  logger.error('unhandled error', { name: err.name, msg: err.message, path: req.path, method: req.method })
   res.status(500).json({
     success: false,
     error: { code: 'INTERNAL_ERROR', message: 'An unexpected error occurred', details: [] }

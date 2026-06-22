@@ -28,16 +28,26 @@ encrypted at rest.
   and a medication administration record), encrypted at rest.
 - **Billing codes** — importable NDIS price-guide codes, deactivate (never delete).
 - **Reports** — AI-assisted progress/summary reports rendered to PDF.
-- **Knowledge base (RAG)** — upload PDFs/DOCX, search them with local embeddings
-  and ask grounded questions.
+- **Knowledge base (RAG)** — upload PDFs, search them with local embeddings
+  (hybrid vector + BM25, locally reranked) and ask grounded questions.
 - **Activity log** — append-only, PII-redacted audit trail, with a filterable
   audit-log viewer (per entity / action / date) for NDIS auditing.
 - **Backups** — scheduled SQLite backups with retention, integrity verification,
   a stale-backup startup warning, and an offline restore CLI (`npm run restore`).
-- **Login hardening** — brute-force rate limiting on login and optional TOTP
-  two-factor authentication (with one-time recovery codes).
+- **Scheduling / roster** — forward-looking shift plan (one-off or recurring
+  series materialised on a rolling horizon), clock in/out lifecycle, and an
+  optional one-way push of shifts to Google Calendar.
+- **Square invoicing (optional)** — turn a completed shift note into a *draft*
+  invoice in your Square account (sending stays a manual step in Square).
+- **Login hardening** — DB-backed brute-force throttling (per ip+username and a
+  per-account global counter, surviving restarts), optional **TOTP two-factor**
+  with one-time recovery codes, **passkeys (WebAuthn)** as a passwordless factor,
+  an admin **require-second-factor policy**, and **active-session / trusted-device**
+  management (list and remotely revoke sessions).
 - **Encryption canary** — refuses to boot if `ENCRYPTION_SECRET` no longer
   matches existing ciphertext, rather than silently returning unreadable PII.
+- **Observability** — structured access logging (JSON in production) and an
+  optional token-gated Prometheus scrape at `/metrics`.
 - **Participant data export** — one-click "download everything" (PDF + JSON zip)
   for data-access requests.
 
@@ -171,10 +181,15 @@ All configuration is via environment variables (see [`.env.example`](.env.exampl
 | `SEARCH_CANDIDATE_POOL` | Candidates pulled per arm (vector + BM25) before fusion/rerank. |
 | `RERANK_ENABLED` / `RERANKER_MODEL` | Local cross-encoder reranker for the knowledge base. |
 | `DEFAULT_PRICE_REGION` | NDIS price region for billing. |
-| `BACKUP_ENABLED` / `BACKUP_PATH` / `BACKUP_RETENTION` / `BACKUP_TIME` | Scheduled backup settings. |
+| `BACKUP_ENABLED` / `BACKUP_PATH` / `BACKUP_RETENTION` / `BACKUP_TIME` / `BACKUP_STALE_HOURS` | Scheduled backup settings and the stale-backup startup-warning threshold. |
+| `LOGIN_MAX_ATTEMPTS` / `LOGIN_WINDOW_MINUTES` | Brute-force throttle: failed-attempt ceiling and window. |
+| `LOG_LEVEL` / `LOG_FORMAT` | Log verbosity (`debug`/`info`/`warn`/`error`) and format (`json` for shippers; defaults to json in production). |
+| `METRICS_ENABLED` / `METRICS_TOKEN` | Opt-in Prometheus scrape at `/metrics`; when a token is set it is required (Bearer or `?token=`). |
+| `WEBAUTHN_RP_ID` / `WEBAUTHN_ORIGIN` | Pin the passkey relying-party id/origin. Auto-derived from the request when blank (correct for same-origin); set both behind a Host-rewriting proxy. |
 | `PUBLIC_API_ENABLED` | Toggle for the public API surface. |
 | `CORS_ORIGINS` | Allowed CORS origins (comma-separated). |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_REDIRECT_URI` | Optional one-way Google Calendar sync. See the [Google Calendar setup guide](docs/google-calendar-setup.md). |
+| `SQUARE_ACCESS_TOKEN` / `SQUARE_ENVIRONMENT` / `SQUARE_LOCATION_ID` | Optional Square draft-invoicing. See the [Square invoicing setup guide](docs/square-invoicing-setup.md). |
 
 > ⚠️ **`ENCRYPTION_SECRET` cannot be rotated casually.** Once data is encrypted
 > with it, changing it makes all existing PII unreadable. Back it up securely.
@@ -205,9 +220,10 @@ Key design points:
   PII-redacted.
 - **Uploads are auth-gated** — files under `uploads/` are served only through
   authenticated routes, never `express.static`.
-- **RAG pipeline** — PDF/DOCX → per-page text → ~600-token chunks → local
-  embeddings → `document_chunks.embedding` BLOB → search via sqlite-vec or JS
-  cosine fallback.
+- **RAG pipeline** — PDF → per-page text → ~300-token chunks → local
+  embeddings → `document_chunks.embedding` BLOB → hybrid search (sqlite-vec or
+  JS cosine fallback + BM25 keyword, fused with Reciprocal Rank Fusion and
+  reordered by a local cross-encoder reranker).
 - **AI is draft-only** — Claude output is always a draft; finalisation
   (`finalised` / `signed_by_client` / `status=final`) is an explicit human
   action enforced in services. Whole PDFs and full participant records are never

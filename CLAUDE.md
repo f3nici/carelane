@@ -108,8 +108,17 @@ API docs at `/api/docs`, health at `/healthz`.
   hits a network error) are parked in IndexedDB (`composables/offlineDrafts.js`,
   store `stores/offline.js`) and flushed automatically on reconnect — the one
   place participant data is stored client-side, deleted the instant it syncs. The
-  service worker still caches nothing sensitive; the queue is plain same-origin
-  IndexedDB. `OfflineIndicator` shows status + pending count + a manual "sync now".
+  queue is plain same-origin IndexedDB. `OfflineIndicator` shows status + pending
+  count + a manual "sync now". The service worker (`public/sw.js`) caches the
+  **non-sensitive app shell** (built HTML/JS/CSS + branding) so the SPA boots with
+  no signal, but never caches API responses, uploads or anything with PII.
+  Offline UX is gated: a known prior session is kept signed in (`auth` persists
+  only the worker's own name/role to `localStorage`, never participant data), the
+  API interceptor suppresses "network error" toasts while offline, and the router
+  funnels every non-note route to a dedicated `/offline` page (`OfflinePage.vue`)
+  — the only things that work offline are the offline home and the new-note form,
+  which picks its participant from a cached roster (`offline.clients`, id+names
+  only, refreshed on each online load). Routes opt in via `meta.offlineReady`.
 - Structured goals: `client_goals` are discrete, trackable participant outcomes
   (status active/achieved/on_hold/discontinued, optional target date) that
   supersede the free-text `clients.support_goals` blob (kept as a quick-notes
@@ -146,7 +155,26 @@ API docs at `/api/docs`, health at `/healthz`.
 - `/auth/login` is brute-force throttled (per ip+username) and supports optional
   TOTP 2FA; the TOTP secret + recovery-code hashes are encrypted at rest like
   any other PII (in `twoFactorService`, never in routes). The login form always
-  shows the 2FA code field (left blank when the account has no 2FA).
+  shows the 2FA code field (left blank when the account has no 2FA). The throttle
+  and the per-route rate limiters are **DB-backed** (`throttle_hits` table, via
+  `loginThrottle.js` / `rateLimit.js`) so lockouts survive restarts and hold
+  across workers; expired buckets are purged hourly + lazily.
+- Operator security policy (`securityPolicyService`): the admin can require a
+  second factor (TOTP **or** a passkey) on every login (`require_2fa` setting,
+  guarded `GET/PUT /auth/security-policy`). Enforcement is lockout-safe — a
+  password login for an account without a second factor still succeeds but is
+  flagged `must_enrol_2fa`, and the SPA router funnels it to Settings to enrol.
+  Enabling the policy is blocked unless the acting admin already has a factor.
+- Active sessions / trusted devices (`sessionService`): each login stamps device
+  metadata (created/last-seen, IP, truncated UA) on the session; the operator
+  lists their sessions and revokes any remotely (`GET /auth/sessions`,
+  `DELETE /auth/sessions/:sid`, `POST /auth/sessions/revoke-others`). Ownership
+  is verified before a session id can be revoked.
+- Observability: structured logging (`logger.js`, JSON in prod via `LOG_FORMAT`)
+  with an access log recording method/route/status/duration only (never query
+  strings or bodies). Optional Prometheus scrape at `GET /metrics`
+  (`METRICS_ENABLED`/`METRICS_TOKEN`) exposing HTTP counters/latency + app
+  gauges; mounted before the auth stack like `/healthz`.
 - Passkeys (WebAuthn) are a passwordless login factor (`passkeyService.js`,
   `@simplewebauthn`). Each authenticator is a `webauthn_credentials` row; public
   keys are non-secret (not encrypted) and the in-flight challenge lives on the

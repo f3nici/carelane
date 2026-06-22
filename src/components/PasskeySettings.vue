@@ -3,9 +3,11 @@ import { ref, onMounted } from 'vue'
 import { startRegistration, browserSupportsWebAuthn } from '@simplewebauthn/browser'
 import { useApi } from '../composables/useApi.js'
 import { useToastStore } from '../stores/toast.js'
+import { useAuthStore } from '../stores/auth.js'
 
 const api = useApi()
 const toast = useToastStore()
+const auth = useAuthStore()
 
 const supported = ref(false)
 const passkeys = ref([])
@@ -37,6 +39,8 @@ async function register () {
     await api.post('/auth/passkeys/register/verify', { response: attResp, name: newName.value || undefined })
     newName.value = ''
     password.value = ''
+    // A passkey counts as a second factor — lift any enrol-to-continue gate.
+    if (auth.user) auth.user.must_enrol_2fa = false
     toast.push('Passkey added', 'success')
     await load()
   } catch (err) {

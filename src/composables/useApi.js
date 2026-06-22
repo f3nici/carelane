@@ -21,12 +21,15 @@ client.interceptors.response.use(
   err => {
     const status = err.response?.status
     const error = err.response?.data?.error
+    const offline = typeof navigator !== 'undefined' && !navigator.onLine
     if (status === 401 && router.currentRoute.value.name !== 'login') {
       useAuthStore().clear()
       router.push({ name: 'login', query: { redirect: router.currentRoute.value.fullPath } })
     } else if (error?.message) {
       useToastStore().push(error.message, 'error')
-    } else if (!err.response) {
+    } else if (!err.response && !offline) {
+      // Genuinely offline failures are expected and surfaced by the offline
+      // indicator — only flag a network error when we believe we're online.
       useToastStore().push('Network error — is the server running?', 'error')
     }
     return Promise.reject(err)
