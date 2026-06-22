@@ -21,6 +21,14 @@ services:
       SQUARE_ACCESS_TOKEN: ${SQUARE_ACCESS_TOKEN:-} # Optional: Square invoicing
       SQUARE_ENVIRONMENT: ${SQUARE_ENVIRONMENT:-sandbox} # 'sandbox' or 'production'
       SQUARE_LOCATION_ID: ${SQUARE_LOCATION_ID:-} # Optional: auto-detected on Test connection
+      # Optional: pin the passkey relying-party id/origin when behind a Host-rewriting
+      # proxy (auto-derived from the request when blank). RP id = registrable domain,
+      # origin = full URL, e.g. carelane.example.com / https://carelane.example.com
+      WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID:-}
+      WEBAUTHN_ORIGIN: ${WEBAUTHN_ORIGIN:-}
+      LOG_FORMAT: ${LOG_FORMAT:-json} # 'json' (log shippers) or 'pretty'
+      METRICS_ENABLED: ${METRICS_ENABLED:-false} # Optional: Prometheus scrape at /metrics
+      METRICS_TOKEN: ${METRICS_TOKEN:-} # Optional: require a Bearer token for /metrics
     volumes:
       - ./data:/app/data
       - ./uploads:/app/uploads

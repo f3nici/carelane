@@ -9,6 +9,7 @@ import { requireAdmin } from '../middleware/auth.js'
 import { getSettings, updateSettings, getSetting } from '../services/settingsService.js'
 import { logActivity } from '../services/activityService.js'
 import { runBackup, listBackups, verifyBackup, backupFreshness } from '../services/backupService.js'
+import { sniffFileType } from '../utils/fileType.js'
 import { ok } from '../utils/pagination.js'
 import { ApiError } from '../middleware/errorHandler.js'
 import config from '../config.js'
@@ -49,8 +50,27 @@ router.put('/', requireAdmin, validate(settingsSchema), (req, res) => {
  * /settings/logo:
  *   post: { tags: [Settings], summary: Upload the business logo (admin only) }
  */
+const LOGO_EXT = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp', 'image/svg+xml': '.svg' }
+
 router.post('/logo', requireAdmin, upload.single('logo'), (req, res, next) => {
   if (!req.file) return next(new ApiError(400, 'UPLOAD_ERROR', 'Upload a png/jpeg/webp/svg logo'))
+  // multer's fileFilter only saw the forgeable client Content-Type. Confirm the
+  // real type from the file's contents — and normalise the on-disk extension to
+  // match — so arbitrary bytes can't be stored (and later served) under a
+  // mislabelled image extension. The serving route additionally locks any SVG
+  // down with a restrictive CSP, but verifying it really is an image first keeps
+  // the logo store consistent with the photo/document upload paths.
+  const detected = sniffFileType(req.file.path)
+  if (!detected || !LOGO_EXT[detected]) {
+    fs.rm(req.file.path, () => {})
+    return next(new ApiError(400, 'UPLOAD_ERROR', 'File contents are not a valid png/jpeg/webp/svg image'))
+  }
+  const safeExt = LOGO_EXT[detected]
+  if (path.extname(req.file.filename).toLowerCase() !== safeExt) {
+    const renamed = path.basename(req.file.filename, path.extname(req.file.filename)) + safeExt
+    fs.renameSync(req.file.path, path.join(LOGO_DIR, renamed))
+    req.file.filename = renamed
+  }
   updateSettings({ logo_filename: req.file.filename })
   logActivity('settings', null, req.session.userId, 'updated', { logo: true })
   res.status(201).json(ok({ logo_filename: req.file.filename }))

@@ -40,7 +40,11 @@ async function enable () {
     const res = await api.post('/auth/2fa/enable', { token: token.value })
     recoveryCodes.value = res.data.recovery_codes
     setup.value = null
-    if (auth.user) auth.user.totp_enabled = true
+    if (auth.user) {
+      auth.user.totp_enabled = true
+      // A second factor now exists — lift any enrol-to-continue policy gate.
+      auth.user.must_enrol_2fa = false
+    }
     toast.push('Two-factor authentication enabled', 'success')
     await loadStatus()
   } catch { /* toast via interceptor */ } finally {

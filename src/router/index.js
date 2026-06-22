@@ -8,6 +8,7 @@ const routes = [
     path: '/',
     component: DefaultLayout,
     children: [
+      { path: 'offline', name: 'offline', component: () => import('../pages/OfflinePage.vue'), meta: { offlineReady: true } },
       { path: '', name: 'dashboard', component: () => import('../pages/DashboardPage.vue') },
       { path: 'clients', name: 'clients', component: () => import('../pages/ClientListPage.vue') },
       { path: 'clients/new', name: 'client-new', component: () => import('../pages/ClientEditPage.vue') },
@@ -19,7 +20,7 @@ const routes = [
       { path: 'documents', name: 'documents', component: () => import('../pages/DocumentsPage.vue') },
       { path: 'roster', name: 'roster', component: () => import('../pages/RosterPage.vue') },
       { path: 'shifts', name: 'shifts', component: () => import('../pages/ShiftListPage.vue') },
-      { path: 'shifts/new', name: 'shift-new', component: () => import('../pages/ShiftDetailPage.vue') },
+      { path: 'shifts/new', name: 'shift-new', component: () => import('../pages/ShiftDetailPage.vue'), meta: { offlineReady: true } },
       { path: 'shifts/:id', name: 'shift-detail', component: () => import('../pages/ShiftDetailPage.vue') },
       { path: 'incidents', name: 'incidents', component: () => import('../pages/IncidentListPage.vue') },
       { path: 'incidents/new', name: 'incident-new', component: () => import('../pages/IncidentDetailPage.vue') },
@@ -49,6 +50,13 @@ router.beforeEach(async to => {
   const auth = useAuthStore()
   if (!auth.checked) await auth.fetchMe()
   if (!auth.isAuthenticated) return { name: 'login', query: { redirect: to.fullPath } }
+  // Policy: a second factor is required but this account has none yet. Funnel
+  // every page to Settings (where the 2FA/passkey setup lives) until they enrol.
+  if (auth.mustEnrol2fa && to.name !== 'settings') return { name: 'settings', query: { enrol: '2fa' } }
+  // Offline, the only pages that work are note capture and the offline home —
+  // everything else fans out to the API and just renders connection errors.
+  const offline = typeof navigator !== 'undefined' && !navigator.onLine
+  if (offline && !to.meta.offlineReady) return { name: 'offline' }
   return true
 })
 

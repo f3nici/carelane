@@ -10,6 +10,14 @@ fs.mkdirSync(path.dirname(config.dbPath), { recursive: true })
 export const sqlite = new Database(config.dbPath)
 sqlite.pragma('journal_mode = WAL')
 sqlite.pragma('foreign_keys = ON')
+// NORMAL is the recommended durability level under WAL: safe against application
+// crashes (only an OS/power loss could lose the last commit, which the nightly
+// backup covers) and a meaningful write-throughput gain over the FULL default.
+sqlite.pragma('synchronous = NORMAL')
+// Wait (up to 5s) for a competing writer to finish instead of failing a query
+// immediately with SQLITE_BUSY — e.g. a CLI script (reindex/backup/restore) run
+// while the server holds the write lock.
+sqlite.pragma('busy_timeout = 5000')
 
 /** Whether the sqlite-vec extension loaded (vector search available). */
 export let vecAvailable = false

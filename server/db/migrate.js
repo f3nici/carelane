@@ -535,6 +535,20 @@ CREATE TABLE IF NOT EXISTS medication_records (
   deleted_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_med_client ON medication_records (client_id, administered_date);
+
+-- DB-backed brute-force throttle / rate-limit buckets (added post-launch). The
+-- login throttle and the per-route rate limiters used to keep their counters in
+-- a process-local Map, so protection reset on every restart and could not be
+-- shared across workers. Persisting them here makes lockouts survive restarts
+-- and (with a shared SQLite file) hold across multiple workers. One row per
+-- throttle key; epoch-ms timestamps. Expired rows are purged lazily + on a timer.
+CREATE TABLE IF NOT EXISTS throttle_hits (
+  key TEXT PRIMARY KEY,
+  count INTEGER NOT NULL DEFAULT 0,
+  first_at INTEGER NOT NULL,
+  locked_until INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_throttle_hits_first ON throttle_hits (first_at);
 `)
 
   // Performance indexes for the largest / fastest-growing query paths. All are
