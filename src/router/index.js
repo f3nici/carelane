@@ -50,6 +50,9 @@ router.beforeEach(async to => {
   const auth = useAuthStore()
   if (!auth.checked) await auth.fetchMe()
   if (!auth.isAuthenticated) return { name: 'login', query: { redirect: to.fullPath } }
+  // Policy: a second factor is required but this account has none yet. Funnel
+  // every page to Settings (where the 2FA/passkey setup lives) until they enrol.
+  if (auth.mustEnrol2fa && to.name !== 'settings') return { name: 'settings', query: { enrol: '2fa' } }
   // Offline, the only pages that work are note capture and the offline home —
   // everything else fans out to the API and just renders connection errors.
   const offline = typeof navigator !== 'undefined' && !navigator.onLine

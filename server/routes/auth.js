@@ -5,16 +5,18 @@ import { sqlite } from '../db/connection.js'
 import { validate } from '../middleware/validate.js'
 import {
   loginSchema, totpConfirmSchema, totpDisableSchema, changePasswordSchema,
-  passkeyRegisterSchema, passkeyLoginSchema, passkeyRenameSchema
+  passkeyRegisterSchema, passkeyLoginSchema, passkeyRenameSchema, securityPolicySchema
 } from '../utils/validators.js'
 import { ApiError } from '../middleware/errorHandler.js'
-import { requireAuth, ensureCsrfToken } from '../middleware/auth.js'
+import { requireAuth, requireAdmin, ensureCsrfToken } from '../middleware/auth.js'
 import { rateLimit } from '../middleware/rateLimit.js'
 import { logActivity } from '../services/activityService.js'
 import * as twoFactor from '../services/twoFactorService.js'
 import * as passkeys from '../services/passkeyService.js'
 import { changePassword, destroyOtherSessions } from '../services/accountService.js'
 import { throttleKey, globalThrottleKey, checkLockout, recordFailure, clearAttempts } from '../services/loginThrottle.js'
+import { getRequire2fa, setRequire2fa, mustEnrolSecondFactor } from '../services/securityPolicyService.js'
+import { stampDevice, listUserSessions, revokeSession } from '../services/sessionService.js'
 import { ok } from '../utils/pagination.js'
 import config from '../config.js'
 
@@ -56,9 +58,20 @@ function establishSession (req, res, user, next, details) {
     if (err) return next(err)
     req.session.userId = user.id
     req.session.role = user.role
+    stampDevice(req)
     const csrf = ensureCsrfToken(req.session)
+    // When the require-2FA policy is on and this account has no second factor
+    // yet, the session is established but flagged so the UI forces enrolment.
+    const mustEnrol = mustEnrolSecondFactor(user)
     logActivity('auth', user.id, user.id, 'login', details)
-    res.json(ok({ id: user.id, username: user.username, display_name: user.display_name, role: user.role, csrf_token: csrf }))
+    res.json(ok({
+      id: user.id,
+      username: user.username,
+      display_name: user.display_name,
+      role: user.role,
+      must_enrol_2fa: mustEnrol,
+      csrf_token: csrf
+    }))
   })
 }
 
@@ -134,7 +147,65 @@ router.post('/logout', (req, res) => {
  */
 router.get('/me', requireAuth, (req, res) => {
   const user = sqlite.prepare('SELECT id, username, display_name, role, totp_enabled FROM users WHERE id = ?').get(req.session.userId)
-  res.json(ok({ ...user, totp_enabled: !!user.totp_enabled, csrf_token: ensureCsrfToken(req.session) }))
+  res.json(ok({
+    ...user,
+    totp_enabled: !!user.totp_enabled,
+    must_enrol_2fa: mustEnrolSecondFactor(user),
+    csrf_token: ensureCsrfToken(req.session)
+  }))
+})
+
+/**
+ * @openapi
+ * /auth/security-policy:
+ *   get: { tags: [Auth], summary: Get the second-factor enforcement policy (admin only) }
+ *   put: { tags: [Auth], summary: Set whether a second factor is required for everyone (admin only) }
+ */
+router.get('/security-policy', requireAuth, requireAdmin, (req, res) => {
+  res.json(ok({ require_2fa: getRequire2fa() }))
+})
+
+router.put('/security-policy', requireAuth, requireAdmin, validate(securityPolicySchema), (req, res, next) => {
+  try {
+    const actingUser = sqlite.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId)
+    const result = setRequire2fa(req.body.require_2fa === 1, actingUser)
+    logActivity('settings', null, req.session.userId, 'security_policy_updated', { require_2fa: result.require_2fa })
+    res.json(ok(result))
+  } catch (err) { next(err) }
+})
+
+/**
+ * @openapi
+ * /auth/sessions:
+ *   get: { tags: [Auth], summary: List the current user's active sessions / devices }
+ */
+router.get('/sessions', requireAuth, (req, res) => {
+  res.json(ok({ sessions: listUserSessions(req.session.userId, req.sessionID) }))
+})
+
+/**
+ * @openapi
+ * /auth/sessions/revoke-others:
+ *   post: { tags: [Auth], summary: Sign out every other session for this user }
+ */
+router.post('/sessions/revoke-others', requireAuth, (req, res) => {
+  const removed = destroyOtherSessions(req.session.userId, req.sessionID)
+  logActivity('auth', req.session.userId, req.session.userId, 'sessions_revoked', { count: removed })
+  res.json(ok({ revoked: removed }))
+})
+
+/**
+ * @openapi
+ * /auth/sessions/{sid}:
+ *   delete: { tags: [Auth], summary: Revoke one of the current user's sessions remotely }
+ */
+router.delete('/sessions/:sid', requireAuth, (req, res, next) => {
+  try {
+    const isCurrent = req.params.sid === req.sessionID
+    revokeSession(req.session.userId, req.params.sid)
+    logActivity('auth', req.session.userId, req.session.userId, 'session_revoked', { current: isCurrent })
+    res.json(ok({ revoked: true, current: isCurrent }))
+  } catch (err) { next(err) }
 })
 
 /**

@@ -7,15 +7,19 @@ import BrandingSettings from '../components/BrandingSettings.vue'
 import PasswordSettings from '../components/PasswordSettings.vue'
 import TwoFactorSettings from '../components/TwoFactorSettings.vue'
 import PasskeySettings from '../components/PasskeySettings.vue'
+import SecurityPolicySettings from '../components/SecurityPolicySettings.vue'
+import SessionsSettings from '../components/SessionsSettings.vue'
 import BackupSettings from '../components/BackupSettings.vue'
 import GoogleCalendarSettings from '../components/GoogleCalendarSettings.vue'
 import SquareInvoicingSettings from '../components/SquareInvoicingSettings.vue'
 import BillingCodesPage from './BillingCodesPage.vue'
+import { useAuthStore } from '../stores/auth.js'
 
 const api = useApi()
 const toast = useToastStore()
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 const settings = ref(null)
 
 const tabs = [
@@ -57,6 +61,11 @@ async function save () {
     <div v-else-if="settings" class="space-y-6 max-w-3xl">
     <h1 class="text-2xl font-semibold">Settings</h1>
 
+    <div v-if="auth.mustEnrol2fa" class="rounded-xl border border-warning/40 bg-warning/10 p-4 space-y-1">
+      <p class="text-sm font-medium text-warning">Set up a second factor to continue</p>
+      <p class="text-xs text-mid">Your administrator requires two-factor authentication or a passkey on every account. Enable one below to unlock the rest of the app.</p>
+    </div>
+
     <BrandingSettings :settings="settings" @save="save" />
 
     <PasswordSettings />
@@ -64,6 +73,10 @@ async function save () {
     <TwoFactorSettings />
 
     <PasskeySettings />
+
+    <SessionsSettings />
+
+    <SecurityPolicySettings />
 
     <GoogleCalendarSettings />
 

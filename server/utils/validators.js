@@ -41,6 +41,11 @@ export const passkeyRenameSchema = z.object({
   name: z.string().trim().min(1).max(60)
 })
 
+// Operator second-factor enforcement policy.
+export const securityPolicySchema = z.object({
+  require_2fa: bool01
+})
+
 export const activityQuerySchema = z.object({
   entity_type: z.string().trim().max(40).nullish(),
   entity_id: z.coerce.number().int().positive().nullish(),
