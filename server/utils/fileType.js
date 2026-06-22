@@ -29,11 +29,12 @@ export function detectFileType (buf) {
     return 'video/mp4'
   }
   // SVG — text/XML, so there is no binary signature. Require it to open like SVG
-  // markup (an XML declaration or the <svg> root, after an optional BOM/leading
-  // whitespace) AND actually contain an <svg> element. This still rejects, say,
-  // HTML smuggled in with a forged image/svg+xml content-type. Pass ≥256 bytes
-  // for a reliable result — the <svg> tag can sit after an XML decl/DOCTYPE.
-  const head = buf.toString('utf8').replace(/^﻿/, '').trimStart().toLowerCase()
+  // markup (an XML declaration or the <svg> root, after optional leading
+  // whitespace/BOM) AND actually contain an <svg> element. This still rejects,
+  // say, HTML smuggled in with a forged image/svg+xml content-type. Pass ≥256
+  // bytes for a reliable result — the <svg> tag can sit after an XML decl/DOCTYPE.
+  // trimStart() also strips a leading BOM (U+FEFF is ECMAScript whitespace).
+  const head = buf.toString('utf8').trimStart().toLowerCase()
   if ((head.startsWith('<?xml') || head.startsWith('<svg') || head.startsWith('<!--')) && head.includes('<svg')) {
     return 'image/svg+xml'
   }
