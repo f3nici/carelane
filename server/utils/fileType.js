@@ -5,7 +5,8 @@ import fs from 'node:fs'
  * client-declared Content-Type (which is attacker-controlled — a request can
  * label arbitrary bytes as `application/pdf`). Returns a MIME string for the
  * formats CareLane accepts, or null when the signature is unrecognised.
- * @param {Buffer} buf the first bytes of the file (≥12 recommended)
+ * @param {Buffer} buf the first bytes of the file (≥12 for binary formats, ≥256
+ *   recommended so a text SVG's <svg> root is in range)
  * @returns {string|null}
  */
 export function detectFileType (buf) {
@@ -27,6 +28,15 @@ export function detectFileType (buf) {
     if (brand.startsWith('3gp')) return 'video/3gpp'
     return 'video/mp4'
   }
+  // SVG — text/XML, so there is no binary signature. Require it to open like SVG
+  // markup (an XML declaration or the <svg> root, after an optional BOM/leading
+  // whitespace) AND actually contain an <svg> element. This still rejects, say,
+  // HTML smuggled in with a forged image/svg+xml content-type. Pass ≥256 bytes
+  // for a reliable result — the <svg> tag can sit after an XML decl/DOCTYPE.
+  const head = buf.toString('utf8').replace(/^﻿/, '').trimStart().toLowerCase()
+  if ((head.startsWith('<?xml') || head.startsWith('<svg') || head.startsWith('<!--')) && head.includes('<svg')) {
+    return 'image/svg+xml'
+  }
   return null
 }
 
@@ -40,9 +50,11 @@ export function sniffFileType (filePath) {
   let fd
   try {
     fd = fs.openSync(filePath, 'r')
-    const buf = Buffer.alloc(12)
-    fs.readSync(fd, buf, 0, 12, 0)
-    return detectFileType(buf)
+    // Read a generous prefix: binary signatures live in the first 12 bytes, but
+    // an SVG's <svg> root can sit further in (after an XML declaration/DOCTYPE).
+    const buf = Buffer.alloc(512)
+    const bytes = fs.readSync(fd, buf, 0, 512, 0)
+    return detectFileType(buf.subarray(0, bytes))
   } catch {
     return null
   } finally {

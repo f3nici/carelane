@@ -10,9 +10,17 @@ describe('detectFileType', () => {
     expect(detectFileType(webp)).toBe('image/webp')
   })
 
-  it('returns null for a forged content type (HTML labelled as a PDF)', () => {
+  it('detects SVG from its markup, with or without an XML declaration', () => {
+    expect(detectFileType(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"></svg>'))).toBe('image/svg+xml')
+    expect(detectFileType(Buffer.from('<?xml version="1.0" encoding="UTF-8"?>\n<svg></svg>'))).toBe('image/svg+xml')
+    expect(detectFileType(Buffer.from('  \n<svg viewBox="0 0 1 1"/>'))).toBe('image/svg+xml')
+  })
+
+  it('returns null for a forged content type (HTML labelled as a PDF/SVG)', () => {
     // The bytes are what matter, not the declared mimetype.
     expect(detectFileType(Buffer.from('<!doctype html><script>alert(1)</script>'))).toBeNull()
+    // XML that is not SVG must not be accepted as an image.
+    expect(detectFileType(Buffer.from('<?xml version="1.0"?><rss></rss>'))).toBeNull()
     expect(detectFileType(Buffer.from('GIF89a'))).toBeNull()
     expect(detectFileType(Buffer.alloc(2))).toBeNull()
   })

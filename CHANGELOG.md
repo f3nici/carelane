@@ -44,3 +44,15 @@ Changes merged to `main` but not yet cut into a release.
   GitHub Actions and Docker updates.
 - README section documenting the terms of service for every optional outbound
   integration (Anthropic, Hugging Face, Google, Square, Docker Hub).
+
+### Security
+- Logo uploads are now verified by magic bytes (matching the photo/document
+  upload paths) and their on-disk extension normalised to the detected type, so
+  arbitrary bytes can no longer be stored under a forged image content-type.
+- The `/metrics` token is compared in constant time, closing a byte-by-byte
+  timing side-channel on `METRICS_TOKEN`.
+
+### Changed
+- SQLite now runs with `synchronous=NORMAL` (a safe write-throughput gain under
+  WAL) and a 5s `busy_timeout` so a concurrent writer (e.g. a CLI script run
+  while the server is up) waits instead of failing with `SQLITE_BUSY`.
