@@ -67,9 +67,9 @@ function setFrom (a) {
   status.value = a.status
   startDate.value = a.start_date || ''
   endDate.value = a.end_date || ''
+  reviewDate.value = a.review_date || ''
   body.value = a.body_markdown || ''
   try { questionnaire.value = a.questionnaire_json ? JSON.parse(a.questionnaire_json) : {} } catch { questionnaire.value = {} }
-  reviewDate.value = questionnaire.value.review_date || ''
 }
 
 function payload () {
@@ -79,6 +79,7 @@ function payload () {
     status: status.value,
     start_date: startDate.value || null,
     end_date: endDate.value || null,
+    review_date: reviewDate.value || null,
     questionnaire_json: draftQuestionnaire.value,
     body_markdown: body.value || null
   }

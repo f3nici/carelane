@@ -399,6 +399,12 @@ CREATE INDEX IF NOT EXISTS idx_webauthn_user ON webauthn_credentials (user_id);
   addColumnIfMissing('reports', 'archived_at', 'TEXT')
   addColumnIfMissing('service_agreements', 'archived_at', 'TEXT')
 
+  // Service-agreement review date (added post-launch). Independent support
+  // workers commonly run open-ended agreements that are periodically *reviewed*
+  // rather than ended, so the review date — not only a hard end date — drives the
+  // "expiring / due for review" dashboard widget and the ntfy plan-review nudge.
+  addColumnIfMissing('service_agreements', 'review_date', 'TEXT')
+
   // Square Invoicing (added post-launch). The participant is mirrored to a Square
   // customer once and the id cached here so repeat invoices reuse it. The
   // square_invoices table tracks each draft we create from a shift note so the
