@@ -3,6 +3,7 @@ import { ref, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useApi } from '../composables/useApi.js'
 import { useAuthStore } from '../stores/auth.js'
+import BrandLogo from './BrandLogo.vue'
 
 const emit = defineEmits(['open-search'])
 
@@ -56,8 +57,7 @@ async function logout () {
     >
       <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" /></svg>
     </button>
-    <img src="/icon.svg" alt="" class="h-7 w-7" />
-    <span class="font-heading text-base font-semibold">CareLane</span>
+    <BrandLogo size="sm" :prompt="false" />
   </header>
 
   <!-- Drawer backdrop (mobile only) -->
@@ -73,8 +73,7 @@ async function logout () {
     :class="mobileOpen ? 'translate-x-0' : '-translate-x-full'"
   >
     <div class="flex items-center gap-2 px-5 py-5">
-      <img src="/icon.svg" alt="" class="h-8 w-8" />
-      <span class="font-heading text-lg font-semibold">CareLane</span>
+      <BrandLogo size="sm" />
       <button
         class="md:hidden ml-auto p-1.5 rounded-lg text-mid hover:text-white hover:bg-white/5 transition-colors"
         aria-label="Close menu"
