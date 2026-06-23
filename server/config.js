@@ -78,7 +78,19 @@ const config = {
   // token is present and the operator enables it. See squareService.
   squareAccessToken: env.SQUARE_ACCESS_TOKEN || '',
   squareEnvironment: env.SQUARE_ENVIRONMENT === 'production' ? 'production' : 'sandbox',
-  squareLocationId: env.SQUARE_LOCATION_ID || ''
+  squareLocationId: env.SQUARE_LOCATION_ID || '',
+  // ntfy push notifications (optional). The server URL, topic and all timings /
+  // toggles are operator-editable in Settings (see ntfyService); only the
+  // secret access token (for protected/self-hosted servers) and the request
+  // timeout live in env. The timeout default is deliberately generous — a
+  // self-hosted or distant ntfy server can take well over a second to respond,
+  // so a too-tight timeout (e.g. a few hundred ms) drops notifications. Raise
+  // NTFY_TIMEOUT_MS further for a very slow/remote server.
+  ntfyToken: env.NTFY_TOKEN || '',
+  ntfyTimeoutMs: Math.max(1000, parseInt(env.NTFY_TIMEOUT_MS || '10000', 10) || 10000),
+  // Public base URL of this CareLane install (e.g. https://carelane.example.org).
+  // When set, push notifications carry a deep link back to the relevant page.
+  appBaseUrl: (env.APP_BASE_URL || '').replace(/\/+$/, '')
 }
 
 /**

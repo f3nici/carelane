@@ -12,6 +12,7 @@ import SessionsSettings from '../components/SessionsSettings.vue'
 import BackupSettings from '../components/BackupSettings.vue'
 import GoogleCalendarSettings from '../components/GoogleCalendarSettings.vue'
 import SquareInvoicingSettings from '../components/SquareInvoicingSettings.vue'
+import NtfyNotificationsSettings from '../components/NtfyNotificationsSettings.vue'
 import BillingCodesPage from './BillingCodesPage.vue'
 import { useAuthStore } from '../stores/auth.js'
 
@@ -81,6 +82,8 @@ async function save () {
     <GoogleCalendarSettings />
 
     <SquareInvoicingSettings />
+
+    <NtfyNotificationsSettings />
 
     <BackupSettings />
 

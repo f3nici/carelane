@@ -39,6 +39,10 @@ encrypted at rest.
   optional one-way push of shifts to Google Calendar.
 - **Square invoicing (optional)** — turn a completed shift note into a *draft*
   invoice in your Square account (sending stays a manual step in Square).
+- **Push notifications (optional)** — proactive [ntfy](https://ntfy.sh) nudges to
+  your phone for plan reviews due, incidents needing follow-up, unbilled shifts
+  aging, and a reminder before each upcoming shift. Set the topic, toggles and
+  timings in-app. See the [ntfy setup guide](docs/ntfy-notifications-setup.md).
 - **Login hardening** — DB-backed brute-force throttling (per ip+username and a
   per-account global counter, surviving restarts), optional **TOTP two-factor**
   with one-time recovery codes, **passkeys (WebAuthn)** as a passwordless factor,
@@ -190,6 +194,7 @@ All configuration is via environment variables (see [`.env.example`](.env.exampl
 | `CORS_ORIGINS` | Allowed CORS origins (comma-separated). |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_REDIRECT_URI` | Optional one-way Google Calendar sync. See the [Google Calendar setup guide](docs/google-calendar-setup.md). |
 | `SQUARE_ACCESS_TOKEN` / `SQUARE_ENVIRONMENT` / `SQUARE_LOCATION_ID` | Optional Square draft-invoicing. See the [Square invoicing setup guide](docs/square-invoicing-setup.md). |
+| `NTFY_TOKEN` / `NTFY_TIMEOUT_MS` / `APP_BASE_URL` | Optional ntfy push notifications (topic/toggles/timings are set in-app). Token is only for a protected/self-hosted server; the timeout defaults to a generous 10s for slow/remote servers. See the [ntfy setup guide](docs/ntfy-notifications-setup.md). |
 
 > ⚠️ **`ENCRYPTION_SECRET` cannot be rotated casually.** Once data is encrypted
 > with it, changing it makes all existing PII unreadable. Back it up securely.
@@ -260,6 +265,7 @@ sending any data, and remember CareLane only ever sends minimised inputs (see
 | **Hugging Face** | Downloading the local embedding & reranker models (`@xenova/transformers`) on first run | Effectively required for the knowledge base (models cached locally after download; inference runs on your own machine) | [Terms of Service](https://huggingface.co/terms-of-service) · [Privacy Policy](https://huggingface.co/privacy) |
 | **Google Calendar** | One-way push of scheduled shifts to your calendar | Optional ([setup guide](docs/google-calendar-setup.md)) | [Google Terms of Service](https://policies.google.com/terms) · [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy) · [Privacy Policy](https://policies.google.com/privacy) |
 | **Square** | Creating draft invoices from completed shifts | Optional ([setup guide](docs/square-invoicing-setup.md)) | [Developer Terms of Service](https://developer.squareup.com/us/en/terms) · [General Terms](https://squareup.com/au/en/legal/general/ua) · [Privacy Notice](https://squareup.com/au/en/legal/general/privacy) |
+| **ntfy** | Push notifications for plan reviews, incident follow-ups, unbilled shifts and shift reminders | Optional ([setup guide](docs/ntfy-notifications-setup.md)); defaults to the public `ntfy.sh`, or point at your own server | [Terms / Privacy](https://ntfy.sh/) |
 | **Docker Hub** | Pulling/publishing the container image (deployment only) | Optional (only if you use the published image) | [Terms of Service](https://www.docker.com/legal/docker-terms-service/) · [Privacy Policy](https://www.docker.com/legal/docker-privacy-policy/) |
 
 As the operator you are the data controller for the participant information you

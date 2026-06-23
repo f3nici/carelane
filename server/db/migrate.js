@@ -577,6 +577,11 @@ CREATE INDEX IF NOT EXISTS idx_throttle_hits_first ON throttle_hits (first_at);
     CREATE INDEX IF NOT EXISTS idx_activity_user ON activity_log (user_id);
   `)
 
+  // Push notifications (added post-launch): track when a per-shift reminder was
+  // pushed via ntfy so the every-minute reminder sweep never double-notifies for
+  // the same scheduled shift. Null until a reminder is sent.
+  addColumnIfMissing('scheduled_shifts', 'reminder_sent_at', 'TEXT')
+
   // Retire the NDIS plan start/end dates (removed post-launch). Independent
   // support workers track service-agreement expiry, not plan-manager plan
   // periods, so these columns are dropped from existing databases.

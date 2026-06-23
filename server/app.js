@@ -25,6 +25,7 @@ import invoiceRoutes from './routes/invoices.js'
 import documentRoutes from './routes/documents.js'
 import dashboardRoutes from './routes/dashboard.js'
 import settingsRoutes from './routes/settings.js'
+import notificationRoutes from './routes/notifications.js'
 import templateRoutes from './routes/templates.js'
 import auditRoutes from './routes/audit.js'
 import deletedRoutes from './routes/deleted.js'
@@ -163,6 +164,7 @@ export function createApp () {
   api.use('/documents', requireAuth, documentRoutes)
   api.use('/dashboard', requireAuth, dashboardRoutes)
   api.use('/settings', requireAuth, settingsRoutes)
+  api.use('/notifications', requireAuth, notificationRoutes)
   api.use('/templates', requireAuth, templateRoutes)
   api.use('/audit', requireAuth, auditRoutes)
   api.use('/deleted', requireAuth, deletedRoutes)

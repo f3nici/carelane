@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs'
 import { sqlite } from './connection.js'
 import { migrate } from './migrate.js'
 import config from '../config.js'
+import { NTFY_DEFAULTS } from '../services/ntfyService.js'
 
 const now = () => new Date().toISOString()
 
@@ -73,6 +74,8 @@ const defaultSettings = {
   ai_tone: 'professional, warm, person-centred',
   square_invoicing_enabled: 0,
   square_currency: 'AUD',
+  // ntfy push notification defaults (server URL, topic, toggles, timings).
+  ...NTFY_DEFAULTS,
   disclaimer: 'CareLane is a documentation tool. It does not replace your obligations under the NDIS Practice Standards and Code of Conduct. AI outputs are drafts and must be reviewed before use.'
 }
 

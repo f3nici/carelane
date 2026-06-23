@@ -21,6 +21,13 @@ services:
       SQUARE_ACCESS_TOKEN: ${SQUARE_ACCESS_TOKEN:-} # Optional: Square invoicing
       SQUARE_ENVIRONMENT: ${SQUARE_ENVIRONMENT:-sandbox} # 'sandbox' or 'production'
       SQUARE_LOCATION_ID: ${SQUARE_LOCATION_ID:-} # Optional: auto-detected on Test connection
+      # Optional: ntfy push notifications. Server URL/topic/timings are set in-app
+      # (Settings → Push notifications). Only the optional access token, request
+      # timeout (generous by default for slow/remote servers) and the public base
+      # URL for deep links come from env.
+      NTFY_TOKEN: ${NTFY_TOKEN:-} # Optional: only for an auth-protected/self-hosted server
+      NTFY_TIMEOUT_MS: ${NTFY_TIMEOUT_MS:-10000} # Raise for a slow/distant ntfy server
+      APP_BASE_URL: ${APP_BASE_URL:-} # e.g. https://carelane.example.org (deep links)
       # Optional: pin the passkey relying-party id/origin when behind a Host-rewriting
       # proxy (auto-derived from the request when blank). RP id = registrable domain,
       # origin = full URL, e.g. carelane.example.com / https://carelane.example.com
