@@ -171,6 +171,24 @@ export const googleSettingsSchema = z.object({
   timezone: z.string().trim().max(60).optional()
 })
 
+// ntfy push notifications. All keys optional so the settings card can PATCH just
+// the fields it changed. Topic follows ntfy's allowed characters; an empty topic
+// clears the connection. Timings drive the digest time and reminder lead.
+export const ntfySettingsSchema = z.object({
+  enabled: bool01.optional(),
+  server_url: z.string().trim().url().max(300).optional(),
+  topic: z.string().trim().regex(/^[-_A-Za-z0-9]{0,64}$/, 'topic may use letters, numbers, - and _').optional(),
+  priority: z.enum(['min', 'low', 'default', 'high', 'max']).optional(),
+  notify_plan_reviews: bool01.optional(),
+  notify_incidents: bool01.optional(),
+  notify_unbilled: bool01.optional(),
+  notify_shift_reminders: bool01.optional(),
+  digest_time: time.optional(),
+  plan_review_days: z.coerce.number().int().min(0).max(365).optional(),
+  unbilled_days: z.coerce.number().int().min(0).max(365).optional(),
+  shift_reminder_minutes: z.coerce.number().int().min(0).max(1440).optional()
+})
+
 export const squareSettingsSchema = z.object({
   enabled: bool01.optional(),
   location_id: z.string().trim().max(64).optional(),

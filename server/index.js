@@ -5,6 +5,7 @@ import { assertEncryptionCanary } from './services/cryptoService.js'
 import { checkEmbeddingModel } from './services/ragService.js'
 import { scheduleBackups, warnIfBackupsStale } from './services/backupService.js'
 import { scheduleMaterialisation } from './services/recurrenceService.js'
+import { scheduleNotifications } from './services/ntfyService.js'
 import { purgeExpired } from './services/loginThrottle.js'
 import { logger } from './services/logger.js'
 import { createApp } from './app.js'
@@ -32,6 +33,8 @@ app.listen(config.port, () => {
   scheduleBackups()
   warnIfBackupsStale()
   scheduleMaterialisation()
+  // Push proactive ntfy nudges (digest + shift reminders); no-op until configured.
+  scheduleNotifications()
   // Sweep stale throttle/rate-limit rows hourly so the DB-backed buckets don't
   // accumulate. unref() so this timer never keeps the process alive on its own.
   purgeExpired()

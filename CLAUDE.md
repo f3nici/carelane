@@ -71,6 +71,22 @@ API docs at `/api/docs`, health at `/healthz`.
   description (Square allows only one recipient, and invoice custom fields need a
   paid Square plan). Each draft is tracked in `square_invoices` so a shift is
   never invoiced twice.
+- ntfy push notifications (optional): `ntfyService` turns the dashboard's
+  "needs attention" counts into proactive phone nudges via an
+  [ntfy](https://ntfy.sh) topic — **plan reviews due** (active agreements nearing
+  `end_date`), **incidents needing follow-up** (open/in-progress reports, overdue
+  ones flagged) and **unbilled shifts aging** (finalised, `billed=0`, older than a
+  threshold) — pushed as a once-daily digest at the operator's configured time,
+  plus per-shift **reminders** a configurable lead time before a scheduled shift
+  starts (deduped via `scheduled_shifts.reminder_sent_at`). All sync is
+  best-effort and a no-op until a topic is set + enabled. Server URL, topic,
+  per-category toggles and timings are operator-editable settings (`ntfy_*`,
+  defaults in `NTFY_DEFAULTS`, dedicated `/notifications` endpoints); only the
+  optional access token (`NTFY_TOKEN`) and the request timeout (`NTFY_TIMEOUT_MS`,
+  default 10s — generous so a slow/remote server isn't cut off) come from env. A
+  single `* * * * *` cron drives both the reminder sweep and the digest, using the
+  operator timezone (shared `google_calendar_timezone`). Messages carry only short
+  labels + counts, never plan/health notes. See `docs/ntfy-notifications-setup.md`.
 - Soft-deleted records (and deactivated billing codes) are listed and restorable
   via `GET /api/v1/deleted` + `POST /api/v1/deleted/:type/:id/restore` (the
   "Deleted Items" page) — clients, agreements, shifts, reports, templates,
