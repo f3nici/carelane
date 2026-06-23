@@ -16,7 +16,7 @@ const route = useRoute()
 const router = useRouter()
 const toast = useToastStore()
 const offline = useOfflineStore()
-const { aiConfigured, ensureLoaded } = useIntegrations()
+const { aiActive, ensureLoaded } = useIntegrations()
 const id = computed(() => route.params.id)
 
 const shift = ref({})
@@ -227,7 +227,7 @@ async function draft () {
     </div>
 
     <AiDraftPanel
-      v-if="aiConfigured && !shift.finalised"
+      v-if="aiActive && !shift.finalised"
       :input-text="editor?.form?.support_provided || ''"
       :estimate-endpoint="id ? `/shifts/${id}/draft/estimate` : ''"
       :estimate-payload="{ bullets: editor?.form?.support_provided || '' }"

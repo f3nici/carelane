@@ -351,6 +351,7 @@ export const settingsSchema = z.object({
   brand_accent_color: hexColor,
   default_price_region: z.string().trim().max(50),
   public_api_enabled: bool01,
+  claude_enabled: bool01,
   claude_model_cheap: z.string().trim().max(120),
   claude_model_quality: z.string().trim().max(120),
   ai_tone: z.string().trim().max(500),

@@ -1,6 +1,10 @@
 <script setup>
-import { reactive, computed, watch } from 'vue'
+import { reactive, computed, watch, onMounted } from 'vue'
 import BillingCodePicker from './BillingCodePicker.vue'
+import { useIntegrations } from '../composables/useIntegrations.js'
+
+const { aiActive, ensureLoaded } = useIntegrations()
+onMounted(ensureLoaded)
 
 const props = defineProps({
   modelValue: { type: Object, default: () => ({}) },
@@ -80,7 +84,7 @@ defineExpose({ form })
       <h3 class="font-semibold mb-4">What happened</h3>
       <div class="space-y-4">
         <div>
-          <label class="label">Support provided (bullets — used for the AI draft)</label>
+          <label class="label">Support provided (bullets{{ aiActive ? ' — used for the AI draft' : '' }})</label>
           <textarea v-model="form.support_provided" class="input font-mono text-xs" rows="5" :disabled="locked" placeholder="- helped prepare lunch&#10;- practised bus route to TAFE&#10;- worked on budgeting goal" />
         </div>
         <div>
@@ -88,7 +92,7 @@ defineExpose({ form })
           <textarea v-model="form.participant_response" class="input" rows="2" :disabled="locked" />
         </div>
         <div>
-          <label class="label">Progress note (final wording — edit the AI draft here)</label>
+          <label class="label">Progress note{{ aiActive ? ' (final wording — edit the AI draft here)' : '' }}</label>
           <textarea v-model="form.body" class="input" rows="8" :disabled="locked" />
         </div>
       </div>

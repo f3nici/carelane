@@ -5,7 +5,7 @@ import { useIntegrations } from '../composables/useIntegrations.js'
 import { renderMarkdown } from '../composables/useMarkdown.js'
 
 const api = useApi()
-const { aiConfigured, ensureLoaded } = useIntegrations()
+const { aiActive, ensureLoaded } = useIntegrations()
 const q = ref('')
 const mode = ref('search')
 const results = ref([])
@@ -40,7 +40,7 @@ async function run () {
   <div class="card space-y-4">
     <div class="flex gap-2">
       <button class="btn-ghost text-xs" :class="mode === 'search' ? '!bg-primary/20 !text-white' : ''" @click="mode = 'search'">Search (local)</button>
-      <button v-if="aiConfigured" class="btn-ghost text-xs" :class="mode === 'ask' ? '!bg-primary/20 !text-white' : ''" @click="mode = 'ask'">Ask (Claude, grounded)</button>
+      <button v-if="aiActive" class="btn-ghost text-xs" :class="mode === 'ask' ? '!bg-primary/20 !text-white' : ''" @click="mode = 'ask'">Ask (Claude, grounded)</button>
     </div>
     <form class="flex gap-2" @submit.prevent="run">
       <input v-model="q" class="input" :placeholder="mode === 'ask' ? 'Ask a question about your NDIS documents…' : 'Search guidelines and policies…'" />

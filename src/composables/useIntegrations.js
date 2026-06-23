@@ -1,19 +1,25 @@
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useApi } from './useApi.js'
 
 // Shared, module-level integration status so the tip/advice boxes for an
 // optional integration only appear when it is actually switched on. Fetched
 // once per session and reused across pages — integration config rarely changes
-// while the app is open, and a manual save in Settings calls `refresh()`.
+// while the app is open, and saving the Claude card in Settings calls
+// `refresh()` so the gating updates without a reload.
 const aiConfigured = ref(false)
+const aiOn = ref(false)
 let inflight = null
 
+// AI tips/UI show only when Claude is both configured (key present) AND switched
+// on by the operator — turning the integration off hides it everywhere.
+const aiActive = computed(() => aiConfigured.value && aiOn.value)
+
 /**
- * Reactive helpers describing which optional integrations are enabled, so UI
- * (estimated-token hints, "Ask Claude", Square invoicing, …) can be hidden when
- * the relevant integration is turned off.
+ * Reactive helpers describing which optional integrations are active, so UI
+ * (estimated-token hints, "used for the AI draft" notes, "Ask Claude", …) can be
+ * hidden when the relevant integration is off.
  *
- * @returns {{aiConfigured: import('vue').Ref<boolean>, ensureLoaded: () => Promise<void>, refresh: () => Promise<void>}}
+ * @returns {{aiActive: import('vue').ComputedRef<boolean>, ensureLoaded: () => Promise<void>, refresh: () => Promise<void>}}
  */
 export function useIntegrations () {
   const api = useApi()
@@ -23,7 +29,8 @@ export function useIntegrations () {
     try {
       const ai = await api.get('/settings/ai/status')
       aiConfigured.value = !!ai.configured
-    } catch { aiConfigured.value = false }
+      aiOn.value = !!ai.enabled
+    } catch { aiConfigured.value = false; aiOn.value = false }
   }
 
   /** Load the status once (shared across all callers); cheap to call on mount. */
@@ -32,5 +39,5 @@ export function useIntegrations () {
     return inflight
   }
 
-  return { aiConfigured, ensureLoaded, refresh }
+  return { aiActive, ensureLoaded, refresh }
 }

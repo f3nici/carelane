@@ -69,6 +69,7 @@ const defaultSettings = {
   brand_accent_color: '#14b8a6',
   default_price_region: config.defaultPriceRegion,
   public_api_enabled: config.publicApiEnabled,
+  claude_enabled: 1,
   claude_model_cheap: config.claudeModelCheap,
   claude_model_quality: config.claudeModelQuality,
   ai_tone: 'professional, warm, person-centred',

@@ -156,6 +156,12 @@ API docs at `/api/docs`, health at `/healthz`.
 - AI: Haiku for cheap tasks (note cleanup, condensing), Sonnet for agreements/
   reports/Q&A. Stable system block uses prompt caching. Inputs are minimised
   (preferred name/initials, bullets, top-k chunks). Usage logged per call.
+  Drafting is operator-toggleable (`claude_enabled` setting, default on): when
+  off, the draft/ask services refuse (`AI_DISABLED`) and the SPA hides every AI
+  tip/panel (estimated-token hints, "used for the AI draft" notes, the
+  Knowledge "Ask Claude" mode) — gated app-wide via `useIntegrations`. Optional
+  integrations (Claude, Google Calendar, Square, ntfy) each show a uniform
+  On / Off / Not configured status tag in Settings.
 
 ## Hard rules
 - Never hard-delete regulated records (clients, agreements, shifts, reports,

@@ -14,7 +14,7 @@ const api = useApi()
 const route = useRoute()
 const router = useRouter()
 const toast = useToastStore()
-const { aiConfigured, ensureLoaded } = useIntegrations()
+const { aiActive, ensureLoaded } = useIntegrations()
 const id = computed(() => route.params.id)
 
 const clients = ref([])
@@ -206,7 +206,7 @@ async function uploadSignedCopy (event) {
 
     <AgreementQuestionnaire v-if="!signed" v-model="questionnaire" :client="selectedClient" />
 
-    <div v-if="aiConfigured && id && !signed && templates.length" class="card">
+    <div v-if="aiActive && id && !signed && templates.length" class="card">
       <label class="label">Template</label>
       <select v-model="templateId" class="input max-w-md">
         <option value="">Automatic (default template)</option>
@@ -216,7 +216,7 @@ async function uploadSignedCopy (event) {
     </div>
 
     <AiDraftPanel
-      v-if="aiConfigured && id && !signed"
+      v-if="aiActive && id && !signed"
       :input-text="JSON.stringify(draftQuestionnaire)"
       :estimate-endpoint="id ? `/agreements/${id}/draft/estimate` : ''"
       :estimate-payload="{ questionnaire: draftQuestionnaire, template_id: templateId ? Number(templateId) : undefined }"

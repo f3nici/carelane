@@ -1,11 +1,13 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useApi } from '../composables/useApi.js'
+import { useIntegrations } from '../composables/useIntegrations.js'
 import { useToastStore } from '../stores/toast.js'
 import KnowledgeSearch from '../components/KnowledgeSearch.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 
 const api = useApi()
+const { aiActive, ensureLoaded } = useIntegrations()
 const toast = useToastStore()
 const documents = ref([])
 const title = ref('')
@@ -18,7 +20,7 @@ async function load () {
   documents.value = res.data
 }
 
-onMounted(load)
+onMounted(() => { load(); ensureLoaded() })
 
 async function upload (event) {
   const file = event.target.files?.[0]
@@ -56,7 +58,7 @@ async function remove (id) {
 <template>
   <div class="space-y-6">
     <h1 class="text-2xl font-semibold">Knowledge base</h1>
-    <p class="text-sm text-mid max-w-2xl">Upload NDIS guidelines and policy PDFs. They are chunked and embedded <strong>locally</strong> for instant semantic search, and used as grounding context for AI drafting.</p>
+    <p class="text-sm text-mid max-w-2xl">Upload NDIS guidelines and policy PDFs. They are chunked and embedded <strong>locally</strong> for instant semantic search{{ aiActive ? ', and used as grounding context for AI drafting' : '' }}.</p>
 
     <div class="card flex flex-wrap items-end gap-3">
       <div><label class="label">Title</label><input v-model="title" class="input w-64" placeholder="e.g. NDIS Pricing Arrangements 2025-26" /></div>

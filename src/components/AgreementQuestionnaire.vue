@@ -1,6 +1,7 @@
 <script setup>
-import { reactive, watch } from 'vue'
+import { reactive, watch, onMounted } from 'vue'
 import { useApi } from '../composables/useApi.js'
+import { useIntegrations } from '../composables/useIntegrations.js'
 
 const props = defineProps({
   modelValue: { type: Object, default: () => ({}) },
@@ -9,6 +10,8 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue'])
 
 const api = useApi()
+const { aiActive, ensureLoaded } = useIntegrations()
+onMounted(ensureLoaded)
 // Remember the last auto-generated supports text so we only refresh it while the
 // operator hasn't hand-edited the field.
 let lastAutoFill = ''
@@ -74,7 +77,8 @@ const fields = [
 <template>
   <div class="card">
     <h3 class="font-semibold mb-1">Intake questionnaire</h3>
-    <p class="text-xs text-mid mb-4">These answers (and only these) are sent to Claude to draft the agreement.</p>
+    <p v-if="aiActive" class="text-xs text-mid mb-4">These answers (and only these) are sent to Claude to draft the agreement.</p>
+    <p v-else class="text-xs text-mid mb-4">Structured intake details for this participant's service agreement.</p>
     <div class="grid sm:grid-cols-2 gap-4">
       <div v-for="f in fields" :key="f.key" :class="f.type === 'textarea' ? 'sm:col-span-2' : ''">
         <label class="label">{{ f.label }}</label>
