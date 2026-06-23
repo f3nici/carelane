@@ -9,6 +9,7 @@ import { requireAdmin } from '../middleware/auth.js'
 import { getSettings, updateSettings, getSetting } from '../services/settingsService.js'
 import { logActivity } from '../services/activityService.js'
 import { runBackup, listBackups, verifyBackup, backupFreshness } from '../services/backupService.js'
+import { aiStatus, testConnection as testAiConnection } from '../services/aiService.js'
 import { sniffFileType } from '../utils/fileType.js'
 import { ok } from '../utils/pagination.js'
 import { ApiError } from '../middleware/errorHandler.js'
@@ -43,6 +44,28 @@ router.put('/', requireAdmin, validate(settingsSchema), (req, res) => {
   const updated = updateSettings(req.body)
   logActivity('settings', null, req.session.userId, 'updated', { keys: Object.keys(req.body).join(',') })
   res.json(ok(updated))
+})
+
+/**
+ * @openapi
+ * /settings/ai/status:
+ *   get: { tags: [Settings], summary: Claude API configuration + active model ids }
+ */
+router.get('/ai/status', (req, res) => {
+  res.json(ok(aiStatus()))
+})
+
+/**
+ * @openapi
+ * /settings/ai/test:
+ *   post: { tags: [Settings], summary: Test connectivity to the Claude API (admin only) }
+ */
+router.post('/ai/test', requireAdmin, async (req, res, next) => {
+  try {
+    const result = await testAiConnection()
+    logActivity('settings', null, req.session.userId, 'ai_test', { ok: result.ok ? 1 : 0 })
+    res.json(ok(result))
+  } catch (err) { next(err) }
 })
 
 /**

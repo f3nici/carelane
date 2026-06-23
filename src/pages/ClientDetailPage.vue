@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useApi } from '../composables/useApi.js'
 import { useToastStore } from '../stores/toast.js'
@@ -14,7 +14,10 @@ const api = useApi()
 const route = useRoute()
 const router = useRouter()
 const toast = useToastStore()
-const id = route.params.id
+// Reactive so navigating straight from one participant to another (e.g. via the
+// global quick-switcher while already on a detail page) reloads instead of
+// showing the previous client until a manual refresh.
+const id = computed(() => route.params.id)
 
 const client = ref(null)
 const agreements = ref([])
@@ -28,12 +31,15 @@ const medicationCount = ref(0)
 const confirmDelete = ref(false)
 const tab = ref('overview')
 
-onMounted(async () => {
+async function load () {
+  // Reset so a slow load on a new participant never flashes the previous one.
+  client.value = null
+  tab.value = 'overview'
   const [c, a, s, b, all] = await Promise.all([
-    api.get(`/clients/${id}`),
-    api.get(`/clients/${id}/agreements`, { per_page: 10 }),
-    api.get(`/clients/${id}/shifts`, { per_page: 10 }),
-    api.get(`/clients/${id}/billing-codes`),
+    api.get(`/clients/${id.value}`),
+    api.get(`/clients/${id.value}/agreements`, { per_page: 10 }),
+    api.get(`/clients/${id.value}/shifts`, { per_page: 10 }),
+    api.get(`/clients/${id.value}/billing-codes`),
     api.get('/billing-codes', { active: 'true', per_page: 100 })
   ])
   client.value = c.data
@@ -41,20 +47,23 @@ onMounted(async () => {
   shifts.value = s.data
   billingCodes.value = b.data
   allCodes.value = all.data
-})
+}
+
+onMounted(load)
+watch(id, load)
 
 async function addCode (event) {
   const codeId = Number(event.target.value)
   if (!codeId) return
   event.target.value = ''
   const codes = [...billingCodes.value.map(c => ({ billing_code_id: c.id, custom_rate: c.custom_rate })), { billing_code_id: codeId }]
-  const res = await api.put(`/clients/${id}/billing-codes`, { codes })
+  const res = await api.put(`/clients/${id.value}/billing-codes`, { codes })
   billingCodes.value = res.data
 }
 
 async function removeCode (codeId) {
   const codes = billingCodes.value.filter(c => c.id !== codeId).map(c => ({ billing_code_id: c.id, custom_rate: c.custom_rate }))
-  const res = await api.put(`/clients/${id}/billing-codes`, { codes })
+  const res = await api.put(`/clients/${id.value}/billing-codes`, { codes })
   billingCodes.value = res.data
 }
 
@@ -64,20 +73,20 @@ async function saveRates () {
     billing_code_id: c.id,
     custom_rate: c.custom_rate === '' || c.custom_rate == null ? null : Number(c.custom_rate)
   }))
-  const res = await api.put(`/clients/${id}/billing-codes`, { codes })
+  const res = await api.put(`/clients/${id.value}/billing-codes`, { codes })
   billingCodes.value = res.data
   toast.push('Rates saved', 'success')
 }
 
 async function remove () {
-  await api.del(`/clients/${id}`)
+  await api.del(`/clients/${id.value}`)
   toast.push('Client archived (soft-deleted for record retention)', 'success')
   router.push('/clients')
 }
 
 /** Download everything held for this participant as a zip (PDF summary + JSON). */
 function exportData () {
-  window.open(`/api/v1/clients/${id}/export.zip`, '_blank')
+  window.open(`/api/v1/clients/${id.value}/export.zip`, '_blank')
 }
 
 const tabs = [
@@ -206,19 +215,19 @@ const tabs = [
     </div>
 
     <div v-show="tab === 'goals'">
-      <ClientGoals :client-id="id" @count="goalCount = $event" />
+      <ClientGoals :key="id" :client-id="id" @count="goalCount = $event" />
     </div>
 
     <div v-show="tab === 'documents'">
-      <ClientDocuments :client-id="id" @count="documentCount = $event" />
+      <ClientDocuments :key="id" :client-id="id" @count="documentCount = $event" />
     </div>
 
     <div v-show="tab === 'medications'">
-      <ClientMedications :client-id="id" @count="medicationCount = $event" />
+      <ClientMedications :key="id" :client-id="id" @count="medicationCount = $event" />
     </div>
 
     <div v-show="tab === 'restrictive'">
-      <ClientRestrictivePractices :client-id="id" @count="restrictiveCount = $event" />
+      <ClientRestrictivePractices :key="id" :client-id="id" @count="restrictiveCount = $event" />
     </div>
 
     <ConfirmDialog

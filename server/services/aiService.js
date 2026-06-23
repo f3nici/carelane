@@ -291,6 +291,41 @@ export async function estimateAgreementTokens (input) {
 }
 
 /**
+ * Whether the Claude API is configured (the key is an env secret, never stored)
+ * plus the currently-active model ids. Powers the Settings integration card.
+ * @returns {{configured:boolean, model_cheap:string, model_quality:string}}
+ */
+export function aiStatus () {
+  return {
+    configured: !!config.anthropicApiKey,
+    model_cheap: cheapModel(),
+    model_quality: qualityModel()
+  }
+}
+
+/**
+ * Lightweight connectivity check for the Claude API: send a tiny prompt to the
+ * cheap model and report whether the configured key + model are reachable.
+ * Backs the Settings "Test connection" button. Never stores anything; the
+ * request is intentionally minimal (a few tokens) to keep it ~free.
+ * @returns {Promise<{ok:boolean, model?:string, error?:string}>}
+ */
+export async function testConnection () {
+  if (!config.anthropicApiKey) return { ok: false, error: 'ANTHROPIC_API_KEY is not configured' }
+  const model = cheapModel()
+  try {
+    await getClient().messages.create({
+      model,
+      max_tokens: 4,
+      messages: [{ role: 'user', content: 'Reply with the single word: ok' }]
+    })
+    return { ok: true, model }
+  } catch (err) {
+    return { ok: false, model, error: err?.message || 'Request failed' }
+  }
+}
+
+/**
  * Grounded guideline Q&A (Sonnet): retrieve top-k chunks locally, answer with
  * citations (document title + page). Read-only helper.
  * @param {string} question

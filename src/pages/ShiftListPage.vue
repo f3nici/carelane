@@ -1,14 +1,23 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useApi } from '../composables/useApi.js'
 import StatusBadge from '../components/StatusBadge.vue'
 
 const api = useApi()
+const route = useRoute()
 const shifts = ref([])
 const meta = ref({})
 const page = ref(1)
-const filter = ref('all')
+// Allow deep-linking a filter (e.g. the dashboard "Unbilled shifts" tile).
+const filter = ref(['all', 'incidents', 'unbilled'].includes(route.query.filter) ? route.query.filter : 'all')
 const showArchived = ref(false)
+
+// Incidents live as a sibling tab of the shift notes list, not a sidebar item.
+const noteTabs = [
+  { to: '/shifts', label: 'Notes' },
+  { to: '/incidents', label: 'Incidents' }
+]
 
 async function load () {
   const params = { page: page.value, per_page: 20 }
@@ -26,6 +35,15 @@ onMounted(load)
 
 <template>
   <div class="space-y-4">
+    <div class="flex gap-1 border-b border-white/10 overflow-x-auto">
+      <router-link
+        v-for="t in noteTabs"
+        :key="t.to"
+        :to="t.to"
+        class="px-4 py-2 text-sm border-b-2 -mb-px whitespace-nowrap transition-colors"
+        :class="route.path.startsWith(t.to) ? 'border-primary text-white' : 'border-transparent text-mid hover:text-white'"
+      >{{ t.label }}</router-link>
+    </div>
     <div class="flex flex-wrap items-center justify-between gap-3">
       <h1 class="text-2xl font-semibold">Shift notes</h1>
       <router-link to="/shifts/new" class="btn-primary">+ New shift note</router-link>
