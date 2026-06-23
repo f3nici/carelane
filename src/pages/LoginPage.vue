@@ -2,6 +2,7 @@
 import { ref, nextTick, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
+import BrandLogo from '../components/BrandLogo.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -69,12 +70,9 @@ async function signInWithPasskey () {
 <template>
   <div class="min-h-screen flex items-center justify-center p-4">
     <div class="card w-full max-w-sm">
-      <div class="flex items-center gap-2 mb-6">
-        <img src="/icon.svg" alt="CareLane" class="h-10 w-10" />
-        <div>
-          <h1 class="font-heading text-xl font-semibold">CareLane</h1>
-          <p class="text-xs text-mid">NDIS support worker management</p>
-        </div>
+      <div class="mb-6">
+        <BrandLogo size="md" tags class="mb-3" />
+        <p class="text-xs text-mid">NDIS support worker management</p>
       </div>
       <form class="space-y-4" @submit.prevent="submit">
         <div>
