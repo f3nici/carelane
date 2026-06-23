@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useApi } from '../composables/useApi.js'
+import { useIntegrations } from '../composables/useIntegrations.js'
 import { useToastStore } from '../stores/toast.js'
 import AgreementQuestionnaire from '../components/AgreementQuestionnaire.vue'
 import AgreementEditor from '../components/AgreementEditor.vue'
@@ -13,6 +14,7 @@ const api = useApi()
 const route = useRoute()
 const router = useRouter()
 const toast = useToastStore()
+const { aiConfigured, ensureLoaded } = useIntegrations()
 const id = computed(() => route.params.id)
 
 const clients = ref([])
@@ -45,6 +47,7 @@ const draftQuestionnaire = computed(() => ({
 }))
 
 onMounted(async () => {
+  ensureLoaded()
   const c = await api.get('/clients', { active: 'true', per_page: 100 })
   clients.value = c.data
   try {
@@ -203,7 +206,7 @@ async function uploadSignedCopy (event) {
 
     <AgreementQuestionnaire v-if="!signed" v-model="questionnaire" :client="selectedClient" />
 
-    <div v-if="id && !signed && templates.length" class="card">
+    <div v-if="aiConfigured && id && !signed && templates.length" class="card">
       <label class="label">Template</label>
       <select v-model="templateId" class="input max-w-md">
         <option value="">Automatic (default template)</option>
@@ -213,7 +216,7 @@ async function uploadSignedCopy (event) {
     </div>
 
     <AiDraftPanel
-      v-if="id && !signed"
+      v-if="aiConfigured && id && !signed"
       :input-text="JSON.stringify(draftQuestionnaire)"
       :estimate-endpoint="id ? `/agreements/${id}/draft/estimate` : ''"
       :estimate-payload="{ questionnaire: draftQuestionnaire, template_id: templateId ? Number(templateId) : undefined }"

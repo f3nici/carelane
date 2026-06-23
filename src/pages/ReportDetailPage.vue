@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useApi } from '../composables/useApi.js'
+import { useIntegrations } from '../composables/useIntegrations.js'
 import { useToastStore } from '../stores/toast.js'
 import ReportBuilder from '../components/ReportBuilder.vue'
 import AgreementEditor from '../components/AgreementEditor.vue'
@@ -13,6 +14,7 @@ const api = useApi()
 const route = useRoute()
 const router = useRouter()
 const toast = useToastStore()
+const { aiConfigured, ensureLoaded } = useIntegrations()
 const id = computed(() => route.params.id)
 
 const clients = ref([])
@@ -28,6 +30,7 @@ const confirmFinalise = ref(false)
 const isFinal = computed(() => report.value.status === 'final')
 
 onMounted(async () => {
+  ensureLoaded()
   const c = await api.get('/clients', { active: 'true', per_page: 100 })
   clients.value = c.data
   try {
@@ -141,7 +144,7 @@ async function uploadFinalCopy (event) {
 
     <ReportBuilder v-model="setup" :clients="clients" :locked="isFinal" />
 
-    <div v-if="id && !isFinal && templates.length" class="card">
+    <div v-if="aiConfigured && id && !isFinal && templates.length" class="card">
       <label class="label">Template</label>
       <select v-model="templateId" class="input max-w-md">
         <option value="">Automatic (default for report type)</option>
@@ -151,7 +154,7 @@ async function uploadFinalCopy (event) {
     </div>
 
     <AiDraftPanel
-      v-if="id && !isFinal"
+      v-if="aiConfigured && id && !isFinal"
       :input-text="`${setup.period_start || ''} ${setup.period_end || ''}`"
       :estimate-endpoint="id ? `/reports/${id}/draft/estimate` : ''"
       :estimate-payload="{ period_start: setup.period_start, period_end: setup.period_end, template_id: templateId ? Number(templateId) : undefined }"

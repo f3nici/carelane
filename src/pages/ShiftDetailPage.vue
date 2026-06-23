@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useApi } from '../composables/useApi.js'
+import { useIntegrations } from '../composables/useIntegrations.js'
 import { useToastStore } from '../stores/toast.js'
 import { useOfflineStore } from '../stores/offline.js'
 import ShiftNoteEditor from '../components/ShiftNoteEditor.vue'
@@ -15,6 +16,7 @@ const route = useRoute()
 const router = useRouter()
 const toast = useToastStore()
 const offline = useOfflineStore()
+const { aiConfigured, ensureLoaded } = useIntegrations()
 const id = computed(() => route.params.id)
 
 const shift = ref({})
@@ -37,6 +39,7 @@ onMounted(async () => {
     clients.value = offline.clients
     return
   }
+  ensureLoaded()
   try {
     const c = await api.get('/clients', { active: 'true', per_page: 100 })
     clients.value = c.data
@@ -224,7 +227,7 @@ async function draft () {
     </div>
 
     <AiDraftPanel
-      v-if="!shift.finalised"
+      v-if="aiConfigured && !shift.finalised"
       :input-text="editor?.form?.support_provided || ''"
       :estimate-endpoint="id ? `/shifts/${id}/draft/estimate` : ''"
       :estimate-payload="{ bullets: editor?.form?.support_provided || '' }"
@@ -255,7 +258,7 @@ async function draft () {
       </template>
     </div>
 
-    <div v-if="id && shift.finalised && squareStatus && squareStatus.configured" class="card space-y-3">
+    <div v-if="id && shift.finalised && squareStatus && (squareStatus.enabled || invoice)" class="card space-y-3">
       <div class="flex items-center justify-between gap-3">
         <h3 class="font-semibold">Square invoice</h3>
         <span v-if="invoice" class="pill bg-success/15 text-success">{{ invoice.status || 'DRAFT' }}</span>
@@ -284,10 +287,9 @@ async function draft () {
         </p>
         <button
           class="btn-primary"
-          :disabled="invoicing || !squareStatus.enabled"
+          :disabled="invoicing"
           @click="generateInvoice"
         >{{ invoicing ? 'Creating…' : 'Create draft invoice in Square' }}</button>
-        <p v-if="!squareStatus.enabled" class="text-xs text-warning">Enable Square invoicing in Settings first.</p>
       </template>
     </div>
 
