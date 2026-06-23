@@ -27,9 +27,11 @@ export function useIntegrations () {
   /** Fetch the latest integration status from the server. */
   async function refresh () {
     try {
+      // api.get() returns the { success, data, meta } envelope — the status
+      // fields live under `.data`.
       const ai = await api.get('/settings/ai/status')
-      aiConfigured.value = !!ai.configured
-      aiOn.value = !!ai.enabled
+      aiConfigured.value = !!ai.data?.configured
+      aiOn.value = !!ai.data?.enabled
     } catch { aiConfigured.value = false; aiOn.value = false }
   }
 
