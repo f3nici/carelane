@@ -23,6 +23,7 @@ const clientId = ref(null)
 const status = ref('draft')
 const startDate = ref('')
 const endDate = ref('')
+const reviewDate = ref('')
 const questionnaire = ref({})
 const body = ref('')
 const agreement = ref({})
@@ -32,6 +33,16 @@ const confirmSign = ref(false)
 
 const selectedClient = computed(() => clients.value.find(c => c.id === Number(clientId.value)) || null)
 const signed = computed(() => !!agreement.value.signed_by_client)
+
+// The agreement's dates live in one place (the top card). They are folded into
+// the questionnaire object sent to Claude so the drafted clauses reference them,
+// and persisted in questionnaire_json (review_date has no dedicated column).
+const draftQuestionnaire = computed(() => ({
+  ...questionnaire.value,
+  start_date: startDate.value || null,
+  end_date: endDate.value || null,
+  review_date: reviewDate.value || null
+}))
 
 onMounted(async () => {
   const c = await api.get('/clients', { active: 'true', per_page: 100 })
@@ -56,6 +67,7 @@ function setFrom (a) {
   status.value = a.status
   startDate.value = a.start_date || ''
   endDate.value = a.end_date || ''
+  reviewDate.value = a.review_date || ''
   body.value = a.body_markdown || ''
   try { questionnaire.value = a.questionnaire_json ? JSON.parse(a.questionnaire_json) : {} } catch { questionnaire.value = {} }
 }
@@ -65,9 +77,10 @@ function payload () {
     client_id: Number(clientId.value),
     title: title.value || `Service agreement — ${selectedClient.value?.preferred_name || ''}`.trim(),
     status: status.value,
-    start_date: startDate.value || questionnaire.value.start_date || null,
-    end_date: endDate.value || questionnaire.value.end_date || null,
-    questionnaire_json: questionnaire.value,
+    start_date: startDate.value || null,
+    end_date: endDate.value || null,
+    review_date: reviewDate.value || null,
+    questionnaire_json: draftQuestionnaire.value,
     body_markdown: body.value || null
   }
 }
@@ -179,8 +192,13 @@ async function uploadSignedCopy (event) {
           </select>
         </div>
         <div><label class="label">Start date</label><input v-model="startDate" type="date" class="input" :disabled="signed" /></div>
-        <div><label class="label">End date</label><input v-model="endDate" type="date" class="input" :disabled="signed" /></div>
+        <div>
+          <label class="label">End date <span class="text-mid font-normal">(optional)</span></label>
+          <input v-model="endDate" type="date" class="input" :disabled="signed" />
+        </div>
+        <div><label class="label">Review date</label><input v-model="reviewDate" type="date" class="input" :disabled="signed" /></div>
       </div>
+      <p class="text-xs text-mid mt-3">Most agreements don't have a fixed end — leave <strong>End date</strong> blank and set a <strong>Review date</strong> to revisit it instead.</p>
     </div>
 
     <AgreementQuestionnaire v-if="!signed" v-model="questionnaire" :client="selectedClient" />
@@ -196,9 +214,9 @@ async function uploadSignedCopy (event) {
 
     <AiDraftPanel
       v-if="id && !signed"
-      :input-text="JSON.stringify(questionnaire)"
+      :input-text="JSON.stringify(draftQuestionnaire)"
       :estimate-endpoint="id ? `/agreements/${id}/draft/estimate` : ''"
-      :estimate-payload="{ questionnaire, template_id: templateId ? Number(templateId) : undefined }"
+      :estimate-payload="{ questionnaire: draftQuestionnaire, template_id: templateId ? Number(templateId) : undefined }"
       :busy="drafting"
       label="Draft agreement"
       hint="Sonnet fills the selected template from your questionnaire plus relevant guideline excerpts. You review, edit and the participant signs."

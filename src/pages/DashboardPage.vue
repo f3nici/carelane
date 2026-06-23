@@ -38,14 +38,14 @@ onMounted(async () => {
 })
 
 const tiles = [
-  { key: 'active_clients', label: 'Active clients' },
-  { key: 'upcoming_shifts', label: 'Upcoming shifts' },
-  { key: 'shifts_this_month', label: 'Shifts this month' },
-  { key: 'unbilled_shifts', label: 'Unbilled shifts' },
-  { key: 'agreements_expiring', label: 'Agreements expiring (90d)' },
+  { key: 'active_clients', label: 'Active clients', to: '/clients' },
+  { key: 'upcoming_shifts', label: 'Upcoming shifts', to: '/roster' },
+  { key: 'shifts_this_month', label: 'Shifts this month', to: '/shifts' },
+  { key: 'unbilled_shifts', label: 'Unbilled shifts', to: '/shifts?filter=unbilled' },
+  { key: 'agreements_expiring', label: 'Agreements expiring/review (90d)', to: '/documents?tab=agreements' },
   { key: 'documents_expiring', label: 'Consents/docs expiring (90d)' },
-  { key: 'open_incident_reports', label: 'Incident reports open', danger: true },
-  { key: 'reportable_unreported', label: 'Reportable not yet reported', danger: true }
+  { key: 'open_incident_reports', label: 'Incident reports open', danger: true, to: '/incidents?filter=open' },
+  { key: 'reportable_unreported', label: 'Reportable not yet reported', danger: true, to: '/incidents?filter=reportable' }
 ]
 </script>
 
@@ -69,10 +69,17 @@ const tiles = [
     </router-link>
 
     <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-      <div v-for="tile in tiles" :key="tile.key" class="card !p-4">
+      <component
+        :is="tile.to ? 'router-link' : 'div'"
+        v-for="tile in tiles"
+        :key="tile.key"
+        :to="tile.to"
+        class="card !p-4 block"
+        :class="tile.to ? 'hover:border-white/20 transition-colors' : ''"
+      >
         <p class="text-2xl font-semibold" :class="tile.danger && stats[tile.key] ? 'text-danger' : ''">{{ stats[tile.key] ?? '—' }}</p>
         <p class="text-xs text-mid mt-1">{{ tile.label }}</p>
-      </div>
+      </component>
     </div>
 
     <div v-if="incidentFollowups.length" class="card border-danger/40">
@@ -120,9 +127,9 @@ const tiles = [
         <h3 class="font-semibold mb-3">Consents &amp; documents expiring</h3>
         <p v-if="!documentExpiries.length" class="text-sm text-mid">No consent forms or documents expiring in the next 90 days.</p>
         <ul class="space-y-2">
-          <li v-for="d in documentExpiries" :key="d.id" class="text-sm flex items-center justify-between gap-2">
-            <router-link :to="`/clients/${d.client_id}`" class="text-accent hover:underline truncate min-w-0">{{ d.client_display_name }} — {{ d.title }}</router-link>
-            <span class="flex items-center gap-2 whitespace-nowrap shrink-0">
+          <li v-for="d in documentExpiries" :key="d.id" class="text-sm flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
+            <router-link :to="`/clients/${d.client_id}`" class="text-accent hover:underline break-words min-w-0">{{ d.client_display_name }} — {{ d.title }}</router-link>
+            <span class="flex items-center gap-2 shrink-0">
               <span class="text-mid">{{ d.expiry_date }}</span>
               <StatusBadge v-if="d.expiry_status === 'expired'" status="expired" />
               <StatusBadge v-else-if="d.expiry_status === 'expiring'" status="expiring" />
@@ -134,12 +141,12 @@ const tiles = [
 
     <div class="grid lg:grid-cols-2 gap-6">
       <div class="card">
-        <h3 class="font-semibold mb-3">Agreements expiring soon</h3>
-        <p v-if="!agreementExpiries.length" class="text-sm text-mid">No agreements expiring in the next 90 days.</p>
+        <h3 class="font-semibold mb-3">Agreements expiring or due for review</h3>
+        <p v-if="!agreementExpiries.length" class="text-sm text-mid">No agreements expiring or due for review in the next 90 days.</p>
         <ul class="space-y-2">
           <li v-for="a in agreementExpiries" :key="a.id" class="text-sm flex items-center justify-between gap-2">
             <router-link :to="`/agreements/${a.id}`" class="text-accent hover:underline truncate min-w-0">{{ a.client_display_name }} — {{ a.title }}</router-link>
-            <span class="text-mid whitespace-nowrap shrink-0">{{ a.end_date }}</span>
+            <span class="text-mid whitespace-nowrap shrink-0">{{ a.due_date }}<span v-if="a.due_type === 'review'" class="text-xs ml-1">(review)</span></span>
           </li>
         </ul>
       </div>

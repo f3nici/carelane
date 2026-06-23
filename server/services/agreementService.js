@@ -2,10 +2,33 @@ import { sqlite } from '../db/connection.js'
 import { clientDisplayName } from './clientService.js'
 import { ApiError } from '../middleware/errorHandler.js'
 
-const COLUMNS = ['client_id', 'title', 'status', 'start_date', 'end_date', 'supports_summary',
-  'hourly_rate', 'total_budget', 'questionnaire_json', 'body_markdown']
+const COLUMNS = ['client_id', 'title', 'status', 'start_date', 'end_date', 'review_date',
+  'supports_summary', 'hourly_rate', 'total_budget', 'questionnaire_json', 'body_markdown']
 
 const now = () => new Date().toISOString()
+
+/**
+ * The date that makes an active agreement "due for attention" within a window:
+ * the soonest of its end date and review date that falls in [today, soon]. Lets
+ * an open-ended agreement (no end date) still surface on its review date, and
+ * keeps the dashboard widget and the ntfy nudge in agreement on which date and
+ * label to show. Falls back to whichever date exists when neither is in-window.
+ * @param {{end_date?:string, review_date?:string}} row
+ * @param {string} today ISO date (inclusive lower bound)
+ * @param {string} soon ISO date (inclusive upper bound)
+ * @returns {{due_date:string|null, due_type:('end'|'review'|null)}}
+ */
+export function agreementDueDate (row, today, soon) {
+  // 'review' first so it wins a same-date tie (a review is the gentler nudge).
+  const inWindow = [['review', row.review_date], ['end', row.end_date]]
+    .filter(([, d]) => d && d >= today && d <= soon)
+    .sort((a, b) => (a[1] < b[1] ? -1 : 1))
+  if (inWindow.length) return { due_date: inWindow[0][1], due_type: inWindow[0][0] }
+  return {
+    due_date: row.end_date || row.review_date || null,
+    due_type: row.end_date ? 'end' : (row.review_date ? 'review' : null)
+  }
+}
 
 /**
  * Add `client_display_name` to a list row and drop the raw joined name columns.

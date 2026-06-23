@@ -88,6 +88,7 @@ export const agreementSchema = z.object({
   status: z.enum(['draft', 'active', 'expired', 'cancelled']).default('draft'),
   start_date: isoDate.nullish(),
   end_date: isoDate.nullish(),
+  review_date: isoDate.nullish(),
   supports_summary: z.string().max(20000).nullish().transform(v => v || null),
   hourly_rate: z.number().nonnegative().nullish(),
   total_budget: z.number().nonnegative().nullish(),

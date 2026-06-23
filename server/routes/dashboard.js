@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { sqlite } from '../db/connection.js'
 import { recentActivity } from '../services/activityService.js'
 import { clientDisplayName } from '../services/clientService.js'
+import { agreementDueDate } from '../services/agreementService.js'
 import { listExpiringDocuments, countExpiringDocuments } from '../services/clientDocumentService.js'
 import { countOpenIncidents, countUnreportedReportable, listOpenIncidents } from '../services/incidentService.js'
 import { ok } from '../utils/pagination.js'
@@ -25,7 +26,10 @@ router.get('/stats', (req, res) => {
     unfinalised_notes: get('SELECT COUNT(*) AS c FROM shift_notes WHERE deleted_at IS NULL AND archived_at IS NULL AND finalised = 0').c,
     unbilled_shifts: get('SELECT COUNT(*) AS c FROM shift_notes WHERE deleted_at IS NULL AND archived_at IS NULL AND billed = 0 AND finalised = 1').c,
     open_incidents: get('SELECT COUNT(*) AS c FROM shift_notes WHERE deleted_at IS NULL AND archived_at IS NULL AND incident_flag = 1 AND follow_up_required = 1').c,
-    agreements_expiring: sqlite.prepare("SELECT COUNT(*) AS c FROM service_agreements WHERE deleted_at IS NULL AND archived_at IS NULL AND status = 'active' AND end_date IS NOT NULL AND end_date BETWEEN ? AND ?").get(today, soon).c,
+    agreements_expiring: sqlite.prepare(`SELECT COUNT(*) AS c FROM service_agreements
+      WHERE deleted_at IS NULL AND archived_at IS NULL AND status = 'active'
+        AND ((end_date IS NOT NULL AND end_date BETWEEN @today AND @soon)
+          OR (review_date IS NOT NULL AND review_date BETWEEN @today AND @soon))`).get({ today, soon }).c,
     upcoming_shifts: sqlite.prepare("SELECT COUNT(*) AS c FROM scheduled_shifts WHERE deleted_at IS NULL AND status IN ('scheduled','in_progress') AND scheduled_date >= ?").get(today).c,
     draft_reports: get('SELECT COUNT(*) AS c FROM reports WHERE deleted_at IS NULL AND archived_at IS NULL AND status = \'draft\'').c,
     documents_indexed: get('SELECT COUNT(*) AS c FROM documents WHERE indexed = 1').c,
@@ -53,20 +57,24 @@ router.get('/document-expiries', (req, res) => {
   res.json(ok(listExpiringDocuments(90)))
 })
 
-/** Active service agreements whose end_date falls in the next 90 days. */
+/** Active service agreements expiring (end date) or due for review in 90 days. */
 router.get('/agreement-expiries', (req, res) => {
   const today = new Date().toISOString().slice(0, 10)
   const soon = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
-  const rows = sqlite.prepare(`SELECT a.id, a.title, a.end_date, a.client_id,
+  const rows = sqlite.prepare(`SELECT a.id, a.title, a.end_date, a.review_date, a.client_id,
       c.preferred_name AS client_preferred_name, c.first_name AS client_first_name, c.last_name AS client_last_name
     FROM service_agreements a JOIN clients c ON c.id = a.client_id
     WHERE a.deleted_at IS NULL AND a.archived_at IS NULL AND a.status = 'active'
-      AND a.end_date IS NOT NULL AND a.end_date BETWEEN ? AND ?
-    ORDER BY a.end_date`).all(today, soon)
-  res.json(ok(rows.map(({ client_first_name, client_last_name, ...r }) => ({
+      AND ((a.end_date IS NOT NULL AND a.end_date BETWEEN @today AND @soon)
+        OR (a.review_date IS NOT NULL AND a.review_date BETWEEN @today AND @soon))`).all({ today, soon })
+  const mapped = rows.map(({ client_first_name, client_last_name, ...r }) => ({
     ...r,
+    ...agreementDueDate(r, today, soon),
     client_display_name: clientDisplayName({ first_name: client_first_name, last_name: client_last_name, preferred_name: r.client_preferred_name, id: r.client_id })
-  }))))
+  }))
+  // Soonest attention first (the triggering end/review date).
+  mapped.sort((a, b) => (a.due_date < b.due_date ? -1 : a.due_date > b.due_date ? 1 : 0))
+  res.json(ok(mapped))
 })
 
 /**

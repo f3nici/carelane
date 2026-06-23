@@ -4,6 +4,7 @@ import config from '../config.js'
 import { getSetting, updateSettings } from './settingsService.js'
 import { logActivity } from './activityService.js'
 import { clientDisplayName } from './clientService.js'
+import { agreementDueDate } from './agreementService.js'
 import { countOpenIncidents } from './incidentService.js'
 
 /**
@@ -236,17 +237,20 @@ export async function sendTest (userId = null) {
 
 /* ----------------------------- dashboard nudges ---------------------------- */
 
-/** Active service agreements whose end date (plan review) falls within the lead window. */
+/** Active service agreements whose end date or review date falls within the lead window. */
 function planReviewsDue () {
   const today = isoDate(Date.now())
   const soon = isoDate(Date.now() + num('ntfy_plan_review_days') * 86400000)
-  return sqlite.prepare(`SELECT a.title, a.end_date,
+  const rows = sqlite.prepare(`SELECT a.title, a.end_date, a.review_date,
       c.preferred_name AS client_preferred_name, c.first_name AS client_first_name,
       c.last_name AS client_last_name, c.id AS client_id
     FROM service_agreements a JOIN clients c ON c.id = a.client_id AND c.deleted_at IS NULL
     WHERE a.deleted_at IS NULL AND a.archived_at IS NULL AND a.status = 'active'
-      AND a.end_date IS NOT NULL AND a.end_date BETWEEN ? AND ?
-    ORDER BY a.end_date`).all(today, soon)
+      AND ((a.end_date IS NOT NULL AND a.end_date BETWEEN @today AND @soon)
+        OR (a.review_date IS NOT NULL AND a.review_date BETWEEN @today AND @soon))`).all({ today, soon })
+  return rows
+    .map(r => ({ ...r, ...agreementDueDate(r, today, soon) }))
+    .sort((a, b) => (a.due_date < b.due_date ? -1 : a.due_date > b.due_date ? 1 : 0))
 }
 
 /** Open/in-progress incident reports whose follow-up due date has passed. */
@@ -282,7 +286,7 @@ export function buildDigest () {
   if (bool(setting('ntfy_notify_plan_reviews'))) {
     const rows = planReviewsDue()
     if (rows.length) {
-      const names = rows.slice(0, 5).map(r => `• ${label(r)} — review by ${r.end_date}`)
+      const names = rows.slice(0, 5).map(r => `• ${label(r)} — review by ${r.due_date}`)
       if (rows.length > 5) names.push(`…and ${rows.length - 5} more`)
       out.push({
         key: 'plan_reviews',
