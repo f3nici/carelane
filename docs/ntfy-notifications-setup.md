@@ -80,13 +80,10 @@ ntfy notifications are sent over HTTPS to the ntfy server. If the server is
 so CareLane uses a **generous timeout (10 seconds by default)**. A too-tight
 timeout silently drops notifications when the round-trip is slow.
 
-Tune it with the `NTFY_TIMEOUT_MS` environment variable (milliseconds):
-
-```bash
-NTFY_TIMEOUT_MS=15000   # wait up to 15s — raise for a slow/remote server
-```
-
-The effective value is shown in the settings card so you can confirm it.
+Tune it in the **settings card** — the **Request timeout** field (milliseconds).
+Raise it (e.g. `15000` for up to 15s) for a slow or remote server; the value is
+saved with your other notification settings, so no redeploy or environment
+variable is needed.
 
 ## Self-hosting ntfy / protected topics (optional)
 
@@ -119,7 +116,6 @@ CareLane reads these from the container's environment. Forward the variables in
 ```yaml
     environment:
       # ...
-      NTFY_TIMEOUT_MS: ${NTFY_TIMEOUT_MS:-10000}
       NTFY_TOKEN: ${NTFY_TOKEN:-}
       APP_BASE_URL: ${APP_BASE_URL:-}
 ```
@@ -138,7 +134,7 @@ docker compose up -d
 | Symptom | Cause / fix |
 |---------|-------------|
 | Test push never arrives | Confirm the topic in CareLane **exactly matches** the one you subscribed to, and that your phone has the topic subscribed. Check the **Last error** banner in Settings. |
-| **"ntfy request timed out"** in the error banner | The server was too slow to respond. Raise `NTFY_TIMEOUT_MS` (e.g. `15000`) and recreate the app. |
+| **"ntfy request timed out"** in the error banner | The server was too slow to respond. Raise the **Request timeout** in the settings card (e.g. `15000`) and save. |
 | Error mentions `403` / unauthorized | The topic is access-protected or the server needs auth. Set `NTFY_TOKEN`. |
 | Digest never goes out | Check **Enable push notifications** is on, the **digest time** matches your timezone, and at least one category is toggled on with items pending (the preview counts show what would send). |
 | Shift reminders don't fire | Reminders only apply to scheduled shifts that have a **start time** and are still `scheduled`. Past or all-day shifts are skipped. |

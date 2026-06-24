@@ -59,14 +59,13 @@ Set these variables in your environment:
 ```bash
 SQUARE_ACCESS_TOKEN=EAAA...            # the access token from step 2
 SQUARE_ENVIRONMENT=sandbox             # 'sandbox' (default) or 'production'
-# SQUARE_LOCATION_ID=L0CATION1D        # optional — auto-detected on Test connection
 ```
 
 - `SQUARE_ENVIRONMENT` must match the token you pasted. A sandbox token with
   `SQUARE_ENVIRONMENT=production` (or vice-versa) will fail to authenticate.
-- `SQUARE_LOCATION_ID` is optional. CareLane auto-detects your first active
-  location the first time you click **Test connection**. Only set it if you have
-  multiple locations and want to pin a specific one.
+- The **location** is detected automatically: CareLane picks up your first active
+  location the first time you click **Test connection** in Settings and saves it —
+  there is no location environment variable to set.
 
 ### Docker Compose
 
@@ -79,7 +78,6 @@ variables:
       # ...
       SQUARE_ACCESS_TOKEN: ${SQUARE_ACCESS_TOKEN:-}
       SQUARE_ENVIRONMENT: ${SQUARE_ENVIRONMENT:-sandbox}
-      SQUARE_LOCATION_ID: ${SQUARE_LOCATION_ID:-}
 ```
 
 Put the values in the `.env` file next to `docker-compose.yml`, then **recreate**

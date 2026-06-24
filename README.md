@@ -175,8 +175,7 @@ All configuration is via environment variables (see [`.env.example`](.env.exampl
 | `NODE_ENV` | `development` or `production`. |
 | `SESSION_SECRET` | Session signing secret. **Required in production.** |
 | `ENCRYPTION_SECRET` | AES-256-GCM key material for PII. **Required in production. Cannot be rotated casually — see warning below.** |
-| `ANTHROPIC_API_KEY` | Claude API key; AI features are disabled without it. |
-| `CLAUDE_MODEL_CHEAP` / `CLAUDE_MODEL_QUALITY` | Model IDs for cheap vs. quality tasks. |
+| `ANTHROPIC_API_KEY` | Claude API key; AI features are disabled without it. (The cheap/quality model IDs are set in-app under **Settings → AI**, not via env.) |
 | `DEFAULT_USERNAME` / `DEFAULT_PASSWORD` | Seeded admin login. |
 | `DB_PATH` | SQLite database file path. |
 | `UPLOAD_PATH` / `MAX_UPLOAD_SIZE` | Upload directory and per-file size cap (bytes). |
@@ -187,14 +186,14 @@ All configuration is via environment variables (see [`.env.example`](.env.exampl
 | `DEFAULT_PRICE_REGION` | NDIS price region for billing. |
 | `BACKUP_ENABLED` / `BACKUP_PATH` / `BACKUP_RETENTION` / `BACKUP_TIME` / `BACKUP_STALE_HOURS` | Scheduled backup settings and the stale-backup startup-warning threshold. |
 | `LOGIN_MAX_ATTEMPTS` / `LOGIN_WINDOW_MINUTES` | Brute-force throttle: failed-attempt ceiling and window. |
-| `LOG_LEVEL` / `LOG_FORMAT` | Log verbosity (`debug`/`info`/`warn`/`error`) and format (`json` for shippers; defaults to json in production). |
-| `METRICS_ENABLED` / `METRICS_TOKEN` | Opt-in Prometheus scrape at `/metrics`; when a token is set it is required (Bearer or `?token=`). |
+| `LOG_LEVEL` / `LOG_FORMAT` | Log verbosity (`debug`/`info`/`warn`/`error`) and format: `pretty` (readable, aligned lines — the docker-compose default) or `json` (one object per line, for log shippers; the default when `NODE_ENV=production` and `LOG_FORMAT` is unset). |
+| `METRICS_ENABLED` / `METRICS_TOKEN` | Opt-in Prometheus scrape at `/metrics`; when a token is set it is required (Bearer or `?token=`). See the [metrics setup guide](docs/metrics-setup.md). |
 | `WEBAUTHN_RP_ID` / `WEBAUTHN_ORIGIN` | Pin the passkey relying-party id/origin. Auto-derived from the request when blank (correct for same-origin); set both behind a Host-rewriting proxy. |
 | `PUBLIC_API_ENABLED` | Toggle for the public API surface. |
 | `CORS_ORIGINS` | Allowed CORS origins (comma-separated). |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_REDIRECT_URI` | Optional one-way Google Calendar sync. See the [Google Calendar setup guide](docs/google-calendar-setup.md). |
-| `SQUARE_ACCESS_TOKEN` / `SQUARE_ENVIRONMENT` / `SQUARE_LOCATION_ID` | Optional Square draft-invoicing. See the [Square invoicing setup guide](docs/square-invoicing-setup.md). |
-| `NTFY_TOKEN` / `NTFY_TIMEOUT_MS` / `APP_BASE_URL` | Optional ntfy push notifications (topic/toggles/timings are set in-app). Token is only for a protected/self-hosted server; the timeout defaults to a generous 10s for slow/remote servers. See the [ntfy setup guide](docs/ntfy-notifications-setup.md). |
+| `SQUARE_ACCESS_TOKEN` / `SQUARE_ENVIRONMENT` | Optional Square draft-invoicing. The location is auto-detected on the first "Test connection" in Settings. See the [Square invoicing setup guide](docs/square-invoicing-setup.md). |
+| `NTFY_TOKEN` / `APP_BASE_URL` | Optional ntfy push notifications (topic/toggles/timings/request-timeout are all set in-app). Token is only for a protected/self-hosted server. See the [ntfy setup guide](docs/ntfy-notifications-setup.md). |
 
 > ⚠️ **`ENCRYPTION_SECRET` cannot be rotated casually.** Once data is encrypted
 > with it, changing it makes all existing PII unreadable. Back it up securely.

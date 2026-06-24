@@ -25,7 +25,8 @@ const SETTING_KEYS = {
   digest_time: 'ntfy_digest_time',
   plan_review_days: 'ntfy_plan_review_days',
   unbilled_days: 'ntfy_unbilled_days',
-  shift_reminder_minutes: 'ntfy_shift_reminder_minutes'
+  shift_reminder_minutes: 'ntfy_shift_reminder_minutes',
+  timeout_ms: 'ntfy_timeout_ms'
 }
 
 /**

@@ -80,10 +80,10 @@ API docs at `/api/docs`, health at `/healthz`.
   plus per-shift **reminders** a configurable lead time before a scheduled shift
   starts (deduped via `scheduled_shifts.reminder_sent_at`). All sync is
   best-effort and a no-op until a topic is set + enabled. Server URL, topic,
-  per-category toggles and timings are operator-editable settings (`ntfy_*`,
-  defaults in `NTFY_DEFAULTS`, dedicated `/notifications` endpoints); only the
-  optional access token (`NTFY_TOKEN`) and the request timeout (`NTFY_TIMEOUT_MS`,
-  default 10s — generous so a slow/remote server isn't cut off) come from env. A
+  per-category toggles, the request timeout (`ntfy_timeout_ms`, default 10s —
+  generous so a slow/remote server isn't cut off) and timings are operator-editable
+  settings (`ntfy_*`, defaults in `NTFY_DEFAULTS`, dedicated `/notifications`
+  endpoints); only the optional access token (`NTFY_TOKEN`) comes from env. A
   single `* * * * *` cron drives both the reminder sweep and the digest, using the
   operator timezone (shared `google_calendar_timezone`). Messages carry only short
   labels + counts, never plan/health notes. See `docs/ntfy-notifications-setup.md`.
@@ -192,11 +192,15 @@ API docs at `/api/docs`, health at `/healthz`.
   lists their sessions and revokes any remotely (`GET /auth/sessions`,
   `DELETE /auth/sessions/:sid`, `POST /auth/sessions/revoke-others`). Ownership
   is verified before a session id can be revoked.
-- Observability: structured logging (`logger.js`, JSON in prod via `LOG_FORMAT`)
-  with an access log recording method/route/status/duration only (never query
-  strings or bodies). Optional Prometheus scrape at `GET /metrics`
+- Observability: structured logging (`logger.js`) with an access log recording
+  method/route/status/duration only (never query strings or bodies). `LOG_FORMAT`
+  picks the renderer: `pretty` (readable, aligned single lines — the request log
+  gets a dedicated `<time> <LEVEL> <METHOD> <status> <path> <ms>` layout; the
+  docker-compose default) or `json` (one object per line for shippers; the prod
+  default when unset). Optional Prometheus scrape at `GET /metrics`
   (`METRICS_ENABLED`/`METRICS_TOKEN`) exposing HTTP counters/latency + app
-  gauges; mounted before the auth stack like `/healthz`.
+  gauges; mounted before the auth stack like `/healthz`. See
+  `docs/metrics-setup.md`.
 - Passkeys (WebAuthn) are a passwordless login factor (`passkeyService.js`,
   `@simplewebauthn`). Each authenticator is a `webauthn_credentials` row; public
   keys are non-secret (not encrypted) and the in-flight challenge lives on the

@@ -30,9 +30,30 @@ function emit (level, msg, fields) {
     process.stdout.write(line + '\n')
     return
   }
-  const extra = fields && Object.keys(fields).length ? ' ' + compact(fields) : ''
-  const out = `${ts} ${level.toUpperCase().padEnd(5)} ${msg}${extra}`
+  const out = pretty(ts, level, msg, fields)
   ;(level === 'error' ? process.stderr : process.stdout).write(out + '\n')
+}
+
+// Wall-clock part of an ISO timestamp ("01:22:23.935") — the date is usually
+// obvious from context and just adds noise on every line when scanning by eye.
+const clock = ts => ts.slice(11, 23)
+
+/**
+ * Human-readable single line for the pretty (non-JSON) formatter. The HTTP
+ * access log is by far the highest-volume message, so it gets a dedicated
+ * aligned layout — `<time> <LEVEL> <METHOD> <status> <path> <ms>` — that reads
+ * like a familiar access log instead of a string of `key=value` pairs. Every
+ * other message falls back to `<time> <LEVEL> <msg> key=value …`.
+ */
+function pretty (ts, level, msg, fields) {
+  const lvl = level.toUpperCase().padEnd(5)
+  if (msg === 'request' && fields) {
+    const { method, path, status, ms, ...rest } = fields
+    const tail = Object.keys(rest).length ? '  ' + compact(rest) : ''
+    return `${clock(ts)} ${lvl} ${String(method).padEnd(6)} ${status} ${path} ${ms}ms${tail}`
+  }
+  const extra = fields && Object.keys(fields).length ? '  ' + compact(fields) : ''
+  return `${clock(ts)} ${lvl} ${msg}${extra}`
 }
 
 /** Render fields as `k=v` pairs for the pretty (non-JSON) formatter. */

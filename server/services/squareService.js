@@ -37,9 +37,10 @@ export function isConfigured () {
   return !!config.squareAccessToken
 }
 
-/** Pinned/auto-detected Square location id used for orders + invoices. */
+/** Auto-detected Square location id used for orders + invoices. Stored in
+ * settings on the first "Test connection"; no env var is involved. */
 function configuredLocationId () {
-  return getSetting('square_location_id', config.squareLocationId || null)
+  return getSetting('square_location_id', null)
 }
 
 /** Currency for money amounts (matches the Square location). */
