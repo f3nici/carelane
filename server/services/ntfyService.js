@@ -215,12 +215,12 @@ export async function publish ({ title, message, tags, priority, click } = {}) {
     updateSettings({ ntfy_last_sent_at: new Date().toISOString(), ntfy_last_error: null })
     return { ok: true }
   } catch (err) {
-    const message = err.name === 'AbortError'
+    const errorMessage = err.name === 'AbortError'
       ? `ntfy request timed out after ${requestTimeout}ms — raise the request timeout in Settings if your server is slow/remote`
       : String(err.message || err).slice(0, 200)
-    logActivity('ntfy', null, null, 'send_failed', { error: message.slice(0, 120) })
-    recordError(message)
-    return { ok: false, error: message }
+    logActivity('ntfy', null, null, 'send_failed', { error: errorMessage.slice(0, 120) })
+    recordError(errorMessage)
+    return { ok: false, error: errorMessage }
   } finally {
     clearTimeout(timer)
   }

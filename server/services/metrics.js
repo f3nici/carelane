@@ -55,8 +55,8 @@ function esc (v) {
 }
 
 /** Single COUNT(*) helper that degrades to null if the table is absent. */
-function count (sql) {
-  try { return sqlite.prepare(sql).get().c } catch { return null }
+function count (sql, ...params) {
+  try { return sqlite.prepare(sql).get(...params).c } catch { return null }
 }
 
 /**
@@ -75,7 +75,7 @@ function appGauges () {
     { name: 'users_2fa_enabled', help: 'User accounts with TOTP enabled', value: count('SELECT COUNT(*) AS c FROM users WHERE totp_enabled = 1') },
     { name: 'audit_log_entries', help: 'Append-only audit log rows', value: count('SELECT COUNT(*) AS c FROM activity_log') },
     { name: 'active_sessions', help: 'Unexpired login sessions', value: count("SELECT COUNT(*) AS c FROM sessions WHERE datetime('now') < datetime(expire)") },
-    { name: 'throttle_locked_keys', help: 'Login/rate-limit keys currently locked out', value: count(`SELECT COUNT(*) AS c FROM throttle_hits WHERE locked_until > ${Date.now()}`) }
+    { name: 'throttle_locked_keys', help: 'Login/rate-limit keys currently locked out', value: count('SELECT COUNT(*) AS c FROM throttle_hits WHERE locked_until > ?', Date.now()) }
   ]
   return gauges.filter(g => g.value !== null)
 }

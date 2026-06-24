@@ -92,7 +92,11 @@ router.post('/ask', askLimiter, validate(askSchema), async (req, res, next) => {
 router.get('/:id/file', (req, res, next) => {
   try {
     const doc = documentService.getDocument(Number(req.params.id))
-    res.download(path.join(DOC_DIR, doc.filename), sanitizeDownloadName(doc.original_name, `${doc.title}.pdf`))
+    // Forward filesystem errors (e.g. a row whose file is missing) to a clean
+    // 404 instead of leaking a path/stack — mirrors the client-document route.
+    res.download(path.resolve(DOC_DIR, path.basename(doc.filename)), sanitizeDownloadName(doc.original_name, `${doc.title}.pdf`), err => {
+      if (err && !res.headersSent) next(new ApiError(404, 'FILE_NOT_FOUND', 'Document file is unavailable'))
+    })
   } catch (err) { next(err) }
 })
 

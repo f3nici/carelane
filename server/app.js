@@ -170,7 +170,10 @@ export function createApp () {
   api.use('/deleted', requireAuth, deletedRoutes)
   app.use('/api/v1', api)
 
-  mountSwagger(app)
+  // Interactive API docs (Swagger UI) describe the whole public API surface and
+  // run with a relaxed inline-script CSP, so they are opt-in via PUBLIC_API_ENABLED
+  // (default off) rather than exposed unauthenticated — mirroring /metrics.
+  if (config.publicApiEnabled) mountSwagger(app)
 
   // Serve the built Vue app in production (uploads/ is deliberately NOT static)
   const distDir = path.resolve('dist')
