@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useApi } from '../composables/useApi.js'
+import { useIntegrations } from '../composables/useIntegrations.js'
 import { useToastStore } from '../stores/toast.js'
 import BrandingSettings from '../components/BrandingSettings.vue'
 import PasswordSettings from '../components/PasswordSettings.vue'
@@ -21,6 +22,7 @@ const toast = useToastStore()
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+const { refresh: refreshIntegrations } = useIntegrations()
 const settings = ref(null)
 
 const tabs = [
@@ -58,11 +60,17 @@ onMounted(async () => {
   ])
   settings.value = res.data
   aiStatus.value = ai.data
+  // Older databases predate the claude_enabled setting — seed the checkbox from
+  // the server's resolved status (which defaults to on) so it round-trips.
+  if (settings.value.claude_enabled === undefined) settings.value.claude_enabled = ai.data.enabled ? 1 : 0
 })
 
 async function save () {
   await api.put('/settings', settings.value)
   toast.push('Settings saved', 'success')
+  // Refresh the app-wide AI gate so the draft panels / tips appear or disappear
+  // immediately when Claude is switched on or off here.
+  await refreshIntegrations()
 }
 
 async function testAi () {
@@ -135,11 +143,13 @@ async function testAi () {
         <div v-if="aiStatus" class="card space-y-4">
           <div class="flex items-center justify-between gap-3">
             <h3 class="font-semibold">Claude AI</h3>
-            <span v-if="aiStatus.configured" class="pill bg-success/15 text-success">Configured</span>
+            <span v-if="aiStatus.configured && settings.claude_enabled" class="pill bg-success/15 text-success">On</span>
+            <span v-else-if="aiStatus.configured" class="pill bg-white/10 text-mid">Off</span>
             <span v-else class="pill bg-white/10 text-mid">Not configured</span>
           </div>
           <p class="text-xs text-mid">Claude drafts shift notes, reports and agreements — output is always a draft you review. The API key is set via the <code>ANTHROPIC_API_KEY</code> environment variable, never stored here. Model IDs are configurable so they can be upgraded without a code change.</p>
           <p v-if="!aiStatus.configured" class="text-sm text-warning">Not configured. Add an Anthropic API key to the server environment to enable AI drafting.</p>
+          <label class="flex items-center gap-2 text-sm"><input v-model="settings.claude_enabled" type="checkbox" :true-value="1" :false-value="0" :disabled="!aiStatus.configured" class="accent-accent" /> Enable AI drafting (shift notes, reports, agreements, grounded Q&amp;A)</label>
           <div class="grid sm:grid-cols-2 gap-4">
             <div><label class="label">Cheap model (notes, condensing)</label><input v-model="settings.claude_model_cheap" class="input font-mono text-xs" /></div>
             <div><label class="label">Quality model (agreements, reports)</label><input v-model="settings.claude_model_quality" class="input font-mono text-xs" /></div>

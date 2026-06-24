@@ -1,6 +1,7 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { renderMarkdown } from '../composables/useMarkdown.js'
+import { useIntegrations } from '../composables/useIntegrations.js'
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -8,8 +9,11 @@ const props = defineProps({
 })
 const emit = defineEmits(['update:modelValue'])
 
+const { aiActive, ensureLoaded } = useIntegrations()
+onMounted(ensureLoaded)
 const preview = ref(false)
 const html = computed(() => renderMarkdown(props.modelValue))
+const placeholder = computed(() => aiActive.value ? 'Markdown body — generate an AI draft or write it yourself' : 'Markdown body — write it here')
 </script>
 
 <template>
@@ -27,7 +31,7 @@ const html = computed(() => renderMarkdown(props.modelValue))
       class="input font-mono text-xs"
       rows="22"
       :disabled="locked"
-      placeholder="Markdown body — generate an AI draft or write it yourself"
+      :placeholder="placeholder"
       @input="emit('update:modelValue', $event.target.value)"
     />
     <div v-else class="prose-dark text-sm space-y-2 max-h-[34rem] overflow-y-auto" v-html="html" />

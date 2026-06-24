@@ -28,6 +28,18 @@ const cheapModel = () => getSetting('claude_model_cheap', config.claudeModelChea
 const qualityModel = () => getSetting('claude_model_quality', config.claudeModelQuality)
 const tone = () => getSetting('ai_tone', 'professional, warm, person-centred')
 
+/** Whether the operator has switched AI drafting on (default on when unset). */
+const aiEnabled = () => !!getSetting('claude_enabled', 1)
+
+/**
+ * Guard the operator-facing draft/ask features: refuse when AI drafting has been
+ * turned off in Settings, even though the API key is present. Connectivity
+ * testing deliberately bypasses this so the key can still be verified while off.
+ */
+function assertEnabled () {
+  if (!aiEnabled()) throw new ApiError(503, 'AI_DISABLED', 'AI drafting is turned off in Settings')
+}
+
 /** Shared persona text — identical across every call, so it anchors the cache. */
 function personaText () {
   return `You are a documentation assistant for an independent NDIS support worker in Australia.
@@ -131,6 +143,7 @@ function shiftNoteUserPrompt (input) {
 }
 
 export async function draftShiftNote (input, userId) {
+  assertEnabled()
   const { text, usage } = await complete({
     model: cheapModel(),
     max_tokens: 600,
@@ -196,6 +209,7 @@ function reportPrompt (input) {
 }
 
 export async function draftReport (input, userId) {
+  assertEnabled()
   const { system, user } = reportPrompt(input)
   const { text } = await complete({
     model: qualityModel(),
@@ -268,6 +282,7 @@ function agreementPrompt (input, guidance) {
 }
 
 export async function draftAgreement (input, userId) {
+  assertEnabled()
   const guidance = await agreementGuidance()
   const { system, user } = agreementPrompt(input, guidance)
   const { text } = await complete({
@@ -291,13 +306,15 @@ export async function estimateAgreementTokens (input) {
 }
 
 /**
- * Whether the Claude API is configured (the key is an env secret, never stored)
- * plus the currently-active model ids. Powers the Settings integration card.
- * @returns {{configured:boolean, model_cheap:string, model_quality:string}}
+ * Whether the Claude API is configured (the key is an env secret, never stored),
+ * whether the operator has switched drafting on, plus the active model ids.
+ * Powers the Settings integration card and gates AI tips/UI across the app.
+ * @returns {{configured:boolean, enabled:boolean, model_cheap:string, model_quality:string}}
  */
 export function aiStatus () {
   return {
     configured: !!config.anthropicApiKey,
+    enabled: aiEnabled(),
     model_cheap: cheapModel(),
     model_quality: qualityModel()
   }
@@ -333,6 +350,7 @@ export async function testConnection () {
  * @returns {Promise<{answer:string, sources:Array, usage?:{input_tokens:number, output_tokens:number}}>}
  */
 export async function askGuidelines (question, userId) {
+  assertEnabled()
   const chunks = await searchChunks(question, 5)
   if (!chunks.length) {
     return { answer: 'No indexed guideline documents found. Upload NDIS guideline PDFs to the Knowledge Base first.', sources: [] }

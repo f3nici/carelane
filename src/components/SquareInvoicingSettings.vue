@@ -51,7 +51,8 @@ async function clearError () {
   <div v-if="status" class="card space-y-4">
     <div class="flex items-center justify-between gap-3">
       <h3 class="font-semibold">Square invoicing</h3>
-      <span v-if="status.configured" class="pill bg-success/15 text-success">Configured</span>
+      <span v-if="status.configured && status.enabled" class="pill bg-success/15 text-success">On</span>
+      <span v-else-if="status.configured" class="pill bg-white/10 text-mid">Off</span>
       <span v-else class="pill bg-white/10 text-mid">Not configured</span>
     </div>
 

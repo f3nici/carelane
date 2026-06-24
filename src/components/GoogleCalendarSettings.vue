@@ -86,8 +86,9 @@ async function saveSettings () {
   <div v-if="status" class="card space-y-4">
     <div class="flex items-center justify-between gap-3">
       <h3 class="font-semibold">Google Calendar</h3>
-      <span v-if="status.connected" class="pill bg-success/15 text-success">Connected</span>
-      <span v-else class="pill bg-white/10 text-mid">Not connected</span>
+      <span v-if="status.configured && status.connected && status.enabled" class="pill bg-success/15 text-success">On</span>
+      <span v-else-if="status.configured" class="pill bg-white/10 text-mid">Off</span>
+      <span v-else class="pill bg-white/10 text-mid">Not configured</span>
     </div>
 
     <p class="text-xs text-mid">
