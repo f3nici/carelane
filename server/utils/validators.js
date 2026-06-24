@@ -187,7 +187,8 @@ export const ntfySettingsSchema = z.object({
   digest_time: time.optional(),
   plan_review_days: z.coerce.number().int().min(0).max(365).optional(),
   unbilled_days: z.coerce.number().int().min(0).max(365).optional(),
-  shift_reminder_minutes: z.coerce.number().int().min(0).max(1440).optional()
+  shift_reminder_minutes: z.coerce.number().int().min(0).max(1440).optional(),
+  timeout_ms: z.coerce.number().int().min(1000).max(120000).optional()
 })
 
 export const squareSettingsSchema = z.object({

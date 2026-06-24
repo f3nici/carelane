@@ -14,10 +14,10 @@ import { countOpenIncidents } from './incidentService.js'
  *
  * Like the other optional integrations (Google Calendar, Square) this is a
  * best-effort, no-op-until-configured side channel: regular CRUD never depends
- * on it and never blocks on the network. The server URL, topic and all timings
- * live in operator-editable settings (`ntfy_*`); only the optional access token
- * and the request timeout come from env (see config). The timeout is generous
- * by default because a distant/self-hosted ntfy server can be slow to respond.
+ * on it and never blocks on the network. The server URL, topic, request timeout
+ * and all timings live in operator-editable settings (`ntfy_*`); only the
+ * optional access token comes from env (see config). The timeout is generous by
+ * default because a distant/self-hosted ntfy server can be slow to respond.
  *
  * Privacy: notifications carry only a short participant label (preferred name /
  * initials) and counts — never plan or health notes — mirroring how PII is
@@ -46,13 +46,20 @@ export const NTFY_DEFAULTS = {
   // least this many days old.
   ntfy_unbilled_days: 14,
   // Shift reminders: how long before a scheduled shift starts to push a reminder.
-  ntfy_shift_reminder_minutes: 60
+  ntfy_shift_reminder_minutes: 60,
+  // How long to wait for the ntfy server to respond (ms). Deliberately generous:
+  // a distant/self-hosted server can take well over a second, and a too-tight
+  // timeout silently drops notifications. Raise it for a slow/remote server.
+  ntfy_timeout_ms: 10000
 }
 
 /** Read an ntfy setting, falling back to the documented default. */
 const setting = key => getSetting(key, NTFY_DEFAULTS[key])
 const bool = v => v === 1 || v === true || v === '1'
 const num = (key) => Number(setting(key)) || Number(NTFY_DEFAULTS[key]) || 0
+
+/** Effective request timeout (ms), clamped to a sane floor. */
+const timeoutMs = () => Math.max(1000, num('ntfy_timeout_ms'))
 
 /** Operator timezone, shared with the calendar mirror / roster clock. */
 const tz = () => getSetting('google_calendar_timezone', 'Australia/Perth')
@@ -156,11 +163,9 @@ export function status () {
     plan_review_days: num('ntfy_plan_review_days'),
     unbilled_days: num('ntfy_unbilled_days'),
     shift_reminder_minutes: num('ntfy_shift_reminder_minutes'),
+    timeout_ms: timeoutMs(),
     timezone: tz(),
-    // Surfaced so the operator can see the connection is using a sane timeout
-    // (the env-configured value) rather than guessing why a far server times out.
     token_configured: !!config.ntfyToken,
-    timeout_ms: config.ntfyTimeoutMs,
     last_sent_at: getSetting('ntfy_last_sent_at', null),
     last_error: getSetting('ntfy_last_error', null),
     pending: digestCounts()
@@ -177,8 +182,9 @@ const linkTo = path => (config.appBaseUrl ? `${config.appBaseUrl}${path}` : unde
 
 /**
  * Publish a single message to the configured ntfy topic. Best-effort and never
- * throws. The request uses a generous, env-configurable timeout (AbortController)
- * so a slow or distant ntfy server does not silently drop the notification.
+ * throws. The request uses a generous, operator-configurable timeout (the
+ * `ntfy_timeout_ms` setting, via AbortController) so a slow or distant ntfy
+ * server does not silently drop the notification.
  * @param {{title?:string, message:string, tags?:string|string[], priority?:string, click?:string}} msg
  * @returns {Promise<{ok:boolean, error?:string}>}
  */
@@ -189,7 +195,8 @@ export async function publish ({ title, message, tags, priority, click } = {}) {
   const url = `${base}/${encodeURIComponent(topic)}`
 
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), config.ntfyTimeoutMs)
+  const requestTimeout = timeoutMs()
+  const timer = setTimeout(() => controller.abort(), requestTimeout)
   try {
     const headers = { 'Content-Type': 'text/plain; charset=utf-8' }
     if (title) headers.Title = headerSafe(title)
@@ -209,7 +216,7 @@ export async function publish ({ title, message, tags, priority, click } = {}) {
     return { ok: true }
   } catch (err) {
     const message = err.name === 'AbortError'
-      ? `ntfy request timed out after ${config.ntfyTimeoutMs}ms — increase NTFY_TIMEOUT_MS if your server is slow/remote`
+      ? `ntfy request timed out after ${requestTimeout}ms — raise the request timeout in Settings if your server is slow/remote`
       : String(err.message || err).slice(0, 200)
     logActivity('ntfy', null, null, 'send_failed', { error: message.slice(0, 120) })
     recordError(message)

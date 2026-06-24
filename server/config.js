@@ -13,8 +13,11 @@ const config = {
   sessionSecret: env.SESSION_SECRET || 'change-me',
   encryptionSecret: env.ENCRYPTION_SECRET || 'change-me',
   anthropicApiKey: env.ANTHROPIC_API_KEY || '',
-  claudeModelCheap: env.CLAUDE_MODEL_CHEAP || 'claude-haiku-4-5-20251001',
-  claudeModelQuality: env.CLAUDE_MODEL_QUALITY || 'claude-sonnet-4-6',
+  // Default Claude model ids. These seed the operator-editable `claude_model_*`
+  // settings (changed in-app under Settings → AI, so models can be upgraded
+  // without redeploying); they are not read from env.
+  claudeModelCheap: 'claude-haiku-4-5-20251001',
+  claudeModelQuality: 'claude-sonnet-4-6',
   defaultUsername: env.DEFAULT_USERNAME || 'admin',
   defaultPassword: env.DEFAULT_PASSWORD || 'changeme',
   dbPath: env.DB_PATH || './data/carelane.db',
@@ -49,6 +52,16 @@ const config = {
   // debug < info < warn < error.
   logLevel: env.LOG_LEVEL || (env.NODE_ENV === 'test' ? 'silent' : 'info'),
   logFormat: env.LOG_FORMAT || (env.NODE_ENV === 'production' ? 'json' : 'pretty'),
+  // HTTP access log verbosity (the per-request line in the container log):
+  //   'all'     – log every request (the previous behaviour)
+  //   'sampled' – skip routine successful reads (2xx/3xx GET/HEAD: status polling,
+  //               static assets, cache revalidations) but keep every write
+  //               (POST/PUT/PATCH/DELETE) and all 4xx/5xx
+  //   'errors'  – only client/server errors (4xx/5xx)
+  //   'off'     – disable the access log entirely
+  // Default 'sampled' keeps `docker logs` readable without hiding problems or
+  // state changes; set LOG_HTTP=all when you need full request tracing.
+  httpLog: ['all', 'sampled', 'errors', 'off'].includes(env.LOG_HTTP) ? env.LOG_HTTP : 'sampled',
   // Prometheus metrics at /metrics (for self-hosters running monitoring).
   // Disabled by default; when enabled it is open unless METRICS_TOKEN is set, in
   // which case a Bearer token (or ?token=) is required. Intended for an
@@ -73,21 +86,17 @@ const config = {
   // Square Invoicing (optional). The access token is a secret credential
   // (a Personal Access Token from the Square Developer Dashboard) and lives in
   // env — like ANTHROPIC_API_KEY, never stored in the database. The environment
-  // selects which Square API host to call; the location is auto-detected on the
-  // first "Test connection" but can be pinned here. Invoicing is a no-op until a
-  // token is present and the operator enables it. See squareService.
+  // selects which Square API host to call. The location is auto-detected and
+  // stored on the first "Test connection" in Settings (no env var needed).
+  // Invoicing is a no-op until a token is present and the operator enables it.
+  // See squareService.
   squareAccessToken: env.SQUARE_ACCESS_TOKEN || '',
   squareEnvironment: env.SQUARE_ENVIRONMENT === 'production' ? 'production' : 'sandbox',
-  squareLocationId: env.SQUARE_LOCATION_ID || '',
-  // ntfy push notifications (optional). The server URL, topic and all timings /
-  // toggles are operator-editable in Settings (see ntfyService); only the
-  // secret access token (for protected/self-hosted servers) and the request
-  // timeout live in env. The timeout default is deliberately generous — a
-  // self-hosted or distant ntfy server can take well over a second to respond,
-  // so a too-tight timeout (e.g. a few hundred ms) drops notifications. Raise
-  // NTFY_TIMEOUT_MS further for a very slow/remote server.
+  // ntfy push notifications (optional). The server URL, topic, request timeout
+  // and all timings / toggles are operator-editable in Settings (see
+  // ntfyService); only the secret access token (for protected/self-hosted
+  // servers) lives in env.
   ntfyToken: env.NTFY_TOKEN || '',
-  ntfyTimeoutMs: Math.max(1000, parseInt(env.NTFY_TIMEOUT_MS || '10000', 10) || 10000),
   // Public base URL of this CareLane install (e.g. https://carelane.example.org).
   // When set, push notifications carry a deep link back to the relevant page.
   appBaseUrl: (env.APP_BASE_URL || '').replace(/\/+$/, '')

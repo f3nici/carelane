@@ -30,7 +30,8 @@ async function save () {
       digest_time: s.value.digest_time,
       plan_review_days: s.value.plan_review_days,
       unbilled_days: s.value.unbilled_days,
-      shift_reminder_minutes: s.value.shift_reminder_minutes
+      shift_reminder_minutes: s.value.shift_reminder_minutes,
+      timeout_ms: s.value.timeout_ms
     })
     s.value = res.data
     toast.push('Notification settings saved', 'success')
@@ -115,8 +116,11 @@ async function clearError () {
       </div>
       <div>
         <label class="label">Request timeout</label>
-        <input :value="s.timeout_ms + ' ms'" class="input" disabled />
-        <p class="text-xs text-mid mt-1">Set via <code>NTFY_TIMEOUT_MS</code>. Raise it if a far-away server is slow to respond.</p>
+        <div class="flex items-center gap-2">
+          <input v-model.number="s.timeout_ms" type="number" min="1000" max="120000" step="500" class="input w-32" />
+          <span class="text-sm text-mid">ms</span>
+        </div>
+        <p class="text-xs text-mid mt-1">How long to wait for the ntfy server. Raise it if a far-away/self-hosted server is slow to respond.</p>
       </div>
     </div>
 

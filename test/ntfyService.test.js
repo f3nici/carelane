@@ -62,7 +62,7 @@ describe('ntfyService.publish', () => {
     const res = await ntfy.publish({ message: 'x' })
     expect(res.ok).toBe(false)
     expect(res.error).toMatch(/timed out/i)
-    expect(res.error).toMatch(/NTFY_TIMEOUT_MS/)
+    expect(res.error).toMatch(/timeout in Settings/i)
     // The live error banner is recorded for the settings UI.
     expect(settingsService.getSetting('ntfy_last_error')).toBeTruthy()
   })

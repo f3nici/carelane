@@ -44,14 +44,25 @@ export function createApp () {
   // Structured access log + latency metrics. Records method, route and status —
   // never query strings or bodies, which may carry PII. /healthz and /metrics
   // are skipped so a monitoring scrape does not flood the log or its own series.
+  // Verbosity follows config.httpLog (LOG_HTTP): 'all' logs everything, 'sampled'
+  // (default) drops routine successful reads — 2xx/3xx GET/HEAD status polling,
+  // static assets and cache revalidations — while keeping writes + all 4xx/5xx,
+  // 'errors' logs only 4xx/5xx, and 'off' disables the access log entirely.
+  const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
   app.use((req, res, next) => {
+    if (config.httpLog === 'off') return next()
     if (req.path === '/healthz' || req.path === '/metrics') return next()
     const start = process.hrtime.bigint()
     res.on('finish', () => {
+      const status = res.statusCode
+      const isError = status >= 400
+      if (config.httpLog === 'errors' && !isError) return
+      // 'sampled': keep errors and successful writes; skip successful reads.
+      if (config.httpLog === 'sampled' && !isError && READ_METHODS.has(req.method)) return
       const ms = Number(process.hrtime.bigint() - start) / 1e6
-      const fields = { method: req.method, path: req.path, status: res.statusCode, ms: Math.round(ms) }
-      if (res.statusCode >= 500) logger.error('request', fields)
-      else if (res.statusCode >= 400) logger.warn('request', fields)
+      const fields = { method: req.method, path: req.path, status, ms: Math.round(ms) }
+      if (status >= 500) logger.error('request', fields)
+      else if (status >= 400) logger.warn('request', fields)
       else logger.info('request', fields)
     })
     next()
