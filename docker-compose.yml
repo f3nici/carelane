@@ -9,30 +9,24 @@ services:
       NODE_ENV: production
       SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env}
       ENCRYPTION_SECRET: ${ENCRYPTION_SECRET:?set ENCRYPTION_SECRET in .env}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-} #Optional
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       DEFAULT_USERNAME: ${DEFAULT_USERNAME:-admin}
       DEFAULT_PASSWORD: ${DEFAULT_PASSWORD:-changeme}
       BACKUP_ENABLED: ${BACKUP_ENABLED:-true}
       BACKUP_RETENTION: ${BACKUP_RETENTION:-14}
       BACKUP_TIME: ${BACKUP_TIME:-02:00}
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-} # Optional: Google Calendar sync
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-} # Optional: Google Calendar sync
-      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-} # e.g. https://your-domain/api/v1/schedule/google/callback
-      SQUARE_ACCESS_TOKEN: ${SQUARE_ACCESS_TOKEN:-} # Optional: Square invoicing
-      SQUARE_ENVIRONMENT: ${SQUARE_ENVIRONMENT:-sandbox} # 'sandbox' or 'production' (location auto-detected on Test connection)
-      # Optional: ntfy push notifications. Server URL/topic/timings/request timeout
-      # are all set in-app (Settings → Push notifications). Only the optional access
-      # token and the public base URL for deep links come from env.
-      NTFY_TOKEN: ${NTFY_TOKEN:-} # Optional: only for an auth-protected/self-hosted server
-      APP_BASE_URL: ${APP_BASE_URL:-} # e.g. https://carelane.example.org (deep links)
-      # Optional: pin the passkey relying-party id/origin when behind a Host-rewriting
-      # proxy (auto-derived from the request when blank). RP id = registrable domain,
-      # origin = full URL, e.g. carelane.example.com / https://carelane.example.com
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
+      SQUARE_ACCESS_TOKEN: ${SQUARE_ACCESS_TOKEN:-}
+      SQUARE_ENVIRONMENT: ${SQUARE_ENVIRONMENT:-sandbox}
+      NTFY_TOKEN: ${NTFY_TOKEN:-}
+      APP_BASE_URL: ${APP_BASE_URL:-}
       WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID:-}
       WEBAUTHN_ORIGIN: ${WEBAUTHN_ORIGIN:-}
-      LOG_FORMAT: ${LOG_FORMAT:-pretty} # 'pretty' (readable, aligned lines for `docker logs`) or 'json' (log shippers like Loki/Vector)
-      METRICS_ENABLED: ${METRICS_ENABLED:-false} # Optional: Prometheus scrape at /metrics. See docs/metrics-setup.md
-      METRICS_TOKEN: ${METRICS_TOKEN:-} # Optional: require a Bearer token for /metrics
+      LOG_FORMAT: ${LOG_FORMAT:-pretty}
+      METRICS_ENABLED: ${METRICS_ENABLED:-false}
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
     volumes:
       - ./data:/app/data
       - ./uploads:/app/uploads
