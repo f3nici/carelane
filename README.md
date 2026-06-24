@@ -186,8 +186,7 @@ All configuration is via environment variables (see [`.env.example`](.env.exampl
 | `DEFAULT_PRICE_REGION` | NDIS price region for billing. |
 | `BACKUP_ENABLED` / `BACKUP_PATH` / `BACKUP_RETENTION` / `BACKUP_TIME` / `BACKUP_STALE_HOURS` | Scheduled backup settings and the stale-backup startup-warning threshold. |
 | `LOGIN_MAX_ATTEMPTS` / `LOGIN_WINDOW_MINUTES` | Brute-force throttle: failed-attempt ceiling and window. |
-| `LOG_LEVEL` / `LOG_FORMAT` | Log verbosity (`debug`/`info`/`warn`/`error`) and format (`json` for shippers; defaults to json in production). |
-| `LOG_HTTP` | HTTP access-log verbosity: `all`, `sampled` (default — keeps writes + errors, drops routine successful reads), `errors`, or `off`. |
+| `LOG_LEVEL` / `LOG_FORMAT` | Log verbosity (`debug`/`info`/`warn`/`error`) and format: `pretty` (readable, aligned lines — the docker-compose default) or `json` (one object per line, for log shippers; the default when `NODE_ENV=production` and `LOG_FORMAT` is unset). |
 | `METRICS_ENABLED` / `METRICS_TOKEN` | Opt-in Prometheus scrape at `/metrics`; when a token is set it is required (Bearer or `?token=`). See the [metrics setup guide](docs/metrics-setup.md). |
 | `WEBAUTHN_RP_ID` / `WEBAUTHN_ORIGIN` | Pin the passkey relying-party id/origin. Auto-derived from the request when blank (correct for same-origin); set both behind a Host-rewriting proxy. |
 | `PUBLIC_API_ENABLED` | Toggle for the public API surface. |

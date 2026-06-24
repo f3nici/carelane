@@ -30,8 +30,7 @@ services:
       # origin = full URL, e.g. carelane.example.com / https://carelane.example.com
       WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID:-}
       WEBAUTHN_ORIGIN: ${WEBAUTHN_ORIGIN:-}
-      LOG_FORMAT: ${LOG_FORMAT:-json} # 'json' (log shippers) or 'pretty'
-      LOG_HTTP: ${LOG_HTTP:-sampled} # Access log: all | sampled (skip routine reads) | errors | off
+      LOG_FORMAT: ${LOG_FORMAT:-pretty} # 'pretty' (readable, aligned lines for `docker logs`) or 'json' (log shippers like Loki/Vector)
       METRICS_ENABLED: ${METRICS_ENABLED:-false} # Optional: Prometheus scrape at /metrics. See docs/metrics-setup.md
       METRICS_TOKEN: ${METRICS_TOKEN:-} # Optional: require a Bearer token for /metrics
     volumes:

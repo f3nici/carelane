@@ -52,16 +52,6 @@ const config = {
   // debug < info < warn < error.
   logLevel: env.LOG_LEVEL || (env.NODE_ENV === 'test' ? 'silent' : 'info'),
   logFormat: env.LOG_FORMAT || (env.NODE_ENV === 'production' ? 'json' : 'pretty'),
-  // HTTP access log verbosity (the per-request line in the container log):
-  //   'all'     – log every request (the previous behaviour)
-  //   'sampled' – skip routine successful reads (2xx/3xx GET/HEAD: status polling,
-  //               static assets, cache revalidations) but keep every write
-  //               (POST/PUT/PATCH/DELETE) and all 4xx/5xx
-  //   'errors'  – only client/server errors (4xx/5xx)
-  //   'off'     – disable the access log entirely
-  // Default 'sampled' keeps `docker logs` readable without hiding problems or
-  // state changes; set LOG_HTTP=all when you need full request tracing.
-  httpLog: ['all', 'sampled', 'errors', 'off'].includes(env.LOG_HTTP) ? env.LOG_HTTP : 'sampled',
   // Prometheus metrics at /metrics (for self-hosters running monitoring).
   // Disabled by default; when enabled it is open unless METRICS_TOKEN is set, in
   // which case a Bearer token (or ?token=) is required. Intended for an

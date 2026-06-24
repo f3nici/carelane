@@ -192,12 +192,12 @@ API docs at `/api/docs`, health at `/healthz`.
   lists their sessions and revokes any remotely (`GET /auth/sessions`,
   `DELETE /auth/sessions/:sid`, `POST /auth/sessions/revoke-others`). Ownership
   is verified before a session id can be revoked.
-- Observability: structured logging (`logger.js`, JSON in prod via `LOG_FORMAT`)
-  with an access log recording method/route/status/duration only (never query
-  strings or bodies). Access-log verbosity is `LOG_HTTP` (`config.httpLog`):
-  `all`, `sampled` (default — drops routine successful 2xx/3xx GET/HEAD reads but
-  keeps writes + all 4xx/5xx, so `docker logs` isn't flooded by status polling),
-  `errors`, or `off`. Optional Prometheus scrape at `GET /metrics`
+- Observability: structured logging (`logger.js`) with an access log recording
+  method/route/status/duration only (never query strings or bodies). `LOG_FORMAT`
+  picks the renderer: `pretty` (readable, aligned single lines — the request log
+  gets a dedicated `<time> <LEVEL> <METHOD> <status> <path> <ms>` layout; the
+  docker-compose default) or `json` (one object per line for shippers; the prod
+  default when unset). Optional Prometheus scrape at `GET /metrics`
   (`METRICS_ENABLED`/`METRICS_TOKEN`) exposing HTTP counters/latency + app
   gauges; mounted before the auth stack like `/healthz`. See
   `docs/metrics-setup.md`.
