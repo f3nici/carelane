@@ -58,6 +58,24 @@ The phone is never "the client of" the server. Both nodes own a full database; s
 reconciles them. The server is distinguished only by the extra capabilities it can run
 (§9) and by hosting the browser experience.
 
+### 2.1 Two operating modes
+
+The app has exactly two states, chosen by whether a server URL is configured:
+
+- **Local mode (no URL set).** Fully standalone. Local encrypted DB, all logic
+  on-device, no network anything. This is the whole product for a user who never
+  self-hosts.
+- **Paired mode (URL set).** *Not a web wrapper* — the phone keeps its full local
+  database and keeps working offline. The configured URL is used only for a discrete,
+  git-style **fetch → merge → push** sync (§5) guarded by a password-established device
+  token over HTTPS (§8/§10). Setting/clearing the URL is a reversible operator action;
+  clearing it drops back to local mode with data intact.
+
+The crucial point: "closer to a web wrapper" is a spectrum, and this design sits firmly
+at the **local-first** end. A thin web-wrapper (needs the server live to function) would
+be easier to build but would break the "works fully standalone" promise. You cannot have
+both; the branch-sync model is the resolution.
+
 ## 3. Tech stack — and how we avoid writing the app twice
 
 A native rewrite throws away the Vue *UI*. It does **not** have to throw away the
@@ -103,71 +121,97 @@ edits from two independent writers.
 Add to every syncable table:
 
 - `node_id` — which node last wrote this row (`phone-<uuid>` / `server-<uuid>`).
-- `hlc` — a **Hybrid Logical Clock** stamp on last write (`<wall-ms>:<counter>:<node>`).
-  Wall-clock timestamps alone are unsafe across two devices with drifting clocks; an HLC
-  gives a total order that never goes backwards and breaks ties deterministically.
+- `rev` — a per-row revision id bumped on every local write, and `base_rev` — the `rev`
+  this row had at the **last successful sync** with the peer. The pair `(base_rev, rev)`
+  is what enables a git-style **3-way merge**: it tells us whether a row changed locally,
+  remotely, both (a conflict), or neither, relative to the last common baseline — with no
+  reliance on wall clocks (see §5/§6). *(An earlier draft used Hybrid Logical Clocks for
+  ordering; the branch model supersedes that and removes the clock-trust risk.)*
 - `deleted_at` as the tombstone (already present on most tables) — deletes **replicate
   as a flag flip**, never as a row removal, which fits the "never hard-delete regulated
   records" hard rule perfectly.
 
-Add one new table:
+Add these sync tables:
 
-- `sync_change_log` — append-only journal of local writes not yet acknowledged by the
-  peer: `(seq, table, row_id, op, hlc, node_id, payload)`. The sync engine ships deltas
-  from this rather than diffing whole tables.
-- `sync_state` — per-peer cursor: the last `hlc`/`seq` we've sent and received.
+- `sync_change_log` — append-only journal of local writes since the last sync:
+  `(seq, table, row_id, op, rev, node_id, changed_fields)`. The engine ships deltas from
+  this rather than diffing whole tables.
+- `sync_commits` — the branch lineage: each successful sync records a **sync commit**
+  with a parent pointer to the previous common baseline. This DAG (not a clock) is what
+  orders history and identifies the merge base.
+- `sync_state` — per-peer cursor: the last sync-commit each side acknowledged.
 
 Tables **missing** `updated_at` today that need it (or need to be declared
 last-write-wins-by-parent): `agreement_line_items`, `client_billing_codes`,
 `billing_codes`, `shift_photos`, `document_chunks`. `document_chunks` should **not**
 sync at all (see §9). `activity_log` is special-cased in §8.
 
-## 5. Sync protocol
+## 5. Sync protocol — a git-style branch/merge model
 
-A change-log / delta-sync model (not full-table diffing, not a CRDT database):
+Paired mode syncs at **discrete, operator-visible sync points** ("Sync now", or on
+reconnect), not continuously. Each side is a *branch*; a sync is a **fetch → merge →
+push** against a known common baseline (the last `sync_commit`), exactly like `git pull`.
+This is the model the operator asked for, and it is a better fit for regulated data than
+continuous reconciliation because conflicts surface at a visible merge rather than being
+resolved silently.
 
-1. **Pull**: `GET /api/v1/sync/changes?since=<hlc-cursor>` returns every change-log
-   entry the server has past the caller's cursor, batched. Phone does the mirror over
-   its own log when the server pulls.
-2. **Apply**: each incoming change is merged per §6 and written locally; the local
-   change-log is **not** re-appended for applied remote changes (no echo).
-3. **Push**: `POST /api/v1/sync/changes` with the local entries past the server's
-   cursor. Idempotent by `(node_id, seq)` so retries are safe.
-4. **Advance cursors** in `sync_state` only after the peer acknowledges.
+One sync round:
+
+1. **Fetch**: `GET /api/v1/sync/changes?since=<last-commit>` returns every change the
+   peer has recorded since the shared baseline commit, batched. (The server does the
+   mirror when the phone serves its own changes.)
+2. **Merge (3-way)**: for each incoming row, compare against the local row using
+   `base_rev` as the common ancestor:
+   - changed on **one** side only → fast-forward (apply, no conflict);
+   - changed on **both** sides → a real conflict, resolved by §6;
+   - unchanged → skip.
+3. **Push**: `POST /api/v1/sync/changes` with local changes since the baseline.
+   Idempotent by `(node_id, rev)` so retries are safe.
+4. **Commit**: on success both sides write a new `sync_commit` whose parent is the old
+   baseline, advance `sync_state`, and set every synced row's `base_rev = rev`. That new
+   commit is the baseline for next time.
 
 Properties:
 
-- **Offline-tolerant**: the phone accumulates change-log entries indefinitely and drains
-  them on next contact. This is the existing `offlineDrafts` idea generalised from
-  "new notes only" to "every write".
+- **Ordering comes from the commit DAG, not wall clocks.** A wrong device clock cannot
+  corrupt merge order — history is ordered by sync-commit lineage and per-row `rev`.
+- **Offline-tolerant**: the phone accumulates `sync_change_log` entries indefinitely and
+  drains them at the next sync. This is the existing `offlineDrafts` idea generalised
+  from "new notes only" to "every write, merged".
 - **Field values travel as plaintext inside a TLS channel**, then get re-encrypted
   locally on the receiving node. We do **not** ship ciphertext blobs, because per-record
   random IVs mean the same plaintext encrypts differently on each node — merging must
   happen on decrypted field values, not opaque `enc:` strings. Since the server can read
   (shared key), this is consistent with the encryption decision.
-- **Auth for sync**: a long-lived device pairing token (see §10), distinct from the
-  browser session cookie.
+- **Auth for sync**: a password-established, long-lived device token (see §8/§10) over
+  HTTPS, distinct from the browser session cookie and independently revocable.
 
 ## 6. Conflict resolution
 
-Default: **field-level Last-Write-Wins keyed by HLC**. Row-level LWW is too coarse — two
-edits to different fields of the same client shouldn't clobber each other. So the
-change-log records changed *fields*, and merge compares HLCs per field.
+Because merge is **3-way against a baseline** (§5), most "conflicts" aren't: an edit on
+only one side fast-forwards cleanly. A true conflict is only when the *same field* of the
+*same row* changed on **both** sides since the last sync — rare for a single operator who
+is usually on one device at a time.
 
-But regulated data needs rules that override raw LWW. These encode the existing hard
-rules as *merge invariants*:
+When it does happen, the default is **field-level last-writer-wins**, but — unlike silent
+LWW — the losing value is preserved in a `sync_conflicts` side table and surfaced in the
+UI so nothing sensitive is lost without the operator seeing it.
+
+Regulated data then layers rules that **override** the default. These encode the existing
+hard rules as *merge invariants*:
 
 | Situation | Rule |
 |---|---|
-| A record is `finalised` / `signed_by_client` / `status=final` | **Monotonic**: finalisation wins over any older non-final edit; an edit with an older HLC can never un-finalise. Concurrent conflicting edits to a finalised record are rejected and surfaced for manual review, never silently applied. |
-| Soft-delete vs. edit | Delete + edit merge to "deleted" only if the delete's HLC is newer; otherwise the row stays and the delete is dropped (matches restore semantics). |
+| A record is `finalised` / `signed_by_client` / `status=final` | **Monotonic**: finalisation always wins; a concurrent non-final edit from the other branch can never un-finalise it. Genuine both-sides edits to a finalised record are rejected and surfaced for manual review, never silently applied. |
+| Soft-delete vs. edit | If one branch deleted and the other edited, keep the row and surface the conflict (a restore beats a stale delete) rather than silently dropping the edit. |
 | Incident-flagged shift note | Cannot be deleted on **either** node (existing rule) — a delete op for one is rejected at apply time. |
 | Billing code | Deactivate, never delete — same as today; sync flips `active`, not existence. |
-| Two-way edit collision on encrypted narrative (e.g. shift `body`) | LWW by HLC, **but** keep the losing version in a `sync_conflicts` side table so nothing sensitive is lost silently; surface it in the UI for the operator to reconcile. |
+| Both-sides edit of an encrypted narrative (e.g. shift `body`) | Field-level LWW, **but** the losing version is kept in `sync_conflicts` and surfaced for the operator to reconcile — never silently discarded. |
 
-Nothing here is a true CRDT; it's LWW-plus-domain-invariants, which is appropriate for a
-single-operator tool where genuine concurrent edits are rare (you're usually on one
-device at a time).
+Nothing here is a true CRDT; it's 3-way-merge-plus-domain-invariants, which is
+appropriate for a single-operator tool where genuine concurrent edits are rare (you're
+usually on one device at a time), and where an explicit, visible merge is preferable to
+silent automatic reconciliation.
 
 ## 7. The audit-log problem (the sharpest edge)
 
@@ -177,7 +221,8 @@ chain (`server/services/activityService.js`, verified via `GET /api/v1/audit/ver
 This is a compliance feature.
 
 A single linear chain **cannot** be extended by two independent writers — that's a
-fundamental contradiction, not a bug to code around. The resolution:
+fundamental contradiction, not a bug to code around. The resolution falls out of the
+branch model naturally: **a per-device audit chain simply *is* that device's branch.**
 
 - **Per-device chains.** Namespace the chain by `node_id`: each node maintains and
   extends *its own* hash chain over the entries *it authored* (`prev_hash` within that
@@ -185,10 +230,10 @@ fundamental contradiction, not a bug to code around. The resolution:
   is exactly the correct security property.
 - **Sync** ships each node's chain entries; the receiver **verifies the incoming chain**
   before accepting it and stores it intact (audit entries are immutable, so they never
-  "merge" — they interleave).
-- **The global audit view** is the union of all per-node chains, ordered by HLC. Verify
-  becomes "every per-node chain is individually intact", and the UI shows which node
-  authored each entry.
+  "merge" — they interleave, exactly as branches do).
+- **The global audit view** is the union of all per-node chains, ordered by the sync
+  commit DAG. Verify becomes "every per-node chain is individually intact", and the UI
+  shows which node authored each entry.
 
 This changes the audit schema and `activityService`, and the migration must re-seal
 existing rows under the server's `node_id`. It is the single most careful piece of the
@@ -259,10 +304,11 @@ This is a multi-month effort. Phasing keeps the existing product working through
 - **Phase 1 — Standalone app, no sync.** RN skeleton, on-device encrypted SQLite, port
   migrations, wire `@carelane/core` to the on-device repo, local auth. Deliverable: a
   fully working offline app with **no** server involvement.
-- **Phase 2 — One-way replication.** Change-log + HLC + `sync/changes` endpoints; phone
-  → server push only. Proves the pipe and gives browser-view + backups immediately.
-- **Phase 3 — Two-way + conflict resolution.** Bidirectional pull/apply, field-level LWW
-  + the §6 invariants, `sync_conflicts` surfacing.
+- **Phase 2 — One-way replication.** Change-log + revision/commit tracking +
+  `sync/changes` endpoints; phone → server push only. Proves the pipe and gives
+  browser-view + backups immediately.
+- **Phase 3 — Two-way branch/merge.** Bidirectional fetch → 3-way merge → push against
+  the baseline commit, the §6 invariants, `sync_conflicts` surfacing.
 - **Phase 4 — Audit per-device chains** (§7) and **binary sync** (§9).
 - **Phase 5 — Parity polish**: server-triggered PDF/AI/integrations from the app,
   pairing UX, device revocation, retire the PWA/service worker.
@@ -272,8 +318,10 @@ This is a multi-month effort. Phasing keeps the existing product working through
 1. **Q-STACK** (§3): confirm React Native. Flutter roughly doubles domain-logic cost.
 2. **Audit chain** (§7) is novel and compliance-sensitive — prototype and get comfort
    *before* committing to the rest.
-3. **Clock trust**: HLC mitigates drift but a wildly wrong phone clock still needs
-   guarding; consider anchoring HLC wall-time to the server at pairing/sync.
+3. ~~**Clock trust**~~ — *retired by the branch model (§5).* Ordering now comes from the
+   sync-commit DAG + per-row `rev`, not wall clocks, so device clock drift cannot corrupt
+   merge order. (`created_at`/`updated_at` are still displayed to the user, so a badly
+   wrong clock is cosmetic, not corrupting.)
 4. **The phone now holds all PII.** Lost/stolen device is a new threat surface that the
    server-only model didn't have — mandates at-rest DB encryption + biometric gate +
    remote revoke, and possibly a remote-wipe-on-revoke.
@@ -289,10 +337,12 @@ This is a multi-month effort. Phasing keeps the existing product working through
 
 - The Android *shell* was never the hard part. **Two-way sync over regulated,
   encrypted, audit-chained data is** — items §6, §7 and §8 are the real work.
+- The **git-style branch/merge model** (local mode ⇄ paired mode, discrete fetch →
+  3-way merge → push) is the right sync design: it fits how a solo operator actually
+  works, surfaces conflicts explicitly instead of silently, retires the clock-trust risk,
+  and aligns 1:1 with the per-device audit chains.
 - The native-rewrite decision is survivable **only** if we go React Native and extract a
   shared TypeScript core (§3); otherwise the domain logic forks permanently.
 - Recommended sequence: **Phase 0 (extract core) → Phase 1 (standalone app)** delivers a
   genuinely useful offline app early and de-risks the hard sync work, which then lands
   incrementally in Phases 2–4.
-</content>
-</invoke>
