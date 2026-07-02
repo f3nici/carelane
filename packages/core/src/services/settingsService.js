@@ -1,0 +1,52 @@
+/** Settings keys that must never be exposed or written via the API. */
+const PROTECTED_KEYS = new Set(['enc_canary', 'google_refresh_token_enc'])
+
+/**
+ * Build the settings service bound to a host context.
+ * @param {import('./index.js').CoreContext} ctx
+ */
+export function createSettingsService (ctx) {
+  const { sqlite } = ctx
+
+  /**
+   * Read all settings as a plain object (JSON-decoded values).
+   */
+  function getSettings () {
+    const rows = sqlite.prepare('SELECT key, value FROM settings').all()
+    const out = {}
+    for (const r of rows) {
+      if (PROTECTED_KEYS.has(r.key)) continue
+      try { out[r.key] = JSON.parse(r.value) } catch { out[r.key] = r.value }
+    }
+    return out
+  }
+
+  /**
+   * Read a single setting value.
+   * @param {string} key
+   * @param {*} [fallback]
+   */
+  function getSetting (key, fallback = null) {
+    const row = sqlite.prepare('SELECT value FROM settings WHERE key = ?').get(key)
+    if (!row) return fallback
+    try { return JSON.parse(row.value) } catch { return row.value }
+  }
+
+  /**
+   * Upsert multiple settings.
+   * @param {object} patch key/value map
+   */
+  function updateSettings (patch) {
+    const stmt = sqlite.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+    const tx = sqlite.transaction(entries => {
+      for (const [key, value] of entries) {
+        if (PROTECTED_KEYS.has(key)) continue
+        stmt.run(key, JSON.stringify(value))
+      }
+    })
+    tx(Object.entries(patch))
+    return getSettings()
+  }
+
+  return { getSettings, getSetting, updateSettings }
+}

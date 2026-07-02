@@ -1,22 +1,10 @@
 import { logger } from '../services/logger.js'
+// ApiError is defined in `@carelane/core` and thrown by the core services, so it
+// must be the *same* class the error handler checks with `instanceof`. Re-export
+// it here so every existing `../middleware/errorHandler.js` import is unchanged.
+import { ApiError } from '@carelane/core'
 
-/**
- * Application error with an API error code and HTTP status.
- */
-export class ApiError extends Error {
-  /**
-   * @param {number} status HTTP status code
-   * @param {string} code machine-readable error code
-   * @param {string} message human-readable message
-   * @param {Array} [details]
-   */
-  constructor (status, code, message, details = []) {
-    super(message)
-    this.status = status
-    this.code = code
-    this.details = details
-  }
-}
+export { ApiError }
 
 /** 404 helper for unmatched API routes. */
 export function notFound (req, res) {
