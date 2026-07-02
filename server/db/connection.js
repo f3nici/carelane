@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/better-sqlite3'
 import fs from 'node:fs'
 import path from 'node:path'
 import config from '../config.js'
-import * as schema from './schema.js'
+import { schema } from '@carelane/core'
 
 fs.mkdirSync(path.dirname(config.dbPath), { recursive: true })
 

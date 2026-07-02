@@ -1,5 +1,6 @@
 import { sqlite } from '../db/connection.js'
 import config from '../config.js'
+import { ctx } from './_core.js'
 import { encrypt, decrypt } from './cryptoService.js'
 import { getSetting, updateSettings } from './settingsService.js'
 import { getClient, clientDisplayName } from './clientService.js'
@@ -341,3 +342,9 @@ export async function syncAll () {
   else clearSyncError()
   return { ok: failed === 0, total: rows.length, synced, failed }
 }
+
+// Register this optional integration on the core context so the portable
+// schedule/recurrence services mirror shift changes to Google Calendar. Hosts
+// that never load this module (e.g. the app) simply leave ctx.googleCalendar
+// unset and the mirror calls become no-ops.
+ctx.googleCalendar = { syncScheduledShift, removeScheduledShift }

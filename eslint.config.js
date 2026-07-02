@@ -18,7 +18,7 @@ const style = {
 }
 
 export default [
-  { ignores: ['dist/**', 'node_modules/**', 'data/**', 'uploads/**', 'coverage/**', 'public/**'] },
+  { ignores: ['dist/**', '**/dist/**', 'node_modules/**', 'data/**', 'uploads/**', 'coverage/**', 'public/**'] },
 
   js.configs.recommended,
   ...vue.configs['flat/essential'],
@@ -35,9 +35,10 @@ export default [
     }
   },
 
-  // Server runs on Node.
+  // Server runs on Node. `@carelane/core` is host-agnostic but relies only on
+  // globals present in both Node and React Native (Buffer, console, JSON, …).
   {
-    files: ['server/**/*.js', '*.config.js', 'vitest.config.js', 'eslint.config.js'],
+    files: ['server/**/*.js', 'packages/**/*.js', '*.config.js', 'vitest.config.js', 'eslint.config.js'],
     languageOptions: { globals: { ...globals.node } }
   },
 
