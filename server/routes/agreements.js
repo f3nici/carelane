@@ -26,7 +26,7 @@ router.param('id', (req, res, next, value) => {
 })
 router.use((req, res, next) => {
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method) || req.isAdmin) return next()
-  next(new ApiError(403, 'FORBIDDEN', 'Read-only access — ask an admin to make changes'))
+  next(new ApiError(403, 'FORBIDDEN', "You don't have access to this"))
 })
 
 /**

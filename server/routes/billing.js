@@ -16,7 +16,7 @@ const router = Router()
 // list — creating, editing, deactivating and importing are admin-only.
 router.use((req, res, next) => {
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method) || req.isAdmin) return next()
-  next(new ApiError(403, 'FORBIDDEN', 'Admin access required'))
+  next(new ApiError(403, 'FORBIDDEN', "You don't have access to this"))
 })
 // Price-guide imports are buffered in memory then parsed (docx/pdf), so keep the
 // cap modest to bound memory use; a deliberately-lowered global limit wins.

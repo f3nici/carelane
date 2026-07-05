@@ -49,16 +49,23 @@ API docs at `/api/docs`, health at `/healthz`.
   the core `list*` functions (which scope via `applyClientScope`). Rosters are
   scoped by `scheduled_shifts.worker_id` instead — a worker sees/clocks only
   their own shifts; an admin assigns each shift a `worker_id`. Workers are
-  **read-only** on the whole participant record (view every note, but never edit,
-  finalise, reopen or delete) — the one thing they may write is a NEW note for a
-  shift they worked (create-only) and clock in/out of their own roster.
+  otherwise **read-only** on the participant record (view every note/agreement/
+  incident/goal/med/RP/document, but never edit, delete or finalise them). The
+  exceptions are shift notes and their own roster: a worker may create a note,
+  and edit/finalise/attach-photos to their OWN note **while it is a draft** — once
+  finalised they can neither edit it nor send it back to draft (only an admin
+  reopens), and they can never touch someone else's note (`canEditNote` guard in
+  `routes/shifts.js`). They also clock in/out of their own roster.
   `accessService`/`userService` (server-only) manage assignments and user CRUD
   (`/api/v1/users`, admin only; last-admin guard). Users are never hard-deleted —
   a departing worker is deactivated (`users.active=0`), revoking their sessions.
-  Operator surfaces (settings, notifications, invoices, templates, knowledge/RAG,
-  audit log, deleted-items) are admin-only; billing codes are readable by all
-  (a worker picks one on a note) but admin-only to edit. The SPA hides
-  admin-only nav/controls (`auth.isAdmin`, router `meta.adminOnly`).
+  Operator surfaces (settings, notifications, invoices, templates, audit log,
+  deleted-items) are admin-only; billing codes and the knowledge base (RAG
+  search) are readable by all (a worker picks a code on a note, searches
+  guidelines) but only an admin edits codes or uploads documents. Access
+  failures return 401 `UNAUTHENTICATED` ("not authenticated") or 403 `FORBIDDEN`
+  ("you don't have access"). The SPA hides admin-only nav/controls
+  (`auth.isAdmin`, router `meta.adminOnly`).
 - Encrypted columns: clients PII fields, shift `body`/`incident_details`.
   NDIS number also gets an HMAC blind index (`ndis_number_hash`) for search.
 - `activity_log` is append-only (SQLite triggers) and tamper-evident: each row

@@ -166,11 +166,14 @@ export function createApp () {
   api.use('/billing-codes', authed, billingRoutes)
   api.use('/dashboard', authed, dashboardRoutes)
   api.use('/users', authed, userRoutes)
-  // Admin-only surfaces: knowledge base, invoicing, settings, notifications,
-  // drafting templates, the audit trail and the deleted-items recycle bin are
-  // operator tools a support worker never touches.
+  // The knowledge base is readable by everyone (workers can search/reference the
+  // guidelines) — only uploading/reindexing/deleting documents is admin-gated,
+  // inside the router itself.
+  api.use('/documents', authed, documentRoutes)
+  // Admin-only surfaces: invoicing, settings, notifications, drafting templates,
+  // the audit trail and the deleted-items recycle bin are operator tools a
+  // support worker never touches.
   api.use('/invoices', authed, requireAdmin, invoiceRoutes)
-  api.use('/documents', authed, requireAdmin, documentRoutes)
   api.use('/settings', authed, requireAdmin, settingsRoutes)
   api.use('/notifications', authed, requireAdmin, notificationRoutes)
   api.use('/templates', authed, requireAdmin, templateRoutes)

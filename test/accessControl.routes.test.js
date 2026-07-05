@@ -63,9 +63,11 @@ describe('multi-user access control', () => {
     expect(ids).not.toContain(otherClient.id)
   })
 
-  it('lets the worker read an assigned participant but 404s an unassigned one', async () => {
+  it('lets the worker read an assigned participant but denies an unassigned one', async () => {
     expect((await worker.agent.get(`/api/v1/clients/${assignedClient.id}`)).status).toBe(200)
-    expect((await worker.agent.get(`/api/v1/clients/${otherClient.id}`)).status).toBe(404)
+    const denied = await worker.agent.get(`/api/v1/clients/${otherClient.id}`)
+    expect(denied.status).toBe(403)
+    expect(denied.body.error.message).toMatch(/don't have access/i)
   })
 
   it('forbids the worker creating or editing participants', async () => {
@@ -84,10 +86,29 @@ describe('multi-user access control', () => {
 
     const denied = await worker.agent.post('/api/v1/shifts').set('x-csrf-token', worker.csrf)
       .send({ client_id: otherClient.id, shift_date: '2026-09-01', body: 'Should be blocked.' })
-    expect(denied.status).toBe(404)
+    expect(denied.status).toBe(403)
   })
 
-  it('lets the worker view but not edit or reopen an existing note', async () => {
+  it('lets the worker edit and finalise their own draft, then locks it', async () => {
+    const draft = (await worker.agent.post('/api/v1/shifts').set('x-csrf-token', worker.csrf)
+      .send({ client_id: assignedClient.id, shift_date: '2026-09-04', body: 'Draft note.' })).body.data
+    expect(draft.finalised).toBe(0)
+    // Edit the draft…
+    const edited = await worker.agent.put(`/api/v1/shifts/${draft.id}`).set('x-csrf-token', worker.csrf)
+      .send({ body: 'Edited by the worker.' })
+    expect(edited.status).toBe(200)
+    // …then finalise it themselves…
+    const finalised = await worker.agent.put(`/api/v1/shifts/${draft.id}`).set('x-csrf-token', worker.csrf)
+      .send({ finalised: 1 })
+    expect(finalised.status).toBe(200)
+    expect(finalised.body.data.finalised).toBe(1)
+    // …after which they can no longer edit it or send it back to draft.
+    const reopen = await worker.agent.put(`/api/v1/shifts/${draft.id}`).set('x-csrf-token', worker.csrf)
+      .send({ finalised: 0 })
+    expect(reopen.status).toBe(403)
+  })
+
+  it('lets the worker view but not edit, delete or reopen someone else\'s note', async () => {
     // Admin finalises a note for the assigned participant.
     const note = (await admin.agent.post('/api/v1/shifts').set('x-csrf-token', admin.csrf)
       .send({ client_id: assignedClient.id, shift_date: '2026-09-03', body: 'Admin note.', finalised: 1 })).body.data
@@ -112,7 +133,7 @@ describe('multi-user access control', () => {
     const mine = await worker.agent.post(`/api/v1/schedule/${assignedScheduled.id}/clock-in`).set('x-csrf-token', worker.csrf)
     expect(mine.body.data.status).toBe('in_progress')
     const notMine = await worker.agent.post(`/api/v1/schedule/${otherScheduled.id}/clock-in`).set('x-csrf-token', worker.csrf)
-    expect(notMine.status).toBe(404)
+    expect(notMine.status).toBe(403)
   })
 
   it('forbids the worker rostering or deleting shifts', async () => {
@@ -124,9 +145,20 @@ describe('multi-user access control', () => {
   })
 
   it('blocks the worker from operator-only surfaces and user management', async () => {
-    for (const path of ['/api/v1/users', '/api/v1/settings', '/api/v1/audit/verify', '/api/v1/deleted', '/api/v1/documents']) {
+    for (const path of ['/api/v1/users', '/api/v1/settings', '/api/v1/audit/verify', '/api/v1/deleted', '/api/v1/invoices']) {
       expect((await worker.agent.get(path)).status).toBe(403)
     }
+  })
+
+  it('lets the worker read the knowledge base but not upload/delete documents', async () => {
+    expect((await worker.agent.get('/api/v1/documents')).status).toBe(200)
+    expect((await worker.agent.get('/api/v1/documents/search').query({ q: 'ndis', mode: 'keyword' })).status).toBe(200)
+    // Uploading and deleting knowledge-base documents stays admin-only.
+    const upload = await worker.agent.post('/api/v1/documents').set('x-csrf-token', worker.csrf)
+      .field('title', 'nope')
+    expect(upload.status).toBe(403)
+    const del = await worker.agent.delete('/api/v1/documents/1').set('x-csrf-token', worker.csrf)
+    expect(del.status).toBe(403)
   })
 
   it('lets the worker read billing codes (needed to note a shift) but not edit them', async () => {

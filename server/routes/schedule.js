@@ -29,7 +29,7 @@ router.param('id', (req, res, next, value) => {
   if (req.isAdmin) return next()
   try {
     const shift = scheduleService.getScheduled(Number(value))
-    if (shift.worker_id !== req.currentUser.id) throw new ApiError(404, 'NOT_FOUND', 'Not found')
+    if (shift.worker_id !== req.currentUser.id) throw new ApiError(403, 'FORBIDDEN', "You don't have access to this")
     req.scheduled = shift
     next()
   } catch (err) { next(err) }

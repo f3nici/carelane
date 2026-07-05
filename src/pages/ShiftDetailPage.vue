@@ -20,9 +20,14 @@ const offline = useOfflineStore()
 const { aiActive, ensureLoaded } = useIntegrations()
 const auth = useAuthStore()
 const id = computed(() => route.params.id)
-// Workers may write a NEW note (their own shift) but view existing notes
-// read-only — no editing, finalising, reopening, archiving or invoicing.
-const workerReadOnly = computed(() => !!id.value && !auth.isAdmin)
+// A worker may write a NEW note and edit/finalise their OWN note while it is a
+// draft; once finalised (or for someone else's note) it is view-only for them.
+// Admins can always edit. Reopening a finalised note is admin-only.
+const canEditNote = computed(() => {
+  if (auth.isAdmin) return true
+  if (!id.value) return true // creating a new note
+  return shift.value.worker_id === auth.user?.id && !shift.value.finalised
+})
 
 const shift = ref({})
 const clients = ref([])
@@ -243,7 +248,7 @@ async function draft () {
       @draft="draft"
     />
 
-    <ShiftNoteEditor ref="editor" :model-value="shift" :clients="clients" :busy="busy" :locked="!!shift.finalised" :readonly="workerReadOnly" :can-finalise="auth.isAdmin" :can-reopen="auth.isAdmin" @submit="save" @reopen="reopen" />
+    <ShiftNoteEditor ref="editor" :model-value="shift" :clients="clients" :busy="busy" :locked="!!shift.finalised" :readonly="!canEditNote" :can-finalise="canEditNote" :can-reopen="auth.isAdmin" @submit="save" @reopen="reopen" />
 
     <div v-if="id && shift.incident_flag" class="card border-danger/40 space-y-3">
       <div class="flex items-center justify-between gap-3">
@@ -301,7 +306,7 @@ async function draft () {
     <div v-if="id" class="card">
       <div class="flex items-center justify-between mb-3">
         <h3 class="font-semibold">Photos</h3>
-        <PhotoUploader v-if="auth.isAdmin" :shift-id="id" @uploaded="p => shift.photos = [...(shift.photos || []), p]" />
+        <PhotoUploader v-if="canEditNote" :shift-id="id" @uploaded="p => shift.photos = [...(shift.photos || []), p]" />
       </div>
       <PhotoGallery :shift-id="id" :photos="shift.photos || []" @deleted="pid => shift.photos = shift.photos.filter(p => p.id !== pid)" />
     </div>

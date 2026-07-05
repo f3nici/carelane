@@ -9,7 +9,7 @@ import { listAssignedClientIds, canAccessClient } from '../services/accessServic
  */
 export function requireAuth (req, res, next) {
   if (req.session?.userId) return next()
-  next(new ApiError(401, 'UNAUTHENTICATED', 'Authentication required'))
+  next(new ApiError(401, 'UNAUTHENTICATED', 'You are not authenticated. Please log in.'))
 }
 
 /**
@@ -28,7 +28,7 @@ export function attachAccess (req, res, next) {
   const user = sqlite.prepare('SELECT id, username, display_name, role, active FROM users WHERE id = ?')
     .get(req.session.userId)
   if (!user || !user.active) {
-    return req.session.destroy(() => next(new ApiError(401, 'UNAUTHENTICATED', 'Account is no longer active')))
+    return req.session.destroy(() => next(new ApiError(401, 'UNAUTHENTICATED', 'You are not authenticated. Please log in.')))
   }
   req.currentUser = user
   req.isAdmin = user.role === 'admin'
@@ -42,19 +42,18 @@ export function attachAccess (req, res, next) {
  */
 export function requireAdmin (req, res, next) {
   if (req.isAdmin ?? req.session?.role === 'admin') return next()
-  next(new ApiError(403, 'FORBIDDEN', 'Admin access required'))
+  next(new ApiError(403, 'FORBIDDEN', "You don't have access to this"))
 }
 
 /**
  * Throw unless the current user may access the given participant. Admins pass;
- * workers must have the participant assigned. Uses 404 (not 403) so an
- * unassigned worker cannot probe which participant ids exist.
+ * workers must have the participant assigned.
  * @param {import('express').Request} req
  * @param {number} clientId
  */
 export function assertClientAccess (req, clientId) {
   if (!canAccessClient(req.currentUser, clientId)) {
-    throw new ApiError(404, 'NOT_FOUND', 'Not found')
+    throw new ApiError(403, 'FORBIDDEN', "You don't have access to this")
   }
 }
 

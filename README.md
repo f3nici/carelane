@@ -47,13 +47,15 @@ encrypted at rest.
   timings in-app. See the [ntfy setup guide](docs/ntfy-notifications-setup.md).
 - **Team & access control** — add support-worker logins alongside the admin, and
   assign each worker the participants they support (managed from the **Team**
-  page). A worker sees only their assigned participants — full record, but
-  **read-only**: they can view every note but not edit one or send a finalised
-  note back to draft. Rosters are per-worker: an admin assigns each scheduled
-  shift to a worker, and a worker sees (and clocks in/out of) only their own
-  shifts, and can write the note for a shift they worked. Everything else
-  (settings, billing catalogue, incidents/agreements/reports authoring, the
-  knowledge base, the audit log and deleted-items recycle bin) stays admin-only.
+  page). A worker sees only their assigned participants, mostly **read-only**:
+  they can view every note, agreement, incident, goal and record but not change
+  them. The exception is their own shift notes — a worker can write a note, and
+  edit/finalise it **while it is a draft**; once finalised only an admin can
+  reopen it. Rosters are per-worker: an admin assigns each scheduled shift to a
+  worker, and a worker sees (and clocks in/out of) only their own shifts. Workers
+  can also search the knowledge base (but not upload to it). Everything else
+  (settings, billing-catalogue editing, incident/agreement/report authoring, the
+  audit log and deleted-items recycle bin) stays admin-only.
 - **Login hardening** — DB-backed brute-force throttling (per ip+username and a
   per-account global counter, surviving restarts), optional **TOTP two-factor**
   with one-time recovery codes, **passkeys (WebAuthn)** as a passwordless factor,

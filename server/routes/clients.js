@@ -33,7 +33,7 @@ const router = Router()
 router.param('id', requireClientParam)
 router.use((req, res, next) => {
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method) || req.isAdmin) return next()
-  next(new ApiError(403, 'FORBIDDEN', 'Read-only access — ask an admin to make changes'))
+  next(new ApiError(403, 'FORBIDDEN', "You don't have access to this"))
 })
 
 const ALLOWED_DOC_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
