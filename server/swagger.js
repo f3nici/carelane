@@ -1,12 +1,13 @@
 import swaggerJsdoc from 'swagger-jsdoc'
 import swaggerUi from 'swagger-ui-express'
+import { VERSION } from '../version.js'
 
 const spec = swaggerJsdoc({
   definition: {
     openapi: '3.0.3',
     info: {
       title: 'CareLane API',
-      version: '0.1.0',
+      version: VERSION,
       description: 'NDIS independent support worker management. Session-authenticated; standard envelope `{ success, data, meta? }` / `{ success:false, error }`. State-changing requests require the `x-csrf-token` header from `/auth/me`.'
     },
     servers: [{ url: '/api/v1' }],

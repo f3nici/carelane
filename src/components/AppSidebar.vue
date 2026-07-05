@@ -4,6 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useApi } from '../composables/useApi.js'
 import { useAuthStore } from '../stores/auth.js'
 import BrandLogo from './BrandLogo.vue'
+import { VERSION } from '../../version.js'
 
 const emit = defineEmits(['open-search'])
 
@@ -75,7 +76,7 @@ async function logout () {
 
   <!-- Sidebar (desktop) / slide-in drawer (mobile) -->
   <aside
-    class="bg-surface border-white/10 fixed inset-y-0 left-0 z-50 w-64 flex flex-col transition-transform duration-200 md:static md:z-auto md:w-60 md:min-h-screen md:border-r md:translate-x-0"
+    class="bg-surface border-white/10 fixed inset-y-0 left-0 z-50 w-64 flex flex-col transition-transform duration-200 md:sticky md:top-0 md:z-auto md:w-60 md:h-screen md:border-r md:translate-x-0"
     :class="mobileOpen ? 'translate-x-0' : '-translate-x-full'"
   >
     <div class="flex items-center gap-2 px-5 py-5">
@@ -112,10 +113,13 @@ async function logout () {
         <span v-if="item.count && stats[item.count]" class="pill bg-white/10 text-mid">{{ stats[item.count] }}</span>
       </router-link>
     </nav>
-    <div class="px-5 py-4 border-t border-white/10 text-xs text-mid">
+    <div class="shrink-0 px-5 py-4 border-t border-white/10 text-xs text-mid">
       <p class="truncate">{{ auth.user?.display_name }}</p>
       <p class="text-[10px] uppercase tracking-wide text-mid/70 mb-1">{{ auth.isAdmin ? 'Admin' : 'Support worker' }}</p>
-      <button class="text-accent hover:underline" @click="logout">Sign out</button>
+      <div class="flex items-center justify-between">
+        <button class="text-accent hover:underline" @click="logout">Sign out</button>
+        <span class="text-[10px] text-mid/60 tabular-nums">v{{ VERSION }}</span>
+      </div>
     </div>
   </aside>
 </template>
