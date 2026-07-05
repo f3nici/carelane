@@ -47,12 +47,35 @@ export function createShiftService (ctx, services) {
     return Math.round((mins / 60) * 4) / 4
   }
 
+  // The list row's text fields that a free-text keyword search scans. `body` and
+  // `incident_details` are decrypted per-row (they are encrypted at rest, so the
+  // match cannot run in SQL) alongside the plaintext columns and the derived
+  // participant name.
+  const SEARCH_FIELDS = ['body', 'incident_details', 'support_provided',
+    'participant_response', 'location', 'billing_code', 'shift_date', 'client_display_name']
+
+  /** True when `row` contains `needle` (case-insensitive) in any searchable field. */
+  function matchesKeyword (row, needle) {
+    return SEARCH_FIELDS.some(f => String(row[f] ?? '').toLowerCase().includes(needle))
+  }
+
   /**
-   * List shift notes with optional client / incident / billed / archived filters.
+   * List shift notes with optional client / incident / billed / archived filters,
+   * a date filter (exact `date`, or a `date_from`/`date_to` range), a free-text
+   * `q` keyword search (across the note body, support provided, participant
+   * response, location, billing code and participant name), and a `sort` order
+   * (`date` newest-first — the default, `date_asc` oldest-first, or `client` by
+   * participant name).
+   *
    * By default archived notes are hidden; pass `archived: 'true'` for archived
    * only, or `archived: 'all'` for both.
+   *
+   * Keyword search and the participant sort both need per-row decryption (the
+   * note body and participant name are encrypted at rest), so those paths load
+   * the filtered set and finish the match/sort/paginate in JS; the plain,
+   * date-ordered list stays a paginated SQL query.
    * @param {{page:number, perPage:number, offset:number}} pg
-   * @param {{client_id?:string, incident?:string, billed?:string, archived?:string}} filters
+   * @param {{client_id?:string, incident?:string, billed?:string, archived?:string, date?:string, date_from?:string, date_to?:string, q?:string, sort?:string}} filters
    */
   function listShifts (pg, filters = {}) {
     const where = ['s.deleted_at IS NULL']
@@ -63,19 +86,46 @@ export function createShiftService (ctx, services) {
     if (filters.client_id) { where.push('s.client_id = ?'); params.push(Number(filters.client_id)) }
     if (filters.incident === 'true') where.push('s.incident_flag = 1')
     if (filters.billed === 'false') where.push('s.billed = 0')
+    if (filters.date) { where.push('s.shift_date = ?'); params.push(filters.date) }
+    if (filters.date_from) { where.push('s.shift_date >= ?'); params.push(filters.date_from) }
+    if (filters.date_to) { where.push('s.shift_date <= ?'); params.push(filters.date_to) }
     const whereSql = 'WHERE ' + where.join(' AND ')
+
     // Join clients (excluding soft-deleted ones) so the count matches the listed
     // rows — a soft-deleted participant's shifts drop out of active lists.
-    const total = sqlite.prepare(`SELECT COUNT(*) AS c FROM shift_notes s
-      JOIN clients c ON c.id = s.client_id AND c.deleted_at IS NULL ${whereSql}`).get(...params).c
-    const rows = sqlite.prepare(`SELECT s.*, c.preferred_name AS client_preferred_name,
+    const select = `SELECT s.*, c.preferred_name AS client_preferred_name,
         c.first_name AS client_first_name, c.last_name AS client_last_name, bc.code AS billing_code
       FROM shift_notes s
       JOIN clients c ON c.id = s.client_id AND c.deleted_at IS NULL
       LEFT JOIN billing_codes bc ON bc.id = s.billing_code_id
-      ${whereSql} ORDER BY s.shift_date DESC, s.id DESC LIMIT ? OFFSET ?`)
-      .all(...params, pg.perPage, pg.offset)
-    return { rows: rows.map(toShiftListRow), total }
+      ${whereSql}`
+
+    const keyword = filters.q?.trim().toLowerCase()
+    const byClient = filters.sort === 'client'
+
+    // Fast path: no keyword and the default date ordering — paginate in SQL.
+    if (!keyword && !byClient) {
+      const order = filters.sort === 'date_asc' ? 'ASC' : 'DESC'
+      const total = sqlite.prepare(`SELECT COUNT(*) AS c FROM shift_notes s
+        JOIN clients c ON c.id = s.client_id AND c.deleted_at IS NULL ${whereSql}`).get(...params).c
+      const rows = sqlite.prepare(`${select} ORDER BY s.shift_date ${order}, s.id ${order} LIMIT ? OFFSET ?`)
+        .all(...params, pg.perPage, pg.offset)
+      return { rows: rows.map(toShiftListRow), total }
+    }
+
+    // Keyword / participant-sort path: decrypt the filtered set, then match, sort
+    // and paginate in JS.
+    let rows = sqlite.prepare(select).all(...params).map(toShiftListRow)
+    if (keyword) rows = rows.filter(r => matchesKeyword(r, keyword))
+    if (byClient) {
+      rows.sort((a, b) => a.client_display_name.localeCompare(b.client_display_name) ||
+        b.shift_date.localeCompare(a.shift_date) || b.id - a.id)
+    } else {
+      const dir = filters.sort === 'date_asc' ? 1 : -1
+      rows.sort((a, b) => dir * (a.shift_date.localeCompare(b.shift_date) || a.id - b.id))
+    }
+    const total = rows.length
+    return { rows: rows.slice(pg.offset, pg.offset + pg.perPage), total }
   }
 
   /**
