@@ -4,6 +4,7 @@ import { services } from './_core.js'
 
 export const {
   listShifts,
+  reindexSearch,
   getShift,
   createShift,
   updateShift,

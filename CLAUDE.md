@@ -77,6 +77,17 @@ API docs at `/api/docs`, health at `/healthz`.
   `meta.adminOnly`).
 - Encrypted columns: clients PII fields, shift `body`/`incident_details`.
   NDIS number also gets an HMAC blind index (`ndis_number_hash`) for search.
+- Shift-note keyword search: the note list (`listShifts`) supports a free-text
+  `q` (plus participant, date/date-range filters and a date/participant `sort`).
+  Because `body`/`incident_details` are encrypted at rest, search runs over a
+  **blind-index FTS5 table** (`shift_notes_fts`): each note's words are reduced
+  to keyed per-word HMACs (`searchToken`, reusing the crypto blind-index key) in
+  the app layer — never a SQL trigger — so no note plaintext is written to the
+  index. A query is hashed the same way and matched via `MATCH`, keeping search
+  a paginated SQL query that scales (whole-word, case-insensitive; multi-word is
+  AND-ed). Maintained on every create/update by `shiftService.indexShift`;
+  `reindexSearch` backfills missing rows (run by the migration, self-healing on
+  boot). Participant sort still decrypts in JS (encrypted legal name).
 - `activity_log` is append-only (SQLite triggers) and tamper-evident: each row
   carries a SHA-256 hash chained off the previous row (`prev_hash`/`hash`),
   verifiable via `GET /api/v1/audit/verify` (Dashboard + Audit-log widgets).

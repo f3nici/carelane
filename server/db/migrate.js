@@ -1,5 +1,6 @@
 import { sqlite } from './connection.js'
 import { backfillAuditHashes } from '../services/activityService.js'
+import { reindexSearch as reindexShiftSearch } from '../services/shiftService.js'
 
 /**
  * Add a column to a table only if it does not already exist. SQLite has no
@@ -617,6 +618,17 @@ CREATE INDEX IF NOT EXISTS idx_client_assignments_client ON client_assignments (
 `)
 
   migrateChunkFts()
+
+  // Blind-index keyword search over shift notes (added post-launch). The note
+  // body is encrypted at rest, so the searchable text cannot live in a plain FTS
+  // shadow table or be tokenised by a SQL trigger. Instead each note's words are
+  // reduced to keyed per-word HMACs in the app layer (`shiftService.indexShift`)
+  // and stored here; a keyword query is hashed the same way and matched via FTS5,
+  // so search scales without ever writing note plaintext to the index. Maintained
+  // from JS on every create/update — no triggers. `reindexSearch` backfills any
+  // note missing a row (all of them on first run) and is a no-op once in sync.
+  sqlite.exec('CREATE VIRTUAL TABLE IF NOT EXISTS shift_notes_fts USING fts5(tokens)')
+  reindexShiftSearch()
 }
 
 /**
