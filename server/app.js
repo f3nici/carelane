@@ -158,7 +158,8 @@ export function createApp () {
   // caller's role + assigned participants (and rejects a deactivated login).
   const authed = [requireAuth, attachAccess]
   api.use('/clients', authed, clientRoutes)
-  api.use('/agreements', authed, agreementRoutes)
+  // Service agreements are an operator surface — hidden from support workers.
+  api.use('/agreements', authed, requireAdmin, agreementRoutes)
   api.use('/shifts', authed, shiftRoutes)
   api.use('/incidents', authed, incidentRoutes)
   api.use('/schedule', authed, scheduleRoutes)

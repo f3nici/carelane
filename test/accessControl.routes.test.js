@@ -48,7 +48,7 @@ beforeAll(async () => {
     .send({ client_id: otherClient.id, scheduled_date: '2026-09-02', start_time: '09:00', end_time: '11:00' })).body.data
 
   worker = await loginAgent('worker1', 'worker-pass-123')
-})
+}, 30000) // generous: the setup does several cost-12 bcrypt hashes/compares
 
 describe('multi-user access control', () => {
   it('logs the worker in with the worker role', async () => {
@@ -163,12 +163,34 @@ describe('multi-user access control', () => {
     // unconfigured in tests, so it fails with 503, never 403).
     const ask = await worker.agent.post('/api/v1/documents/ask').set('x-csrf-token', worker.csrf).send({ question: 'What is a support plan?' })
     expect(ask.status).not.toBe(403)
+    // Downloading a source document is allowed (a missing id 404s, never 403).
+    expect((await worker.agent.get('/api/v1/documents/999999/file')).status).not.toBe(403)
     // Uploading and deleting knowledge-base documents stays admin-only.
     const upload = await worker.agent.post('/api/v1/documents').set('x-csrf-token', worker.csrf)
       .field('title', 'nope')
     expect(upload.status).toBe(403)
     const del = await worker.agent.delete('/api/v1/documents/1').set('x-csrf-token', worker.csrf)
     expect(del.status).toBe(403)
+  })
+
+  it('hides the participant charge rate and service agreements from the worker', async () => {
+    // Admin links a billing code with a per-participant charge rate.
+    await admin.agent.put(`/api/v1/clients/${assignedClient.id}/billing-codes`).set('x-csrf-token', admin.csrf)
+      .send({ codes: [{ billing_code_id: 1, custom_rate: 99.5 }] })
+    // Admin sees the rate…
+    const adminView = await admin.agent.get(`/api/v1/clients/${assignedClient.id}/billing-codes`)
+    expect(adminView.body.data[0].custom_rate).toBe(99.5)
+    // …the worker sees the code (to pick it on a note) but not the rate/caps.
+    const workerView = await worker.agent.get(`/api/v1/clients/${assignedClient.id}/billing-codes`)
+    expect(workerView.status).toBe(200)
+    expect(workerView.body.data[0].code).toBeTruthy()
+    expect(workerView.body.data[0].custom_rate).toBeUndefined()
+    expect(workerView.body.data[0].price_cap_standard).toBeUndefined()
+    // Service agreements are hidden entirely.
+    expect((await worker.agent.get('/api/v1/agreements')).status).toBe(403)
+    expect((await worker.agent.get(`/api/v1/clients/${assignedClient.id}/agreements`)).status).toBe(403)
+    // …and the full-record export (which includes agreements + rates) is admin-only.
+    expect((await worker.agent.get(`/api/v1/clients/${assignedClient.id}/export`)).status).toBe(403)
   })
 
   it('lets the worker AI-draft their own draft note but not someone else\'s', async () => {

@@ -81,7 +81,9 @@ async function remove (id) {
 
     <KnowledgeSearch />
 
-    <div v-if="auth.isAdmin" class="card !p-0 overflow-x-auto">
+    <!-- The document library is visible to everyone so workers can download the
+         source PDFs; only an admin can re-index or delete them. -->
+    <div class="card !p-0 overflow-x-auto">
       <table class="w-full text-sm">
         <thead>
           <tr class="text-left text-xs text-mid border-b border-white/10">
@@ -89,7 +91,7 @@ async function remove (id) {
           </tr>
         </thead>
         <tbody>
-          <tr v-if="!documents.length"><td colspan="6" class="p-4 text-mid">No documents uploaded yet.</td></tr>
+          <tr v-if="!documents.length"><td colspan="6" class="p-4 text-mid">No documents in the library yet.</td></tr>
           <tr v-for="d in documents" :key="d.id" class="border-b border-white/5 hover:bg-white/5">
             <td class="p-3">{{ d.title }}</td>
             <td class="p-3 text-xs text-mid">{{ d.category }}</td>
@@ -98,8 +100,10 @@ async function remove (id) {
             <td class="p-3"><StatusBadge :status="d.indexed ? 'indexed' : 'indexing'" /></td>
             <td class="p-3 text-xs whitespace-nowrap">
               <a class="text-accent hover:underline mr-2" :href="`/api/v1/documents/${d.id}/file`" target="_blank" rel="noopener">download</a>
-              <button class="text-accent hover:underline mr-2" @click="reindex(d.id)">re-index</button>
-              <button class="text-danger hover:underline" @click="remove(d.id)">delete</button>
+              <template v-if="auth.isAdmin">
+                <button class="text-accent hover:underline mr-2" @click="reindex(d.id)">re-index</button>
+                <button class="text-danger hover:underline" @click="remove(d.id)">delete</button>
+              </template>
             </td>
           </tr>
         </tbody>

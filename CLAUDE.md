@@ -49,8 +49,11 @@ API docs at `/api/docs`, health at `/healthz`.
   the core `list*` functions (which scope via `applyClientScope`). Rosters are
   scoped by `scheduled_shifts.worker_id` instead — a worker sees/clocks only
   their own shifts; an admin assigns each shift a `worker_id`. Workers are
-  otherwise **read-only** on the participant record (view every note/agreement/
-  incident/goal/med/RP/document, but never edit, delete or finalise them). The
+  otherwise **read-only** on the participant record (view every note/incident/
+  goal/med/RP/document, but never edit, delete or finalise them). Service
+  agreements, the per-participant charge rate (`custom_rate` + price caps, stripped
+  from the billing-codes read) and the full-record export are hidden from workers
+  entirely, and a worker's dashboard shows only their upcoming shifts. The
   exceptions are shift notes and their own roster: a worker may create a note,
   and edit/finalise/attach-photos to their OWN note **while it is a draft** — once
   finalised they can neither edit it nor send it back to draft (only an admin
@@ -62,7 +65,8 @@ API docs at `/api/docs`, health at `/healthz`.
   Operator surfaces (notifications, invoices, templates, audit log, deleted-items)
   are admin-only; billing codes and the knowledge base (RAG search + grounded
   Q&A) are usable by all (a worker picks a code on a note, searches/asks the
-  guidelines) but only an admin edits codes or uploads documents. AI drafting
+  guidelines and downloads source PDFs) but only an admin edits codes or uploads/
+  re-indexes/deletes documents. AI drafting
   follows the note-edit rule — a worker can AI-draft their OWN draft note — and
   the whole AI surface degrades to nothing when Claude is off/unconfigured
   (`useIntegrations`/`aiActive`). Settings *reads* (branding + AI status) are open

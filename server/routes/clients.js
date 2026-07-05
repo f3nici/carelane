@@ -6,7 +6,7 @@ import multer from 'multer'
 import { ZipArchive } from 'archiver'
 import { validate, validatePartial } from '../middleware/validate.js'
 import { clientSchema, clientBillingCodesSchema, clientDocumentMetaSchema, goalSchema, goalProgressSchema, restrictivePracticeSchema, medicationRecordSchema, clientWorkersSchema } from '../utils/validators.js'
-import { requireClientParam } from '../middleware/auth.js'
+import { requireClientParam, requireAdmin } from '../middleware/auth.js'
 import * as accessService from '../services/accessService.js'
 import * as clientService from '../services/clientService.js'
 import * as agreementService from '../services/agreementService.js'
@@ -114,8 +114,8 @@ router.delete('/:id', (req, res) => {
   res.json(ok({ deleted: true }))
 })
 
-/** Privacy: full data export for a client (data access request). */
-router.get('/:id/export', (req, res) => {
+/** Privacy: full data export for a client (data access request; admin only). */
+router.get('/:id/export', requireAdmin, (req, res) => {
   const data = clientService.exportClient(Number(req.params.id))
   logActivity('client', Number(req.params.id), req.session.userId, 'exported')
   res.json(ok(data))
@@ -129,7 +129,7 @@ router.get('/:id/export', (req, res) => {
  *     summary: One-click "download everything" for a participant — a zip of the
  *       full JSON export plus a branded PDF summary (data access request)
  */
-router.get('/:id/export.zip', async (req, res, next) => {
+router.get('/:id/export.zip', requireAdmin, async (req, res, next) => {
   const id = Number(req.params.id)
   try {
     const data = clientService.exportClient(id)
@@ -153,7 +153,7 @@ router.get('/:id/export.zip', async (req, res, next) => {
   }
 })
 
-router.get('/:id/agreements', (req, res) => {
+router.get('/:id/agreements', requireAdmin, (req, res) => {
   const pg = parsePagination(req.query)
   const { rows, total } = agreementService.listAgreements(pg, { client_id: req.params.id })
   res.json(ok(rows, paginationMeta(pg.page, pg.perPage, total)))
@@ -166,7 +166,17 @@ router.get('/:id/shifts', (req, res) => {
 })
 
 router.get('/:id/billing-codes', (req, res) => {
-  res.json(ok(clientService.getClientBillingCodes(Number(req.params.id))))
+  const codes = clientService.getClientBillingCodes(Number(req.params.id))
+  // The per-participant charge rate is operator-commercial info — strip it (and
+  // the standard price caps) for support workers, who only need to pick a code.
+  const visible = req.isAdmin
+    ? codes
+    : codes.map(c => {
+      const copy = { ...c }
+      for (const k of ['custom_rate', 'price_cap_standard', 'price_cap_remote', 'price_cap_very_remote']) delete copy[k]
+      return copy
+    })
+  res.json(ok(visible))
 })
 
 router.put('/:id/billing-codes', validate(clientBillingCodesSchema), (req, res) => {
