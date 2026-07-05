@@ -11,6 +11,13 @@ import { ApiError } from '../middleware/errorHandler.js'
 import config from '../config.js'
 
 const router = Router()
+// Support items are a shared catalogue: any authenticated user may read them
+// (a worker picks a code when noting a shift), but only an admin maintains the
+// list — creating, editing, deactivating and importing are admin-only.
+router.use((req, res, next) => {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method) || req.isAdmin) return next()
+  next(new ApiError(403, 'FORBIDDEN', "You don't have access to this"))
+})
 // Price-guide imports are buffered in memory then parsed (docx/pdf), so keep the
 // cap modest to bound memory use; a deliberately-lowered global limit wins.
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: config.uploadLimitFor(15 * 1024 * 1024) } })

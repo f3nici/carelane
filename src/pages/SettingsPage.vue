@@ -25,10 +25,11 @@ const auth = useAuthStore()
 const { refresh: refreshIntegrations } = useIntegrations()
 const settings = ref(null)
 
-const tabs = [
-  { key: 'general', label: 'General' },
-  { key: 'billing', label: 'Billing codes' }
-]
+// Billing-code maintenance is an admin tool; workers only get the (self-service)
+// general settings.
+const tabs = auth.isAdmin
+  ? [{ key: 'general', label: 'General' }, { key: 'billing', label: 'Billing codes' }]
+  : [{ key: 'general', label: 'General' }]
 const tab = ref(tabs.some(t => t.key === route.query.tab) ? route.query.tab : 'general')
 
 function setTab (key) {
@@ -54,6 +55,9 @@ const aiBusy = ref(false)
 const aiTestResult = ref(null)
 
 onMounted(async () => {
+  // Business/integration settings are admin-only on the server; a support worker
+  // only uses this page for their own password / 2FA / passkeys / sessions.
+  if (!auth.isAdmin) return
   const [res, ai] = await Promise.all([
     api.get('/settings'),
     api.get('/settings/ai/status')
@@ -99,7 +103,7 @@ async function testAi () {
 
     <BillingCodesPage v-if="tab === 'billing'" />
 
-    <div v-else-if="settings" class="space-y-4 max-w-3xl">
+    <div v-else class="space-y-4 max-w-3xl">
     <h1 class="text-2xl font-semibold">Settings</h1>
 
     <div v-if="auth.mustEnrol2fa" class="rounded-xl border border-warning/40 bg-warning/10 p-4 space-y-1">
@@ -107,8 +111,8 @@ async function testAi () {
       <p class="text-xs text-mid">Your administrator requires two-factor authentication or a passkey on every account. Enable one below to unlock the rest of the app.</p>
     </div>
 
-    <!-- Business & branding -->
-    <section class="rounded-xl border border-white/10 overflow-hidden">
+    <!-- Business & branding (admin only) -->
+    <section v-if="auth.isAdmin && settings" class="rounded-xl border border-white/10 overflow-hidden">
       <button class="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-white/5 transition-colors" @click="toggle('business')">
         <span class="font-semibold">Business &amp; branding</span>
         <svg class="h-5 w-5 text-mid shrink-0 transition-transform" :class="open.business ? 'rotate-180' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
@@ -133,8 +137,8 @@ async function testAi () {
       </div>
     </section>
 
-    <!-- Integrations -->
-    <section class="rounded-xl border border-white/10 overflow-hidden">
+    <!-- Integrations (admin only) -->
+    <section v-if="auth.isAdmin && settings" class="rounded-xl border border-white/10 overflow-hidden">
       <button class="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-white/5 transition-colors" @click="toggle('integrations')">
         <span class="font-semibold">Integrations</span>
         <svg class="h-5 w-5 text-mid shrink-0 transition-transform" :class="open.integrations ? 'rotate-180' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
@@ -171,8 +175,8 @@ async function testAi () {
       </div>
     </section>
 
-    <!-- Data & privacy -->
-    <section class="rounded-xl border border-white/10 overflow-hidden">
+    <!-- Data & privacy (admin only) -->
+    <section v-if="auth.isAdmin && settings" class="rounded-xl border border-white/10 overflow-hidden">
       <button class="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-white/5 transition-colors" @click="toggle('data')">
         <span class="font-semibold">Data &amp; privacy</span>
         <svg class="h-5 w-5 text-mid shrink-0 transition-transform" :class="open.data ? 'rotate-180' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>

@@ -5,7 +5,9 @@ import crypto from 'node:crypto'
 import multer from 'multer'
 import { ZipArchive } from 'archiver'
 import { validate, validatePartial } from '../middleware/validate.js'
-import { clientSchema, clientBillingCodesSchema, clientDocumentMetaSchema, goalSchema, goalProgressSchema, restrictivePracticeSchema, medicationRecordSchema } from '../utils/validators.js'
+import { clientSchema, clientBillingCodesSchema, clientDocumentMetaSchema, goalSchema, goalProgressSchema, restrictivePracticeSchema, medicationRecordSchema, clientWorkersSchema } from '../utils/validators.js'
+import { requireClientParam, requireAdmin } from '../middleware/auth.js'
+import * as accessService from '../services/accessService.js'
 import * as clientService from '../services/clientService.js'
 import * as agreementService from '../services/agreementService.js'
 import * as shiftService from '../services/shiftService.js'
@@ -22,6 +24,17 @@ import { ApiError } from '../middleware/errorHandler.js'
 import config from '../config.js'
 
 const router = Router()
+
+// Access control for the participant module:
+//  - a worker may only reach participants assigned to them (enforced on every
+//    `:id` route by the param guard);
+//  - the whole participant record is read-only for workers — creating,
+//    editing, deleting or uploading is admin-only.
+router.param('id', requireClientParam)
+router.use((req, res, next) => {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method) || req.isAdmin) return next()
+  next(new ApiError(403, 'FORBIDDEN', "You don't have access to this"))
+})
 
 const ALLOWED_DOC_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
 const docUpload = multer({
@@ -49,7 +62,9 @@ const docUpload = multer({
  */
 router.get('/', (req, res) => {
   const pg = parsePagination(req.query)
-  const { rows, total } = clientService.listClients(pg, req.query)
+  // A worker only ever lists their assigned participants; an admin sees all
+  // (req.assignedClientIds is null → unrestricted).
+  const { rows, total } = clientService.listClients(pg, { ...req.query, client_ids: req.assignedClientIds })
   res.json(ok(rows, paginationMeta(pg.page, pg.perPage, total)))
 })
 
@@ -57,6 +72,22 @@ router.post('/', validate(clientSchema), (req, res) => {
   const client = clientService.createClient(req.body)
   logActivity('client', client.id, req.session.userId, 'created')
   res.status(201).json(ok(client))
+})
+
+/**
+ * @openapi
+ * /clients/{id}/workers:
+ *   get: { tags: [Clients], summary: List the support workers assigned to a participant (admin) }
+ *   put: { tags: [Clients], summary: Replace the support workers assigned to a participant (admin) }
+ */
+router.get('/:id/workers', (req, res) => {
+  res.json(ok(accessService.listClientWorkers(Number(req.params.id))))
+})
+
+router.put('/:id/workers', validate(clientWorkersSchema), (req, res) => {
+  const workers = accessService.setClientWorkers(Number(req.params.id), req.body.user_ids, req.session.userId)
+  logActivity('client', Number(req.params.id), req.session.userId, 'workers_updated', { count: workers.length })
+  res.json(ok(workers))
 })
 
 /**
@@ -83,8 +114,8 @@ router.delete('/:id', (req, res) => {
   res.json(ok({ deleted: true }))
 })
 
-/** Privacy: full data export for a client (data access request). */
-router.get('/:id/export', (req, res) => {
+/** Privacy: full data export for a client (data access request; admin only). */
+router.get('/:id/export', requireAdmin, (req, res) => {
   const data = clientService.exportClient(Number(req.params.id))
   logActivity('client', Number(req.params.id), req.session.userId, 'exported')
   res.json(ok(data))
@@ -98,7 +129,7 @@ router.get('/:id/export', (req, res) => {
  *     summary: One-click "download everything" for a participant — a zip of the
  *       full JSON export plus a branded PDF summary (data access request)
  */
-router.get('/:id/export.zip', async (req, res, next) => {
+router.get('/:id/export.zip', requireAdmin, async (req, res, next) => {
   const id = Number(req.params.id)
   try {
     const data = clientService.exportClient(id)
@@ -122,7 +153,7 @@ router.get('/:id/export.zip', async (req, res, next) => {
   }
 })
 
-router.get('/:id/agreements', (req, res) => {
+router.get('/:id/agreements', requireAdmin, (req, res) => {
   const pg = parsePagination(req.query)
   const { rows, total } = agreementService.listAgreements(pg, { client_id: req.params.id })
   res.json(ok(rows, paginationMeta(pg.page, pg.perPage, total)))
@@ -135,7 +166,17 @@ router.get('/:id/shifts', (req, res) => {
 })
 
 router.get('/:id/billing-codes', (req, res) => {
-  res.json(ok(clientService.getClientBillingCodes(Number(req.params.id))))
+  const codes = clientService.getClientBillingCodes(Number(req.params.id))
+  // The per-participant charge rate is operator-commercial info — strip it (and
+  // the standard price caps) for support workers, who only need to pick a code.
+  const visible = req.isAdmin
+    ? codes
+    : codes.map(c => {
+      const copy = { ...c }
+      for (const k of ['custom_rate', 'price_cap_standard', 'price_cap_remote', 'price_cap_very_remote']) delete copy[k]
+      return copy
+    })
+  res.json(ok(visible))
 })
 
 router.put('/:id/billing-codes', validate(clientBillingCodesSchema), (req, res) => {

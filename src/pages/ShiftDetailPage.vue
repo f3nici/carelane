@@ -5,6 +5,7 @@ import { useApi } from '../composables/useApi.js'
 import { useIntegrations } from '../composables/useIntegrations.js'
 import { useToastStore } from '../stores/toast.js'
 import { useOfflineStore } from '../stores/offline.js'
+import { useAuthStore } from '../stores/auth.js'
 import ShiftNoteEditor from '../components/ShiftNoteEditor.vue'
 import AiDraftPanel from '../components/AiDraftPanel.vue'
 import PhotoUploader from '../components/PhotoUploader.vue'
@@ -17,7 +18,16 @@ const router = useRouter()
 const toast = useToastStore()
 const offline = useOfflineStore()
 const { aiActive, ensureLoaded } = useIntegrations()
+const auth = useAuthStore()
 const id = computed(() => route.params.id)
+// A worker may write a NEW note and edit/finalise their OWN note while it is a
+// draft; once finalised (or for someone else's note) it is view-only for them.
+// Admins can always edit. Reopening a finalised note is admin-only.
+const canEditNote = computed(() => {
+  if (auth.isAdmin) return true
+  if (!id.value) return true // creating a new note
+  return shift.value.worker_id === auth.user?.id && !shift.value.finalised
+})
 
 const shift = ref({})
 const clients = ref([])
@@ -222,12 +232,12 @@ async function draft () {
       <div class="flex items-center gap-2">
         <StatusBadge v-if="id" :status="shift.finalised ? 'finalised' : 'draft'" />
         <span v-if="shift.archived_at" class="pill bg-white/10 text-mid">Archived</span>
-        <button v-if="id" class="btn-ghost" :disabled="busy" @click="toggleArchive">{{ shift.archived_at ? 'Unarchive' : 'Archive' }}</button>
+        <button v-if="id && auth.isAdmin" class="btn-ghost" :disabled="busy" @click="toggleArchive">{{ shift.archived_at ? 'Unarchive' : 'Archive' }}</button>
       </div>
     </div>
 
     <AiDraftPanel
-      v-if="aiActive && !shift.finalised"
+      v-if="aiActive && !shift.finalised && canEditNote"
       :input-text="editor?.form?.support_provided || ''"
       :estimate-endpoint="id ? `/shifts/${id}/draft/estimate` : ''"
       :estimate-payload="{ bullets: editor?.form?.support_provided || '' }"
@@ -238,7 +248,7 @@ async function draft () {
       @draft="draft"
     />
 
-    <ShiftNoteEditor ref="editor" :model-value="shift" :clients="clients" :busy="busy" :locked="!!shift.finalised" @submit="save" @reopen="reopen" />
+    <ShiftNoteEditor ref="editor" :model-value="shift" :clients="clients" :busy="busy" :locked="!!shift.finalised" :readonly="!canEditNote" :can-finalise="canEditNote" :can-reopen="auth.isAdmin" @submit="save" @reopen="reopen" />
 
     <div v-if="id && shift.incident_flag" class="card border-danger/40 space-y-3">
       <div class="flex items-center justify-between gap-3">
@@ -254,11 +264,11 @@ async function draft () {
           This note is flagged as an incident. Promote it to a structured incident report with NDIS
           reportable-incident fields and a follow-up status — the description is seeded from the note.
         </p>
-        <button class="btn-primary" :disabled="promoting" @click="promoteIncident">{{ promoting ? 'Creating…' : 'Create incident report' }}</button>
+        <button v-if="auth.isAdmin" class="btn-primary" :disabled="promoting" @click="promoteIncident">{{ promoting ? 'Creating…' : 'Create incident report' }}</button>
       </template>
     </div>
 
-    <div v-if="id && shift.finalised && squareStatus && (squareStatus.enabled || invoice)" class="card space-y-3">
+    <div v-if="id && shift.finalised && auth.isAdmin && squareStatus && (squareStatus.enabled || invoice)" class="card space-y-3">
       <div class="flex items-center justify-between gap-3">
         <h3 class="font-semibold">Square invoice</h3>
         <span v-if="invoice" class="pill bg-success/15 text-success">{{ invoice.status || 'DRAFT' }}</span>
@@ -296,7 +306,7 @@ async function draft () {
     <div v-if="id" class="card">
       <div class="flex items-center justify-between mb-3">
         <h3 class="font-semibold">Photos</h3>
-        <PhotoUploader :shift-id="id" @uploaded="p => shift.photos = [...(shift.photos || []), p]" />
+        <PhotoUploader v-if="canEditNote" :shift-id="id" @uploaded="p => shift.photos = [...(shift.photos || []), p]" />
       </div>
       <PhotoGallery :shift-id="id" :photos="shift.photos || []" @deleted="pid => shift.photos = shift.photos.filter(p => p.id !== pid)" />
     </div>

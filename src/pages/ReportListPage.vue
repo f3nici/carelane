@@ -1,9 +1,11 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
 import { useApi } from '../composables/useApi.js'
+import { useAuthStore } from '../stores/auth.js'
 import StatusBadge from '../components/StatusBadge.vue'
 
 const api = useApi()
+const auth = useAuthStore()
 const reports = ref([])
 const meta = ref({})
 const page = ref(1)
@@ -25,7 +27,7 @@ onMounted(load)
       <h1 class="text-2xl font-semibold">Reports</h1>
       <div class="flex items-center gap-2">
         <button class="btn-ghost text-xs" :class="showArchived ? '!bg-primary/20 !text-white' : ''" @click="showArchived = !showArchived; page = 1">{{ showArchived ? 'Viewing archived' : 'Show archived' }}</button>
-        <router-link to="/reports/new" class="btn-primary">+ New report</router-link>
+        <router-link v-if="auth.isAdmin" to="/reports/new" class="btn-primary">+ New report</router-link>
       </div>
     </div>
     <p v-if="!reports.length" class="text-sm text-mid">No reports yet.</p>

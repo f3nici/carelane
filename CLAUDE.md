@@ -1,8 +1,9 @@
 # CareLane — Development Guide
 
 Self-hosted management tool for an independent NDIS support worker (Australia).
-Single-operator by default; users table + roles exist so more worker logins can
-be added later. NOT multi-tenant SaaS. All data is sensitive health information.
+Single-operator by default, but supports multiple logins with scoped access
+(admin + support workers — see the multi-user access-control note under
+Architecture). NOT multi-tenant SaaS. All data is sensitive health information.
 
 Licensed under MIT with the Commons Clause (source-available; free to use,
 modify, fork and self-host — including a paid support-work practice — but the
@@ -37,6 +38,43 @@ API docs at `/api/docs`, health at `/healthz`.
 - `server/services/*` — all business logic. **Encryption happens only here**
   (`cryptoService.js`, AES-256-GCM, `enc:` prefix, per-record IV). Routes never
   touch raw crypto or ciphertext.
+- Multi-user access control: two roles — `admin` (the operator) and `worker`
+  (support worker). `client_assignments` (user↔client) grants a worker access to
+  specific participants; an admin sees everything. Enforcement is server-side:
+  `attachAccess` (middleware, runs after `requireAuth`) loads the user fresh
+  (reflecting deactivation/role changes immediately) and sets `req.isAdmin` +
+  `req.assignedClientIds` (null for admin). Detail routes gate via a
+  `router.param('id', …)` that resolves the record's participant and calls
+  `assertClientAccess`; list routes pass `client_ids: req.assignedClientIds` into
+  the core `list*` functions (which scope via `applyClientScope`). Rosters are
+  scoped by `scheduled_shifts.worker_id` instead — a worker sees/clocks only
+  their own shifts; an admin assigns each shift a `worker_id`. Workers are
+  otherwise **read-only** on the participant record (view every note/incident/
+  goal/med/RP/document, but never edit, delete or finalise them). Service
+  agreements, the per-participant charge rate (`custom_rate` + price caps, stripped
+  from the billing-codes read) and the full-record export are hidden from workers
+  entirely, and a worker's dashboard shows only their upcoming shifts. The
+  exceptions are shift notes and their own roster: a worker may create a note,
+  and edit/finalise/attach-photos to their OWN note **while it is a draft** — once
+  finalised they can neither edit it nor send it back to draft (only an admin
+  reopens), and they can never touch someone else's note (`canEditNote` guard in
+  `routes/shifts.js`). They also clock in/out of their own roster.
+  `accessService`/`userService` (server-only) manage assignments and user CRUD
+  (`/api/v1/users`, admin only; last-admin guard). Users are never hard-deleted —
+  a departing worker is deactivated (`users.active=0`), revoking their sessions.
+  Operator surfaces (notifications, invoices, templates, audit log, deleted-items)
+  are admin-only; billing codes and the knowledge base (RAG search + grounded
+  Q&A) are usable by all (a worker picks a code on a note, searches/asks the
+  guidelines and downloads source PDFs) but only an admin edits codes or uploads/
+  re-indexes/deletes documents. AI drafting
+  follows the note-edit rule — a worker can AI-draft their OWN draft note — and
+  the whole AI surface degrades to nothing when Claude is off/unconfigured
+  (`useIntegrations`/`aiActive`). Settings *reads* (branding + AI status) are open
+  to all — the app needs them — but every settings *write* keeps its own
+  `requireAdmin` (secrets are stripped from the read). Access failures return 401
+  `UNAUTHENTICATED` ("not authenticated") or 403 `FORBIDDEN` ("you don't have
+  access"). The SPA hides admin-only nav/controls (`auth.isAdmin`, router
+  `meta.adminOnly`).
 - Encrypted columns: clients PII fields, shift `body`/`incident_details`.
   NDIS number also gets an HMAC blind index (`ndis_number_hash`) for search.
 - `activity_log` is append-only (SQLite triggers) and tamper-evident: each row

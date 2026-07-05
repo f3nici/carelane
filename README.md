@@ -8,8 +8,10 @@ to be run by a **single operator on their own infrastructure** — it is not a
 multi-tenant SaaS. All data is treated as sensitive health information and
 encrypted at rest.
 
-> A `users` table and roles exist so additional worker logins can be added
-> later, but the default deployment assumes one person.
+> The default deployment assumes one person, but CareLane supports **multiple
+> logins with scoped access**: an admin manages the practice and can add support
+> workers who each see only the participants assigned to them and only their own
+> roster, read-only. See _Team & access control_ below.
 
 ## Features
 
@@ -43,6 +45,21 @@ encrypted at rest.
   your phone for plan reviews due, incidents needing follow-up, unbilled shifts
   aging, and a reminder before each upcoming shift. Set the topic, toggles and
   timings in-app. See the [ntfy setup guide](docs/ntfy-notifications-setup.md).
+- **Team & access control** — add support-worker logins alongside the admin, and
+  assign each worker the participants they support (managed from the **Team**
+  page). A worker sees only their assigned participants, mostly **read-only**:
+  they can view every note, agreement, incident, goal and record but not change
+  them. The exception is their own shift notes — a worker can write a note, and
+  edit/finalise it **while it is a draft**; once finalised only an admin can
+  reopen it. Rosters are per-worker: an admin assigns each scheduled shift to a
+  worker, and a worker sees (and clocks in/out of) only their own shifts; their
+  dashboard shows just their upcoming shifts. Workers can search/ask the
+  knowledge base, download its source PDFs and AI-draft their own notes (when
+  Claude is configured) — they just can't upload documents. Service agreements,
+  the rate a participant is charged, and the full-record export are hidden from
+  workers. Everything else (settings changes, billing-catalogue editing,
+  incident/agreement/report authoring, the audit log and deleted-items recycle
+  bin) stays admin-only.
 - **Login hardening** — DB-backed brute-force throttling (per ip+username and a
   per-account global counter, surviving restarts), optional **TOTP two-factor**
   with one-time recovery codes, **passkeys (WebAuthn)** as a passwordless factor,

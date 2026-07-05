@@ -1,10 +1,12 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useApi } from '../composables/useApi.js'
+import { useAuthStore } from '../stores/auth.js'
 import ActivityFeed from '../components/ActivityFeed.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 
 const api = useApi()
+const auth = useAuthStore()
 const stats = ref({})
 const agreementExpiries = ref([])
 const documentExpiries = ref([])
@@ -16,14 +18,20 @@ const upcoming = ref([])
 const activeShift = ref(null)
 
 onMounted(async () => {
-  const [s, p, doc, sh, inc, audit, sched, ifu] = await Promise.all([
+  // A support worker's dashboard shows only their upcoming shifts, so that is all
+  // it fetches — the operator widgets (and some of their endpoints) are admin-only.
+  const sched = await api.get('/schedule/upcoming', { days: 14 })
+  upcoming.value = sched.data.upcoming
+  activeShift.value = sched.data.active
+  if (!auth.isAdmin) return
+
+  const [s, p, doc, sh, inc, audit, ifu] = await Promise.all([
     api.get('/dashboard/stats'),
     api.get('/dashboard/agreement-expiries'),
     api.get('/dashboard/document-expiries'),
     api.get('/shifts', { per_page: 5 }),
     api.get('/shifts', { incident: 'true', per_page: 5 }),
     api.get('/audit/verify'),
-    api.get('/schedule/upcoming', { days: 14 }),
     api.get('/dashboard/incident-followups')
   ])
   stats.value = s.data
@@ -32,8 +40,6 @@ onMounted(async () => {
   recentShifts.value = sh.data
   incidents.value = inc.data
   integrity.value = audit.data
-  upcoming.value = sched.data.upcoming
-  activeShift.value = sched.data.active
   incidentFollowups.value = ifu.data
 })
 
@@ -56,7 +62,7 @@ const tiles = [
       <div class="flex gap-2">
         <router-link to="/roster" class="btn-primary">Roster</router-link>
         <router-link to="/shifts/new" class="btn-ghost">+ Shift note</router-link>
-        <router-link to="/clients/new" class="btn-ghost">+ Client</router-link>
+        <router-link v-if="auth.isAdmin" to="/clients/new" class="btn-ghost">+ Client</router-link>
       </div>
     </div>
 
@@ -68,7 +74,7 @@ const tiles = [
       <span class="btn-primary">Clock out</span>
     </router-link>
 
-    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+    <div v-if="auth.isAdmin" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
       <component
         :is="tile.to ? 'router-link' : 'div'"
         v-for="tile in tiles"
@@ -82,7 +88,7 @@ const tiles = [
       </component>
     </div>
 
-    <div v-if="incidentFollowups.length" class="card border-danger/40">
+    <div v-if="auth.isAdmin && incidentFollowups.length" class="card border-danger/40">
       <div class="flex items-center justify-between mb-3">
         <h3 class="font-semibold text-danger">Incident reports needing follow-up</h3>
         <router-link to="/incidents" class="text-xs text-accent hover:underline">All incidents →</router-link>
@@ -99,7 +105,7 @@ const tiles = [
       </ul>
     </div>
 
-    <div v-if="incidents.length" class="card border-danger/40">
+    <div v-if="auth.isAdmin && incidents.length" class="card border-danger/40">
       <h3 class="font-semibold mb-3 text-danger">Flagged shift notes</h3>
       <ul class="space-y-2">
         <li v-for="s in incidents" :key="s.id" class="text-sm">
@@ -122,7 +128,7 @@ const tiles = [
       </ul>
     </div>
 
-    <div class="grid lg:grid-cols-2 gap-6">
+    <div v-if="auth.isAdmin" class="grid lg:grid-cols-2 gap-6">
       <div class="card" :class="documentExpiries.some(d => d.expiry_status === 'expired') ? 'border-danger/40' : ''">
         <h3 class="font-semibold mb-3">Consents &amp; documents expiring</h3>
         <p v-if="!documentExpiries.length" class="text-sm text-mid">No consent forms or documents expiring in the next 90 days.</p>
@@ -139,7 +145,7 @@ const tiles = [
       </div>
     </div>
 
-    <div class="grid lg:grid-cols-2 gap-6">
+    <div v-if="auth.isAdmin" class="grid lg:grid-cols-2 gap-6">
       <div class="card">
         <h3 class="font-semibold mb-3">Agreements expiring or due for review</h3>
         <p v-if="!agreementExpiries.length" class="text-sm text-mid">No agreements expiring or due for review in the next 90 days.</p>
@@ -162,7 +168,7 @@ const tiles = [
       </div>
     </div>
 
-    <div class="grid lg:grid-cols-3 gap-6">
+    <div v-if="auth.isAdmin" class="grid lg:grid-cols-3 gap-6">
       <div class="lg:col-span-2">
         <ActivityFeed />
       </div>

@@ -1,4 +1,5 @@
 import { ApiError } from '../errors.js'
+import { applyClientScope } from '../utils/sql.js'
 
 /**
  * Build the shift-note service bound to a host context.
@@ -56,6 +57,7 @@ export function createShiftService (ctx, services) {
   function listShifts (pg, filters = {}) {
     const where = ['s.deleted_at IS NULL']
     const params = []
+    applyClientScope(where, params, 's.client_id', filters.client_ids)
     if (filters.archived === 'true' || filters.archived === '1') where.push('s.archived_at IS NOT NULL')
     else if (filters.archived !== 'all') where.push('s.archived_at IS NULL')
     if (filters.client_id) { where.push('s.client_id = ?'); params.push(Number(filters.client_id)) }

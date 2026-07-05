@@ -5,6 +5,7 @@ import { reportSchema, reportDraftSchema } from '../utils/validators.js'
 import * as reportService from '../services/reportService.js'
 import * as shiftService from '../services/shiftService.js'
 import * as clientService from '../services/clientService.js'
+import { assertClientAccess } from '../middleware/auth.js'
 import { buildGoalsSummary } from '../services/goalService.js'
 import { resolveTemplateForDraft } from '../services/templateService.js'
 import { condenseShift, draftReport, estimateReportTokens } from '../services/aiService.js'
@@ -20,6 +21,19 @@ const router = Router()
 // Report drafting fans out to many Haiku + one Sonnet call; cap per-operator.
 const aiLimiter = rateLimit({ name: 'ai-report', max: 10, windowMs: 60 * 1000 })
 
+// Workers may read reports for their assigned participants; creating, editing,
+// drafting and finalising are admin-only.
+router.param('id', (req, res, next, value) => {
+  try {
+    assertClientAccess(req, reportService.getReport(Number(value)).client_id)
+    next()
+  } catch (err) { next(err) }
+})
+router.use((req, res, next) => {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method) || req.isAdmin) return next()
+  next(new ApiError(403, 'FORBIDDEN', "You don't have access to this"))
+})
+
 /**
  * @openapi
  * /reports:
@@ -28,7 +42,7 @@ const aiLimiter = rateLimit({ name: 'ai-report', max: 10, windowMs: 60 * 1000 })
  */
 router.get('/', (req, res) => {
   const pg = parsePagination(req.query)
-  const { rows, total } = reportService.listReports(pg, req.query)
+  const { rows, total } = reportService.listReports(pg, { ...req.query, client_ids: req.assignedClientIds })
   res.json(ok(rows, paginationMeta(pg.page, pg.perPage, total)))
 })
 

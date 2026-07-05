@@ -4,14 +4,17 @@ import { useRouter } from 'vue-router'
 import VueCal from 'vue-cal'
 import 'vue-cal/dist/vuecal.css'
 import { useApi } from '../composables/useApi.js'
+import { useAuthStore } from '../stores/auth.js'
 import ScheduledShiftModal from '../components/ScheduledShiftModal.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 
 const api = useApi()
 const router = useRouter()
+const auth = useAuthStore()
 
 const events = ref([])
 const clients = ref([])
+const workers = ref([])
 const upcoming = ref([])
 const active = ref(null)
 const range = ref({ from: '', to: '' })
@@ -25,6 +28,13 @@ const STATUS_BADGE = { scheduled: 'draft', in_progress: 'active', completed: 'fi
 onMounted(async () => {
   const c = await api.get('/clients', { active: 'true', per_page: 100 })
   clients.value = c.data
+  // Admins can roster shifts to any active support worker.
+  if (auth.isAdmin) {
+    try {
+      const u = await api.get('/users')
+      workers.value = u.data.filter(x => x.role === 'worker' && x.active)
+    } catch { /* non-fatal */ }
+  }
   await loadUpcoming()
 })
 
@@ -62,6 +72,8 @@ function toEvent (s) {
 }
 
 function openNew (date) {
+  // Only an admin rosters shifts; a worker can view and clock in/out only.
+  if (!auth.isAdmin) return
   selectedShift.value = null
   selectedDate.value = date ? fmt(date) : new Date().toISOString().slice(0, 10)
   modalOpen.value = true
@@ -86,7 +98,7 @@ function goWriteNote (scheduledId) {
   <div class="space-y-5">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <h1 class="text-2xl font-semibold">Roster</h1>
-      <button class="btn-primary" @click="openNew()">+ Schedule shift</button>
+      <button v-if="auth.isAdmin" class="btn-primary" @click="openNew()">+ Schedule shift</button>
     </div>
 
     <!-- Currently clocked-in banner -->
@@ -137,6 +149,8 @@ function goWriteNote (scheduledId) {
       v-if="modalOpen"
       :shift="selectedShift"
       :clients="clients"
+      :workers="workers"
+      :can-manage="auth.isAdmin"
       :default-date="selectedDate"
       @close="modalOpen = false"
       @changed="refresh"

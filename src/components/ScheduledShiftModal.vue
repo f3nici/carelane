@@ -8,7 +8,12 @@ import StatusBadge from './StatusBadge.vue'
 const props = defineProps({
   shift: { type: Object, default: null }, // existing scheduled shift, or null for new
   clients: { type: Array, default: () => [] },
-  defaultDate: { type: String, default: '' }
+  // Active support workers this shift can be rostered to (admin only).
+  workers: { type: Array, default: () => [] },
+  defaultDate: { type: String, default: '' },
+  // When false (a support worker) the shift is view-only: they can clock in/out
+  // and write the note, but not create, edit, cancel or delete it.
+  canManage: { type: Boolean, default: true }
 })
 const emit = defineEmits(['close', 'changed', 'create-note'])
 
@@ -24,10 +29,12 @@ const WEEKDAYS = [
 
 const isExisting = computed(() => !!props.shift?.id)
 const status = computed(() => props.shift?.status || 'scheduled')
-const locked = computed(() => isExisting.value && (status.value === 'completed' || status.value === 'cancelled'))
+// Fields are read-only when the shift is completed/cancelled, or when the viewer
+// is a support worker (they may clock in/out but not edit the plan).
+const locked = computed(() => !props.canManage || (isExisting.value && (status.value === 'completed' || status.value === 'cancelled')))
 
 const form = reactive({
-  client_id: null, title: '', scheduled_date: props.defaultDate || new Date().toISOString().slice(0, 10),
+  client_id: null, worker_id: null, title: '', scheduled_date: props.defaultDate || new Date().toISOString().slice(0, 10),
   start_time: '', end_time: '', billing_code_id: null, location: '', plan_notes: ''
 })
 const recur = reactive({ frequency: 'weekly', interval: 1, weekdays: [], until_date: '' })
@@ -52,6 +59,7 @@ function toggleWeekday (v) {
 function payload () {
   return {
     client_id: Number(form.client_id),
+    worker_id: form.worker_id ? Number(form.worker_id) : null,
     title: form.title || null,
     scheduled_date: form.scheduled_date,
     start_time: form.start_time || null,
@@ -153,6 +161,14 @@ async function remove () {
             <option v-for="c in clients" :key="c.id" :value="c.id">{{ c.preferred_name || `${c.first_name} ${c.last_name}` }}</option>
           </select>
         </div>
+        <div v-if="canManage && workers.length" class="sm:col-span-2">
+          <label class="label">Support worker</label>
+          <select v-model="form.worker_id" class="input" :disabled="locked">
+            <option :value="null">— Me (unassigned)</option>
+            <option v-for="w in workers" :key="w.id" :value="w.id">{{ w.display_name }}</option>
+          </select>
+          <p class="text-xs text-mid mt-1">Only the assigned worker (and admins) will see this shift on their roster.</p>
+        </div>
         <div class="sm:col-span-2"><label class="label">Title (optional)</label><input v-model="form.title" class="input" :disabled="locked" placeholder="e.g. Community access" /></div>
         <div><label class="label">{{ recurring ? 'First date *' : 'Date *' }}</label><input v-model="form.scheduled_date" type="date" class="input" :disabled="locked" required /></div>
         <div><label class="label">Location</label><input v-model="form.location" class="input" :disabled="locked" /></div>
@@ -169,7 +185,7 @@ async function remove () {
       </div>
 
       <!-- Recurrence (new shifts only) -->
-      <div v-if="!isExisting" class="rounded-xl border border-white/10 p-3 space-y-3">
+      <div v-if="!isExisting && canManage" class="rounded-xl border border-white/10 p-3 space-y-3">
         <label class="flex items-center gap-2 text-sm"><input v-model="recurring" type="checkbox" class="accent-accent" /> Repeat this appointment</label>
         <div v-if="recurring" class="grid sm:grid-cols-2 gap-3">
           <div>
@@ -195,7 +211,7 @@ async function remove () {
 
       <div class="flex flex-wrap items-center gap-2 pt-1">
         <button v-if="!locked" class="btn-primary" :disabled="busy" @click="save">{{ busy ? 'Saving…' : (isExisting ? 'Save changes' : 'Schedule') }}</button>
-        <template v-if="isExisting">
+        <template v-if="isExisting && canManage">
           <button v-if="status !== 'completed' && status !== 'cancelled'" class="btn-ghost ml-auto" :disabled="busy" @click="cancelShift">Cancel shift</button>
           <button class="btn-ghost text-danger" :disabled="busy" @click="remove">Delete</button>
         </template>

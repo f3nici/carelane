@@ -1,4 +1,5 @@
 import { ApiError } from '../errors.js'
+import { applyClientScope } from '../utils/sql.js'
 
 /**
  * Build the incident-report service (CRUD + lifecycle + markdown) bound to a
@@ -50,6 +51,7 @@ export function createIncidentService (ctx, services) {
   function listIncidents (pg, filters = {}) {
     const where = ['i.deleted_at IS NULL']
     const params = []
+    applyClientScope(where, params, 'i.client_id', filters.client_ids)
     if (filters.client_id) { where.push('i.client_id = ?'); params.push(Number(filters.client_id)) }
     if (filters.shift_note_id) { where.push('i.shift_note_id = ?'); params.push(Number(filters.shift_note_id)) }
     if (filters.status && ['open', 'in_progress', 'closed'].includes(filters.status)) { where.push('i.status = ?'); params.push(filters.status) }
@@ -193,28 +195,44 @@ export function createIncidentService (ctx, services) {
     return getIncident(id)
   }
 
-  /** Count incident reports still needing follow-up (open or in progress). */
-  function countOpenIncidents () {
-    return sqlite.prepare("SELECT COUNT(*) AS c FROM incident_reports WHERE deleted_at IS NULL AND status IN ('open','in_progress')").get().c
+  /**
+   * Count incident reports still needing follow-up (open or in progress).
+   * @param {number[]} [clientIds] restrict to these participants (worker scope)
+   */
+  function countOpenIncidents (clientIds) {
+    const where = ["deleted_at IS NULL AND status IN ('open','in_progress')"]
+    const params = []
+    applyClientScope(where, params, 'client_id', clientIds)
+    return sqlite.prepare(`SELECT COUNT(*) AS c FROM incident_reports WHERE ${where.join(' AND ')}`).get(...params).c
   }
 
-  /** Count reportable incidents not yet marked reported to the NDIS Commission. */
-  function countUnreportedReportable () {
-    return sqlite.prepare('SELECT COUNT(*) AS c FROM incident_reports WHERE deleted_at IS NULL AND reportable = 1 AND reported_to_ndis = 0').get().c
+  /**
+   * Count reportable incidents not yet marked reported to the NDIS Commission.
+   * @param {number[]} [clientIds] restrict to these participants (worker scope)
+   */
+  function countUnreportedReportable (clientIds) {
+    const where = ['deleted_at IS NULL AND reportable = 1 AND reported_to_ndis = 0']
+    const params = []
+    applyClientScope(where, params, 'client_id', clientIds)
+    return sqlite.prepare(`SELECT COUNT(*) AS c FROM incident_reports WHERE ${where.join(' AND ')}`).get(...params).c
   }
 
   /**
    * Incident reports still needing follow-up, newest first, for the dashboard.
    * Narrative fields are not included (the list is a register, not the full file).
+   * @param {number[]} [clientIds] restrict to these participants (worker scope)
    * @returns {object[]}
    */
-  function listOpenIncidents () {
+  function listOpenIncidents (clientIds) {
+    const where = ["i.deleted_at IS NULL AND i.status IN ('open','in_progress')"]
+    const params = []
+    applyClientScope(where, params, 'i.client_id', clientIds)
     const rows = sqlite.prepare(`SELECT i.id, i.client_id, i.incident_date, i.incident_type, i.severity,
         i.reportable, i.reported_to_ndis, i.follow_up_due_date, i.status,
         c.preferred_name AS client_preferred_name, c.first_name AS client_first_name, c.last_name AS client_last_name
       FROM incident_reports i JOIN clients c ON c.id = i.client_id AND c.deleted_at IS NULL
-      WHERE i.deleted_at IS NULL AND i.status IN ('open','in_progress')
-      ORDER BY (i.follow_up_due_date IS NULL), i.follow_up_due_date, i.incident_date DESC`).all()
+      WHERE ${where.join(' AND ')}
+      ORDER BY (i.follow_up_due_date IS NULL), i.follow_up_due_date, i.incident_date DESC`).all(...params)
     return rows.map(toListRow)
   }
 

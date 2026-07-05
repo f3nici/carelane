@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useApi } from '../composables/useApi.js'
 import { useToastStore } from '../stores/toast.js'
+import { useAuthStore } from '../stores/auth.js'
 import StatusBadge from '../components/StatusBadge.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import ClientGoals from '../components/ClientGoals.vue'
@@ -14,6 +15,7 @@ const api = useApi()
 const route = useRoute()
 const router = useRouter()
 const toast = useToastStore()
+const auth = useAuthStore()
 // Reactive so navigating straight from one participant to another (e.g. via the
 // global quick-switcher while already on a detail page) reloads instead of
 // showing the previous client until a manual refresh.
@@ -35,18 +37,24 @@ async function load () {
   // Reset so a slow load on a new participant never flashes the previous one.
   client.value = null
   tab.value = 'overview'
-  const [c, a, s, b, all] = await Promise.all([
+  const [c, s, b] = await Promise.all([
     api.get(`/clients/${id.value}`),
-    api.get(`/clients/${id.value}/agreements`, { per_page: 10 }),
     api.get(`/clients/${id.value}/shifts`, { per_page: 10 }),
-    api.get(`/clients/${id.value}/billing-codes`),
-    api.get('/billing-codes', { active: 'true', per_page: 100 })
+    api.get(`/clients/${id.value}/billing-codes`)
   ])
   client.value = c.data
-  agreements.value = a.data
   shifts.value = s.data
   billingCodes.value = b.data
-  allCodes.value = all.data
+  // Service agreements and the full billing catalogue (for the add-code picker)
+  // are operator-only — workers never fetch them.
+  if (auth.isAdmin) {
+    const [a, all] = await Promise.all([
+      api.get(`/clients/${id.value}/agreements`, { per_page: 10 }),
+      api.get('/billing-codes', { active: 'true', per_page: 100 })
+    ])
+    agreements.value = a.data
+    allCodes.value = all.data
+  }
 }
 
 onMounted(load)
@@ -107,9 +115,11 @@ const tabs = [
       </div>
       <div class="flex gap-2">
         <router-link :to="`/shifts/new?client=${id}`" class="btn-primary">+ Shift note</router-link>
-        <router-link :to="`/clients/${id}/edit`" class="btn-ghost">Edit</router-link>
-        <button class="btn-ghost" @click="exportData">Export data</button>
-        <button class="btn-danger" @click="confirmDelete = true">Archive</button>
+        <template v-if="auth.isAdmin">
+          <router-link :to="`/clients/${id}/edit`" class="btn-ghost">Edit</router-link>
+          <button class="btn-ghost" @click="exportData">Export data</button>
+          <button class="btn-danger" @click="confirmDelete = true">Archive</button>
+        </template>
       </div>
     </div>
 
@@ -156,17 +166,18 @@ const tabs = [
     <div class="card">
       <div class="flex items-center justify-between mb-3">
         <h3 class="font-semibold">Billing codes</h3>
-        <select class="input max-w-xs" @change="addCode">
+        <select v-if="auth.isAdmin" class="input max-w-xs" @change="addCode">
           <option value="">+ Add a support item…</option>
           <option v-for="c in allCodes.filter(c => !billingCodes.some(b => b.id === c.id))" :key="c.id" :value="c.id">{{ c.code }} — {{ c.name }}</option>
         </select>
       </div>
       <p v-if="!billingCodes.length" class="text-sm text-mid">No support items linked yet.</p>
-      <p class="text-xs text-mid mb-2">Set the rate you charge this participant for each item — this is the rate used when generating a Square invoice. Leave blank to use the NDIS price-cap (<span class="italic">standard</span>).</p>
+      <p v-if="auth.isAdmin" class="text-xs text-mid mb-2">Set the rate you charge this participant for each item — this is the rate used when generating a Square invoice. Leave blank to use the NDIS price-cap (<span class="italic">standard</span>).</p>
       <ul class="space-y-2">
         <li v-for="c in billingCodes" :key="c.id" class="text-sm flex items-center justify-between gap-3">
           <span class="truncate min-w-0">{{ c.code }} — {{ c.name }}</span>
-          <span class="flex items-center gap-2 shrink-0">
+          <!-- The rate a participant is charged is hidden from support workers. -->
+          <span v-if="auth.isAdmin" class="flex items-center gap-2 shrink-0">
             <span class="text-mid">$</span>
             <input
               v-model="c.custom_rate"
@@ -185,7 +196,8 @@ const tabs = [
     </div>
 
     <div class="grid lg:grid-cols-2 gap-6">
-      <div class="card">
+      <!-- Service agreements are hidden from support workers. -->
+      <div v-if="auth.isAdmin" class="card">
         <div class="flex items-center justify-between mb-3">
           <h3 class="font-semibold">Agreements</h3>
           <router-link :to="`/agreements/new?client=${id}`" class="text-accent text-sm hover:underline">+ New</router-link>
@@ -215,19 +227,19 @@ const tabs = [
     </div>
 
     <div v-show="tab === 'goals'">
-      <ClientGoals :key="id" :client-id="id" @count="goalCount = $event" />
+      <ClientGoals :key="id" :client-id="id" :readonly="!auth.isAdmin" @count="goalCount = $event" />
     </div>
 
     <div v-show="tab === 'documents'">
-      <ClientDocuments :key="id" :client-id="id" @count="documentCount = $event" />
+      <ClientDocuments :key="id" :client-id="id" :readonly="!auth.isAdmin" @count="documentCount = $event" />
     </div>
 
     <div v-show="tab === 'medications'">
-      <ClientMedications :key="id" :client-id="id" @count="medicationCount = $event" />
+      <ClientMedications :key="id" :client-id="id" :readonly="!auth.isAdmin" @count="medicationCount = $event" />
     </div>
 
     <div v-show="tab === 'restrictive'">
-      <ClientRestrictivePractices :key="id" :client-id="id" @count="restrictiveCount = $event" />
+      <ClientRestrictivePractices :key="id" :client-id="id" :readonly="!auth.isAdmin" @count="restrictiveCount = $event" />
     </div>
 
     <ConfirmDialog

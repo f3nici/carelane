@@ -1,4 +1,4 @@
-import { escapeLike } from '../utils/sql.js'
+import { escapeLike, applyClientScope } from '../utils/sql.js'
 import { ApiError } from '../errors.js'
 
 /** Snake_case column names that are encrypted at rest. */
@@ -58,6 +58,9 @@ export function createClientService (ctx, services) {
   function listClients (pg, filters = {}) {
     const where = ['deleted_at IS NULL']
     const params = []
+    // Access control: restrict to the caller's assigned participants when
+    // `filters.client_ids` is supplied (a worker); admins pass nothing.
+    applyClientScope(where, params, 'id', filters.client_ids)
     if (filters.active === 'true') { where.push('active = 1') }
     if (filters.q) {
       const q = `%${escapeLike(filters.q)}%`
