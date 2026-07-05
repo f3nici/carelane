@@ -170,11 +170,15 @@ export function createApp () {
   // guidelines) — only uploading/reindexing/deleting documents is admin-gated,
   // inside the router itself.
   api.use('/documents', authed, documentRoutes)
-  // Admin-only surfaces: invoicing, settings, notifications, drafting templates,
-  // the audit trail and the deleted-items recycle bin are operator tools a
-  // support worker never touches.
+  // Settings reads (branding + AI integration status) are needed by every
+  // client, workers included, so the router is mounted for all authenticated
+  // users — each mutating route (PUT, logo, backups, AI test) carries its own
+  // `requireAdmin`, and secrets are stripped from the read (see settingsService).
+  api.use('/settings', authed, settingsRoutes)
+  // Admin-only surfaces: invoicing, notifications, drafting templates, the audit
+  // trail and the deleted-items recycle bin are operator tools a support worker
+  // never touches.
   api.use('/invoices', authed, requireAdmin, invoiceRoutes)
-  api.use('/settings', authed, requireAdmin, settingsRoutes)
   api.use('/notifications', authed, requireAdmin, notificationRoutes)
   api.use('/templates', authed, requireAdmin, templateRoutes)
   api.use('/audit', authed, requireAdmin, auditRoutes)

@@ -145,20 +145,45 @@ describe('multi-user access control', () => {
   })
 
   it('blocks the worker from operator-only surfaces and user management', async () => {
-    for (const path of ['/api/v1/users', '/api/v1/settings', '/api/v1/audit/verify', '/api/v1/deleted', '/api/v1/invoices']) {
+    for (const path of ['/api/v1/users', '/api/v1/audit/verify', '/api/v1/deleted', '/api/v1/invoices', '/api/v1/settings/backups']) {
       expect((await worker.agent.get(path)).status).toBe(403)
     }
+    // Settings *reads* (branding + AI status) are allowed for the app to work;
+    // writing settings is not.
+    expect((await worker.agent.get('/api/v1/settings')).status).toBe(200)
+    expect((await worker.agent.get('/api/v1/settings/ai/status')).status).toBe(200)
+    const write = await worker.agent.put('/api/v1/settings').set('x-csrf-token', worker.csrf).send({ business_name: 'Nope' })
+    expect(write.status).toBe(403)
   })
 
-  it('lets the worker read the knowledge base but not upload/delete documents', async () => {
+  it('lets the worker read/search the knowledge base but not upload/delete documents', async () => {
     expect((await worker.agent.get('/api/v1/documents')).status).toBe(200)
     expect((await worker.agent.get('/api/v1/documents/search').query({ q: 'ndis', mode: 'keyword' })).status).toBe(200)
+    // Grounded Q&A is available to workers too — access is granted (the AI is
+    // unconfigured in tests, so it fails with 503, never 403).
+    const ask = await worker.agent.post('/api/v1/documents/ask').set('x-csrf-token', worker.csrf).send({ question: 'What is a support plan?' })
+    expect(ask.status).not.toBe(403)
     // Uploading and deleting knowledge-base documents stays admin-only.
     const upload = await worker.agent.post('/api/v1/documents').set('x-csrf-token', worker.csrf)
       .field('title', 'nope')
     expect(upload.status).toBe(403)
     const del = await worker.agent.delete('/api/v1/documents/1').set('x-csrf-token', worker.csrf)
     expect(del.status).toBe(403)
+  })
+
+  it('lets the worker AI-draft their own draft note but not someone else\'s', async () => {
+    const draft = (await worker.agent.post('/api/v1/shifts').set('x-csrf-token', worker.csrf)
+      .send({ client_id: assignedClient.id, shift_date: '2026-09-06', support_provided: '- helped with shopping' })).body.data
+    // Access is granted (the AI is unconfigured in tests → 503, never 403).
+    const own = await worker.agent.post(`/api/v1/shifts/${draft.id}/draft`).set('x-csrf-token', worker.csrf)
+      .send({ bullets: '- helped with shopping' })
+    expect(own.status).not.toBe(403)
+    // An admin-owned note is off-limits to the worker's AI draft.
+    const adminNote = (await admin.agent.post('/api/v1/shifts').set('x-csrf-token', admin.csrf)
+      .send({ client_id: assignedClient.id, shift_date: '2026-09-07', support_provided: '- admin' })).body.data
+    const other = await worker.agent.post(`/api/v1/shifts/${adminNote.id}/draft`).set('x-csrf-token', worker.csrf)
+      .send({ bullets: '- x' })
+    expect(other.status).toBe(403)
   })
 
   it('lets the worker read billing codes (needed to note a shift) but not edit them', async () => {

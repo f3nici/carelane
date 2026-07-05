@@ -59,13 +59,18 @@ API docs at `/api/docs`, health at `/healthz`.
   `accessService`/`userService` (server-only) manage assignments and user CRUD
   (`/api/v1/users`, admin only; last-admin guard). Users are never hard-deleted —
   a departing worker is deactivated (`users.active=0`), revoking their sessions.
-  Operator surfaces (settings, notifications, invoices, templates, audit log,
-  deleted-items) are admin-only; billing codes and the knowledge base (RAG
-  search) are readable by all (a worker picks a code on a note, searches
-  guidelines) but only an admin edits codes or uploads documents. Access
-  failures return 401 `UNAUTHENTICATED` ("not authenticated") or 403 `FORBIDDEN`
-  ("you don't have access"). The SPA hides admin-only nav/controls
-  (`auth.isAdmin`, router `meta.adminOnly`).
+  Operator surfaces (notifications, invoices, templates, audit log, deleted-items)
+  are admin-only; billing codes and the knowledge base (RAG search + grounded
+  Q&A) are usable by all (a worker picks a code on a note, searches/asks the
+  guidelines) but only an admin edits codes or uploads documents. AI drafting
+  follows the note-edit rule — a worker can AI-draft their OWN draft note — and
+  the whole AI surface degrades to nothing when Claude is off/unconfigured
+  (`useIntegrations`/`aiActive`). Settings *reads* (branding + AI status) are open
+  to all — the app needs them — but every settings *write* keeps its own
+  `requireAdmin` (secrets are stripped from the read). Access failures return 401
+  `UNAUTHENTICATED` ("not authenticated") or 403 `FORBIDDEN` ("you don't have
+  access"). The SPA hides admin-only nav/controls (`auth.isAdmin`, router
+  `meta.adminOnly`).
 - Encrypted columns: clients PII fields, shift `body`/`incident_details`.
   NDIS number also gets an HMAC blind index (`ndis_number_hash`) for search.
 - `activity_log` is append-only (SQLite triggers) and tamper-evident: each row

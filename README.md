@@ -53,9 +53,10 @@ encrypted at rest.
   edit/finalise it **while it is a draft**; once finalised only an admin can
   reopen it. Rosters are per-worker: an admin assigns each scheduled shift to a
   worker, and a worker sees (and clocks in/out of) only their own shifts. Workers
-  can also search the knowledge base (but not upload to it). Everything else
-  (settings, billing-catalogue editing, incident/agreement/report authoring, the
-  audit log and deleted-items recycle bin) stays admin-only.
+  can also search and ask the knowledge base and AI-draft their own notes (when
+  Claude is configured) — they just can't upload documents. Everything else
+  (settings changes, billing-catalogue editing, incident/agreement/report
+  authoring, the audit log and deleted-items recycle bin) stays admin-only.
 - **Login hardening** — DB-backed brute-force throttling (per ip+username and a
   per-account global counter, surviving restarts), optional **TOTP two-factor**
   with one-time recovery codes, **passkeys (WebAuthn)** as a passwordless factor,

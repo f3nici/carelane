@@ -27,10 +27,10 @@ export function useIntegrations () {
 
   /** Fetch the latest integration status from the server. */
   async function refresh () {
-    // The status endpoint (like all of /settings) is admin-only, and AI drafting
-    // is an admin feature — a support worker never sees the AI UI, so skip the
-    // call (which would otherwise 403) and leave the integration gated off.
-    if (!useAuthStore().isAdmin) { aiConfigured.value = false; aiOn.value = false; return }
+    // Only ask the server once we know there's a session — the AI-status read is
+    // available to workers and admins alike, so both see AI features when Claude
+    // is configured + enabled (and nothing when it isn't).
+    if (!useAuthStore().isAuthenticated) { aiConfigured.value = false; aiOn.value = false; return }
     try {
       // api.get() returns the { success, data, meta } envelope — the status
       // fields live under `.data`.
