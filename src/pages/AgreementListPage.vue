@@ -1,9 +1,11 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
 import { useApi } from '../composables/useApi.js'
+import { useAuthStore } from '../stores/auth.js'
 import StatusBadge from '../components/StatusBadge.vue'
 
 const api = useApi()
+const auth = useAuthStore()
 const agreements = ref([])
 const meta = ref({})
 const page = ref(1)
@@ -26,7 +28,7 @@ onMounted(load)
       <h1 class="text-2xl font-semibold">Service agreements</h1>
       <div class="flex items-center gap-2">
         <button class="btn-ghost text-xs" :class="showArchived ? '!bg-primary/20 !text-white' : ''" @click="showArchived = !showArchived; page = 1">{{ showArchived ? 'Viewing archived' : 'Show archived' }}</button>
-        <router-link to="/agreements/new" class="btn-primary">+ New agreement</router-link>
+        <router-link v-if="auth.isAdmin" to="/agreements/new" class="btn-primary">+ New agreement</router-link>
       </div>
     </div>
     <select v-model="status" class="input max-w-xs">

@@ -60,7 +60,9 @@ export function createScheduleService (ctx, services) {
   /**
    * List scheduled shifts within an optional date range / client / status filter.
    * Deleted rows are always excluded. Ordered chronologically for the calendar.
-   * @param {{from?:string, to?:string, client_id?:string, status?:string}} filters
+   * A `worker_id` filter scopes the roster to a single support worker (a worker
+   * sees only their own shifts; an admin sees everyone's).
+   * @param {{from?:string, to?:string, client_id?:string, status?:string, worker_id?:number}} filters
    */
   function listScheduled (filters = {}) {
     const where = ['s.deleted_at IS NULL']
@@ -68,6 +70,7 @@ export function createScheduleService (ctx, services) {
     if (filters.from) { where.push('s.scheduled_date >= ?'); params.push(filters.from) }
     if (filters.to) { where.push('s.scheduled_date <= ?'); params.push(filters.to) }
     if (filters.client_id) { where.push('s.client_id = ?'); params.push(Number(filters.client_id)) }
+    if (filters.worker_id) { where.push('s.worker_id = ?'); params.push(Number(filters.worker_id)) }
     if (filters.status && STATUSES.includes(filters.status)) { where.push('s.status = ?'); params.push(filters.status) }
     const rows = sqlite.prepare(`SELECT s.*, c.preferred_name AS client_preferred_name,
         c.first_name AS client_first_name, c.last_name AS client_last_name, bc.code AS billing_code
@@ -97,10 +100,13 @@ export function createScheduleService (ctx, services) {
    */
   function createScheduled (data, workerId) {
     const ts = now()
+    // The shift is rostered to `data.worker_id` when the admin assigned one,
+    // otherwise to the acting user (single-operator default).
+    const assignedWorker = data.worker_id || workerId
     const cols = [...COLUMNS, 'worker_id', 'status', 'created_at', 'updated_at']
     const values = COLUMNS.map(c => (ENCRYPTED.includes(c) ? encrypt(data[c] ?? null) : (data[c] ?? null)))
     const id = sqlite.prepare(`INSERT INTO scheduled_shifts (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`)
-      .run(...values, workerId, 'scheduled', ts, ts).lastInsertRowid
+      .run(...values, assignedWorker, 'scheduled', ts, ts).lastInsertRowid
     googleCalendar.syncScheduledShift(rawRow(id))
     return getScheduled(id)
   }
@@ -257,18 +263,26 @@ export function createScheduleService (ctx, services) {
 
   /**
    * Upcoming shifts for the dashboard (next N days, not completed/cancelled) plus
-   * any shift currently clocked in.
+   * any shift currently clocked in. An optional `workerId` scopes the list to a
+   * single support worker (a worker's dashboard shows only their own roster).
    * @param {number} [days]
+   * @param {number} [workerId]
    */
-  function upcomingScheduled (days = 14) {
+  function upcomingScheduled (days = 14, workerId = null) {
     const today = new Date(ctx.now()).toISOString().slice(0, 10)
     const to = new Date(Date.now() + days * 86400000).toISOString().slice(0, 10)
-    return listScheduled({ from: today, to }).filter(s => s.status === 'scheduled' || s.status === 'in_progress')
+    return listScheduled({ from: today, to, worker_id: workerId || undefined }).filter(s => s.status === 'scheduled' || s.status === 'in_progress')
   }
 
-  /** The single shift currently in progress (clocked in, not out), if any. */
-  function activeShift () {
-    const row = sqlite.prepare("SELECT * FROM scheduled_shifts WHERE status = 'in_progress' AND deleted_at IS NULL ORDER BY clock_in_at DESC LIMIT 1").get()
+  /**
+   * The single shift currently in progress (clocked in, not out), if any. An
+   * optional `workerId` restricts this to the given worker's own shift.
+   * @param {number} [workerId]
+   */
+  function activeShift (workerId = null) {
+    const row = workerId
+      ? sqlite.prepare("SELECT * FROM scheduled_shifts WHERE status = 'in_progress' AND deleted_at IS NULL AND worker_id = ? ORDER BY clock_in_at DESC LIMIT 1").get(workerId)
+      : sqlite.prepare("SELECT * FROM scheduled_shifts WHERE status = 'in_progress' AND deleted_at IS NULL ORDER BY clock_in_at DESC LIMIT 1").get()
     if (!row) return null
     return toScheduledListRow(sqlite.prepare(`SELECT s.*, c.preferred_name AS client_preferred_name,
         c.first_name AS client_first_name, c.last_name AS client_last_name FROM scheduled_shifts s

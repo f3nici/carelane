@@ -3,10 +3,12 @@ import { ref, onMounted } from 'vue'
 import { useApi } from '../composables/useApi.js'
 import { useIntegrations } from '../composables/useIntegrations.js'
 import { useToastStore } from '../stores/toast.js'
+import { useAuthStore } from '../stores/auth.js'
 import KnowledgeSearch from '../components/KnowledgeSearch.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 
 const api = useApi()
+const auth = useAuthStore()
 const { aiActive, ensureLoaded } = useIntegrations()
 const toast = useToastStore()
 const documents = ref([])
@@ -58,9 +60,12 @@ async function remove (id) {
 <template>
   <div class="space-y-6">
     <h1 class="text-2xl font-semibold">Knowledge base</h1>
-    <p class="text-sm text-mid max-w-2xl">Upload NDIS guidelines and policy PDFs. They are chunked and embedded <strong>locally</strong> for instant semantic search{{ aiActive ? ', and used as grounding context for AI drafting' : '' }}.</p>
+    <p class="text-sm text-mid max-w-2xl">
+      Search NDIS guidelines and policy PDFs, chunked and embedded <strong>locally</strong> for instant semantic search{{ aiActive ? ', and used as grounding context for AI drafting' : '' }}.
+      <template v-if="auth.isAdmin"> Upload documents below to add them to the searchable library.</template>
+    </p>
 
-    <div class="card flex flex-wrap items-end gap-3">
+    <div v-if="auth.isAdmin" class="card flex flex-wrap items-end gap-3">
       <div><label class="label">Title</label><input v-model="title" class="input w-64" placeholder="e.g. NDIS Pricing Arrangements 2025-26" /></div>
       <div>
         <label class="label">Category</label>
@@ -76,6 +81,8 @@ async function remove (id) {
 
     <KnowledgeSearch />
 
+    <!-- The document library is visible to everyone so workers can download the
+         source PDFs; only an admin can re-index or delete them. -->
     <div class="card !p-0 overflow-x-auto">
       <table class="w-full text-sm">
         <thead>
@@ -84,7 +91,7 @@ async function remove (id) {
           </tr>
         </thead>
         <tbody>
-          <tr v-if="!documents.length"><td colspan="6" class="p-4 text-mid">No documents uploaded yet.</td></tr>
+          <tr v-if="!documents.length"><td colspan="6" class="p-4 text-mid">No documents in the library yet.</td></tr>
           <tr v-for="d in documents" :key="d.id" class="border-b border-white/5 hover:bg-white/5">
             <td class="p-3">{{ d.title }}</td>
             <td class="p-3 text-xs text-mid">{{ d.category }}</td>
@@ -93,8 +100,10 @@ async function remove (id) {
             <td class="p-3"><StatusBadge :status="d.indexed ? 'indexed' : 'indexing'" /></td>
             <td class="p-3 text-xs whitespace-nowrap">
               <a class="text-accent hover:underline mr-2" :href="`/api/v1/documents/${d.id}/file`" target="_blank" rel="noopener">download</a>
-              <button class="text-accent hover:underline mr-2" @click="reindex(d.id)">re-index</button>
-              <button class="text-danger hover:underline" @click="remove(d.id)">delete</button>
+              <template v-if="auth.isAdmin">
+                <button class="text-accent hover:underline mr-2" @click="reindex(d.id)">re-index</button>
+                <button class="text-danger hover:underline" @click="remove(d.id)">delete</button>
+              </template>
             </td>
           </tr>
         </tbody>

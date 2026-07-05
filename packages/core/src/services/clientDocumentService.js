@@ -1,4 +1,5 @@
 import { ApiError } from '../errors.js'
+import { applyClientScope } from '../utils/sql.js'
 
 /**
  * Build the client-document metadata service bound to a host context. File
@@ -133,16 +134,19 @@ export function createClientDocumentService (ctx, services) {
    * Returns the participant display name (operator-facing view), never written
    * back to the PII-redacted audit log.
    * @param {number} [withinDays]
+   * @param {number[]} [clientIds] restrict to these participants (worker scope)
    * @returns {object[]}
    */
-  function listExpiringDocuments (withinDays = 90) {
+  function listExpiringDocuments (withinDays = 90, clientIds) {
     const soon = new Date(Date.now() + withinDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    const where = ['d.deleted_at IS NULL AND c.deleted_at IS NULL AND d.expiry_date IS NOT NULL AND d.expiry_date <= ?']
+    const params = [soon]
+    applyClientScope(where, params, 'd.client_id', clientIds)
     const rows = sqlite.prepare(`SELECT d.id, d.client_id, d.title, d.doc_type, d.expiry_date,
         c.preferred_name AS client_preferred_name, c.first_name AS client_first_name, c.last_name AS client_last_name
       FROM client_documents d JOIN clients c ON c.id = d.client_id
-      WHERE d.deleted_at IS NULL AND c.deleted_at IS NULL
-        AND d.expiry_date IS NOT NULL AND d.expiry_date <= ?
-      ORDER BY d.expiry_date`).all(soon)
+      WHERE ${where.join(' AND ')}
+      ORDER BY d.expiry_date`).all(...params)
     return rows.map(({ client_first_name, client_last_name, ...r }) => ({
       ...r,
       expiry_status: expiryStatus(r.expiry_date),
@@ -152,11 +156,18 @@ export function createClientDocumentService (ctx, services) {
     }))
   }
 
-  /** Count of expired + soon-to-expire documents (dashboard headline stat). */
-  function countExpiringDocuments (withinDays = 90) {
+  /**
+   * Count of expired + soon-to-expire documents (dashboard headline stat).
+   * @param {number} [withinDays]
+   * @param {number[]} [clientIds] restrict to these participants (worker scope)
+   */
+  function countExpiringDocuments (withinDays = 90, clientIds) {
     const soon = new Date(Date.now() + withinDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    const where = ['d.deleted_at IS NULL AND c.deleted_at IS NULL AND d.expiry_date IS NOT NULL AND d.expiry_date <= ?']
+    const params = [soon]
+    applyClientScope(where, params, 'd.client_id', clientIds)
     return sqlite.prepare(`SELECT COUNT(*) AS c FROM client_documents d JOIN clients c ON c.id = d.client_id
-      WHERE d.deleted_at IS NULL AND c.deleted_at IS NULL AND d.expiry_date IS NOT NULL AND d.expiry_date <= ?`).get(soon).c
+      WHERE ${where.join(' AND ')}`).get(...params).c
   }
 
   /**

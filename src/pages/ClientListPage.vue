@@ -1,9 +1,11 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
 import { useApi } from '../composables/useApi.js'
+import { useAuthStore } from '../stores/auth.js'
 import ClientCard from '../components/ClientCard.vue'
 
 const api = useApi()
+const auth = useAuthStore()
 const clients = ref([])
 const meta = ref({})
 const q = ref('')
@@ -28,7 +30,7 @@ onMounted(load)
   <div class="space-y-4">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <h1 class="text-2xl font-semibold">Clients</h1>
-      <router-link to="/clients/new" class="btn-primary">+ New client</router-link>
+      <router-link v-if="auth.isAdmin" to="/clients/new" class="btn-primary">+ New client</router-link>
     </div>
     <input v-model="q" class="input max-w-md" placeholder="Search preferred name, suburb, postcode or NDIS number…" />
     <p v-if="!clients.length" class="text-mid text-sm">No clients found.</p>

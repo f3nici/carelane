@@ -2,9 +2,11 @@
 import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useApi } from '../composables/useApi.js'
+import { useAuthStore } from '../stores/auth.js'
 import StatusBadge from '../components/StatusBadge.vue'
 
 const api = useApi()
+const auth = useAuthStore()
 const route = useRoute()
 const incidents = ref([])
 const meta = ref({})
@@ -51,7 +53,7 @@ onMounted(load)
     </div>
     <div class="flex flex-wrap items-center justify-between gap-3">
       <h1 class="text-2xl font-semibold">Incident reports</h1>
-      <router-link to="/incidents/new" class="btn-primary">+ New incident report</router-link>
+      <router-link v-if="auth.isAdmin" to="/incidents/new" class="btn-primary">+ New incident report</router-link>
     </div>
     <p class="text-sm text-mid">Structured NDIS incident records with reportable-incident classification and a follow-up lifecycle. Promote a flagged shift note from the note itself, or log one directly here.</p>
 

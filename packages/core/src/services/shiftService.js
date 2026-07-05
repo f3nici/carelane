@@ -1,4 +1,5 @@
 import { ApiError } from '../errors.js'
+import { applyClientScope } from '../utils/sql.js'
 
 /**
  * Build the shift-note service bound to a host context.
@@ -7,7 +8,7 @@ import { ApiError } from '../errors.js'
  */
 export function createShiftService (ctx, services) {
   const { sqlite } = ctx
-  const { encrypt, decryptFields } = services.crypto
+  const { encrypt, decryptFields, blindIndex } = services.crypto
   const { clientDisplayName } = services.client
 
   const ENCRYPTED = ['body', 'incident_details']
@@ -46,32 +47,134 @@ export function createShiftService (ctx, services) {
     return Math.round((mins / 60) * 4) / 4
   }
 
+  // Note text that feeds the keyword search. `body`/`incident_details` are
+  // encrypted at rest, so they are tokenised from the decrypted note here in the
+  // app layer (never in a SQL trigger) and only a keyed per-word hash reaches the
+  // FTS index — the plaintext is never written to the shadow table.
+  const SEARCH_TEXT_FIELDS = ['body', 'incident_details', 'support_provided', 'participant_response', 'location']
+
+  /** Split free text into lowercased, de-duplicated word tokens (min length 2). */
+  function tokenizeText (text) {
+    return [...new Set((String(text ?? '').toLowerCase().match(/[a-z0-9]+/g) || []).filter(t => t.length > 1))]
+  }
+
   /**
-   * List shift notes with optional client / incident / billed / archived filters.
+   * A per-word blind index: a truncated, keyed HMAC of one token. Reuses the
+   * crypto blind-index key, so the FTS row never reveals the note's words; the
+   * leading letter keeps every token a valid FTS5 bareword.
+   */
+  function searchToken (word) {
+    return 't' + blindIndex(word).slice(0, 16)
+  }
+
+  /** Space-joined blind-index tokens for a shift's searchable text (its FTS row). */
+  function indexTokens (shift) {
+    const words = new Set()
+    for (const f of SEARCH_TEXT_FIELDS) for (const w of tokenizeText(shift[f])) words.add(w)
+    return [...words].map(searchToken).join(' ')
+  }
+
+  /**
+   * FTS5 MATCH expression for a keyword query: every query word must be present
+   * (AND). Returns null when the query has no indexable (>=2 char) token.
+   */
+  function searchMatch (q) {
+    const tokens = tokenizeText(q).map(searchToken)
+    return tokens.length ? tokens.join(' AND ') : null
+  }
+
+  /**
+   * (Re)write a shift's blind-index row in the keyword FTS table. Called on every
+   * create/update; a delete-then-insert keeps the row a self-contained FTS entry
+   * (no external-content triggers to drift). Soft-delete/restore need not touch
+   * the index — list queries already gate visibility on `deleted_at`.
+   * @param {object} shift a decrypted shift note (from {@link getShift})
+   */
+  function indexShift (shift) {
+    sqlite.prepare('DELETE FROM shift_notes_fts WHERE rowid = ?').run(shift.id)
+    sqlite.prepare('INSERT INTO shift_notes_fts (rowid, tokens) VALUES (?, ?)').run(shift.id, indexTokens(shift))
+  }
+
+  /**
+   * Backfill the keyword FTS index for any shift note missing a row — used once
+   * by the migration when the index is first created, and self-healing on later
+   * boots (a no-op when already in sync). Runs in a single transaction.
+   * @returns {number} how many notes were (re)indexed
+   */
+  function reindexSearch () {
+    const missing = sqlite.prepare('SELECT id FROM shift_notes WHERE id NOT IN (SELECT rowid FROM shift_notes_fts)').all()
+    const run = sqlite.transaction(ids => {
+      for (const { id } of ids) indexShift(toShift(sqlite.prepare('SELECT * FROM shift_notes WHERE id = ?').get(id)))
+    })
+    run(missing)
+    return missing.length
+  }
+
+  /**
+   * List shift notes with optional client / incident / billed / archived filters,
+   * a date filter (exact `date`, or a `date_from`/`date_to` range), a free-text
+   * `q` keyword search over the note body, incident details, support provided,
+   * participant response and location, and a `sort` order (`date` newest-first —
+   * the default, `date_asc` oldest-first, or `client` by participant name).
+   *
    * By default archived notes are hidden; pass `archived: 'true'` for archived
    * only, or `archived: 'all'` for both.
+   *
+   * Keyword search runs against the blind-index FTS table (`shift_notes_fts`),
+   * so it stays a paginated SQL query that scales — the note body is searched
+   * without ever decrypting the whole table. Whole-word (case-insensitive)
+   * matching only: a query word matches a note word, not an arbitrary substring.
+   * Sorting by participant is the one path that still decrypts in JS, since the
+   * legal name is encrypted (the FTS join first narrows the set when searching).
    * @param {{page:number, perPage:number, offset:number}} pg
-   * @param {{client_id?:string, incident?:string, billed?:string, archived?:string}} filters
+   * @param {{client_id?:string, incident?:string, billed?:string, archived?:string, date?:string, date_from?:string, date_to?:string, q?:string, sort?:string}} filters
    */
   function listShifts (pg, filters = {}) {
     const where = ['s.deleted_at IS NULL']
     const params = []
+    applyClientScope(where, params, 's.client_id', filters.client_ids)
     if (filters.archived === 'true' || filters.archived === '1') where.push('s.archived_at IS NOT NULL')
     else if (filters.archived !== 'all') where.push('s.archived_at IS NULL')
     if (filters.client_id) { where.push('s.client_id = ?'); params.push(Number(filters.client_id)) }
     if (filters.incident === 'true') where.push('s.incident_flag = 1')
     if (filters.billed === 'false') where.push('s.billed = 0')
+    if (filters.date) { where.push('s.shift_date = ?'); params.push(filters.date) }
+    if (filters.date_from) { where.push('s.shift_date >= ?'); params.push(filters.date_from) }
+    if (filters.date_to) { where.push('s.shift_date <= ?'); params.push(filters.date_to) }
+
+    // Keyword search joins the blind-index FTS table and matches on hashed
+    // tokens. A query with no indexable token can never match, so return empty.
+    let joinFts = ''
+    if (filters.q?.trim()) {
+      const match = searchMatch(filters.q)
+      if (!match) return { rows: [], total: 0 }
+      joinFts = 'JOIN shift_notes_fts ON shift_notes_fts.rowid = s.id'
+      where.push('shift_notes_fts MATCH ?')
+      params.push(match)
+    }
     const whereSql = 'WHERE ' + where.join(' AND ')
+
     // Join clients (excluding soft-deleted ones) so the count matches the listed
     // rows — a soft-deleted participant's shifts drop out of active lists.
-    const total = sqlite.prepare(`SELECT COUNT(*) AS c FROM shift_notes s
-      JOIN clients c ON c.id = s.client_id AND c.deleted_at IS NULL ${whereSql}`).get(...params).c
-    const rows = sqlite.prepare(`SELECT s.*, c.preferred_name AS client_preferred_name,
-        c.first_name AS client_first_name, c.last_name AS client_last_name, bc.code AS billing_code
-      FROM shift_notes s
+    const from = `FROM shift_notes s
       JOIN clients c ON c.id = s.client_id AND c.deleted_at IS NULL
       LEFT JOIN billing_codes bc ON bc.id = s.billing_code_id
-      ${whereSql} ORDER BY s.shift_date DESC, s.id DESC LIMIT ? OFFSET ?`)
+      ${joinFts} ${whereSql}`
+    const select = `SELECT s.*, c.preferred_name AS client_preferred_name,
+        c.first_name AS client_first_name, c.last_name AS client_last_name, bc.code AS billing_code ${from}`
+
+    // Participant sort: the legal name is encrypted, so sort in JS (over the
+    // FTS-narrowed set when a keyword is present) rather than in SQL.
+    if (filters.sort === 'client') {
+      const rows = sqlite.prepare(select).all(...params).map(toShiftListRow)
+      rows.sort((a, b) => a.client_display_name.localeCompare(b.client_display_name) ||
+        b.shift_date.localeCompare(a.shift_date) || b.id - a.id)
+      return { rows: rows.slice(pg.offset, pg.offset + pg.perPage), total: rows.length }
+    }
+
+    const order = filters.sort === 'date_asc' ? 'ASC' : 'DESC'
+    const total = sqlite.prepare(`SELECT COUNT(*) AS c ${from}`).get(...params).c
+    const rows = sqlite.prepare(`${select} ORDER BY s.shift_date ${order}, s.id ${order} LIMIT ? OFFSET ?`)
       .all(...params, pg.perPage, pg.offset)
     return { rows: rows.map(toShiftListRow), total }
   }
@@ -105,7 +208,9 @@ export function createShiftService (ctx, services) {
     })
     const result = sqlite.prepare(`INSERT INTO shift_notes (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`)
       .run(...values, workerId, ts, ts)
-    return getShift(result.lastInsertRowid)
+    const shift = getShift(result.lastInsertRowid)
+    indexShift(shift)
+    return shift
   }
 
   /**
@@ -142,7 +247,9 @@ export function createShiftService (ctx, services) {
     sets.push('updated_at = ?')
     params.push(now(), id)
     sqlite.prepare(`UPDATE shift_notes SET ${sets.join(', ')} WHERE id = ?`).run(...params)
-    return getShift(id)
+    const shift = getShift(id)
+    indexShift(shift)
+    return shift
   }
 
   /**
@@ -225,6 +332,7 @@ export function createShiftService (ctx, services) {
 
   return {
     listShifts,
+    reindexSearch,
     getShift,
     createShift,
     updateShift,

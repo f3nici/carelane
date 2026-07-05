@@ -81,6 +81,62 @@ describe('shiftService business rules', () => {
     expect(() => shiftService.getShift(shift.id)).toThrow(/not found/i)
   })
 
+  it('searches the encrypted note body and plaintext fields by keyword (blind-index FTS)', () => {
+    const c = clientService.createClient({ first_name: 'Ada', last_name: 'Lovelace', ndis_number: '430000099', active: 1 }).id
+    const s1 = shiftService.createShift(baseShift({ client_id: c, shift_date: '2026-05-02', body: 'Attended a hydrotherapy session.' }), workerId)
+    shiftService.createShift(baseShift({ client_id: c, shift_date: '2026-05-03', body: 'Meal prep and cleaning.', location: 'Community centre' }), workerId)
+    const pg = { page: 1, perPage: 100, offset: 0 }
+    // Matches the encrypted body of the first note only (case-insensitively).
+    const hydro = shiftService.listShifts(pg, { client_id: c, q: 'Hydrotherapy' })
+    expect(hydro.total).toBe(1)
+    expect(hydro.rows[0].body).toMatch(/hydrotherapy/)
+    // Matches a plaintext location field.
+    expect(shiftService.listShifts(pg, { client_id: c, q: 'community' }).total).toBe(1)
+    // Multi-word queries are AND-ed across the note's words.
+    expect(shiftService.listShifts(pg, { client_id: c, q: 'meal cleaning' }).total).toBe(1)
+    expect(shiftService.listShifts(pg, { client_id: c, q: 'meal hydrotherapy' }).total).toBe(0)
+    // No match returns nothing.
+    expect(shiftService.listShifts(pg, { client_id: c, q: 'zzz-nope' }).total).toBe(0)
+
+    // The index stores only keyed token hashes — never the note's plaintext words.
+    const indexed = sqlite.prepare('SELECT tokens FROM shift_notes_fts WHERE rowid = ?').get(s1.id).tokens
+    expect(indexed).not.toMatch(/hydrotherapy/i)
+    expect(indexed).toMatch(/^t[0-9a-f]/)
+
+    // Editing the body re-indexes it: the old word stops matching, the new matches.
+    shiftService.updateShift(s1.id, { body: 'Went for a swim at the pool.' })
+    expect(shiftService.listShifts(pg, { client_id: c, q: 'hydrotherapy' }).total).toBe(0)
+    expect(shiftService.listShifts(pg, { client_id: c, q: 'swim' }).total).toBe(1)
+  })
+
+  it('filters by an exact date and by a date range', () => {
+    const c = clientService.createClient({ first_name: 'Alan', last_name: 'Turing', ndis_number: '430000098', active: 1 }).id
+    shiftService.createShift(baseShift({ client_id: c, shift_date: '2026-03-01' }), workerId)
+    shiftService.createShift(baseShift({ client_id: c, shift_date: '2026-03-15' }), workerId)
+    shiftService.createShift(baseShift({ client_id: c, shift_date: '2026-04-01' }), workerId)
+    const pg = { page: 1, perPage: 100, offset: 0 }
+    expect(shiftService.listShifts(pg, { client_id: c, date: '2026-03-15' }).total).toBe(1)
+    // Inclusive range spanning the two March shifts.
+    const march = shiftService.listShifts(pg, { client_id: c, date_from: '2026-03-01', date_to: '2026-03-31' })
+    expect(march.total).toBe(2)
+    expect(march.rows.every(r => r.shift_date.startsWith('2026-03'))).toBe(true)
+    // Open-ended lower bound.
+    expect(shiftService.listShifts(pg, { client_id: c, date_from: '2026-03-20' }).total).toBe(1)
+  })
+
+  it('sorts by participant name and by date order', () => {
+    const zed = clientService.createClient({ first_name: 'Zed', last_name: 'Zephyr', preferred_name: 'Zed', ndis_number: '430000097', active: 1 }).id
+    const abe = clientService.createClient({ first_name: 'Abe', last_name: 'Abbott', preferred_name: 'Abe', ndis_number: '430000096', active: 1 }).id
+    shiftService.createShift(baseShift({ client_id: zed, shift_date: '2026-02-01' }), workerId)
+    shiftService.createShift(baseShift({ client_id: abe, shift_date: '2026-02-02' }), workerId)
+    const pg = { page: 1, perPage: 100, offset: 0 }
+    const byClient = shiftService.listShifts(pg, { sort: 'client' }).rows.filter(r => [zed, abe].includes(r.client_id))
+    expect(byClient[0].client_display_name).toBe('Abe')
+    // Oldest-first date sort within the same participant set.
+    const asc = shiftService.listShifts(pg, { sort: 'date_asc' }).rows.map(r => r.shift_date)
+    expect([...asc]).toEqual([...asc].sort())
+  })
+
   it('archives a note out of the default list and back again', () => {
     const shift = shiftService.createShift(baseShift({ shift_date: '2026-07-01' }), workerId)
     const pg = { page: 1, perPage: 100, offset: 0 }

@@ -1,4 +1,5 @@
 import { ApiError } from '../errors.js'
+import { applyClientScope } from '../utils/sql.js'
 
 /**
  * Build the report service bound to a host context.
@@ -33,6 +34,7 @@ export function createReportService (ctx, services) {
   function listReports (pg, filters = {}) {
     const where = ['r.deleted_at IS NULL']
     const params = []
+    applyClientScope(where, params, 'r.client_id', filters.client_ids)
     if (filters.archived === 'true' || filters.archived === '1') where.push('r.archived_at IS NOT NULL')
     else if (filters.archived !== 'all') where.push('r.archived_at IS NULL')
     if (filters.client_id) { where.push('r.client_id = ?'); params.push(Number(filters.client_id)) }
