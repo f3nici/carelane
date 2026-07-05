@@ -21,6 +21,8 @@ COPY --from=builder /app/server ./server
 # ./packages/core, so the package tree must be present in the runtime image too.
 COPY --from=builder /app/packages ./packages
 COPY --from=builder /app/package.json ./
+# version.js is a single-source root module imported at runtime by server/swagger.js.
+COPY --from=builder /app/version.js ./version.js
 RUN mkdir -p /app/data /app/uploads
 EXPOSE 3778
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s \
