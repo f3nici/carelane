@@ -2,11 +2,26 @@ import { Router } from 'express'
 import { validate, validatePartial } from '../middleware/validate.js'
 import { incidentReportSchema } from '../utils/validators.js'
 import * as incidentService from '../services/incidentService.js'
+import { assertClientAccess } from '../middleware/auth.js'
 import { logActivity, diffChanges } from '../services/activityService.js'
 import { renderPdf, pdfPath, safeFilename } from '../utils/pdfRenderer.js'
 import { parsePagination, paginationMeta, ok } from '../utils/pagination.js'
+import { ApiError } from '../middleware/errorHandler.js'
 
 const router = Router()
+
+// Workers may view incident reports for their assigned participants; creating,
+// promoting from a shift, editing and deleting are admin-only.
+router.param('id', (req, res, next, value) => {
+  try {
+    assertClientAccess(req, incidentService.getIncident(Number(value)).client_id)
+    next()
+  } catch (err) { next(err) }
+})
+router.use((req, res, next) => {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method) || req.isAdmin) return next()
+  next(new ApiError(403, 'FORBIDDEN', 'Read-only access — ask an admin to make changes'))
+})
 
 /**
  * @openapi
@@ -16,7 +31,7 @@ const router = Router()
  */
 router.get('/', (req, res) => {
   const pg = parsePagination(req.query)
-  const { rows, total } = incidentService.listIncidents(pg, req.query)
+  const { rows, total } = incidentService.listIncidents(pg, { ...req.query, client_ids: req.assignedClientIds })
   res.json(ok(rows, paginationMeta(pg.page, pg.perPage, total)))
 })
 

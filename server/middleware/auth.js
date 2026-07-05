@@ -1,5 +1,7 @@
 import crypto from 'node:crypto'
 import { ApiError } from './errorHandler.js'
+import { sqlite } from '../db/connection.js'
+import { listAssignedClientIds, canAccessClient } from '../services/accessService.js'
 
 /**
  * Require an authenticated session. All `/api/v1` routes except auth/login
@@ -11,11 +13,65 @@ export function requireAuth (req, res, next) {
 }
 
 /**
- * Require the admin role (settings, user management).
+ * Load the current user fresh and attach the access context used across the API:
+ * `req.currentUser`, `req.isAdmin` and (for workers) `req.assignedClientIds`
+ * (the participant ids they may see; admins get `null` = unrestricted).
+ *
+ * Reading the row live — rather than trusting the role stamped on the session at
+ * login — means an admin deactivating a login or changing its role takes effect
+ * on the worker's very next request, not only after they log in again. A
+ * deactivated account is rejected immediately.
+ *
+ * Runs after {@link requireAuth}, so a session is guaranteed present.
+ */
+export function attachAccess (req, res, next) {
+  const user = sqlite.prepare('SELECT id, username, display_name, role, active FROM users WHERE id = ?')
+    .get(req.session.userId)
+  if (!user || !user.active) {
+    return req.session.destroy(() => next(new ApiError(401, 'UNAUTHENTICATED', 'Account is no longer active')))
+  }
+  req.currentUser = user
+  req.isAdmin = user.role === 'admin'
+  req.assignedClientIds = req.isAdmin ? null : listAssignedClientIds(user.id)
+  next()
+}
+
+/**
+ * Require the admin role (settings, user management, all write paths that a
+ * support worker may not perform).
  */
 export function requireAdmin (req, res, next) {
-  if (req.session?.userId && req.session.role === 'admin') return next()
+  if (req.isAdmin ?? req.session?.role === 'admin') return next()
   next(new ApiError(403, 'FORBIDDEN', 'Admin access required'))
+}
+
+/**
+ * Throw unless the current user may access the given participant. Admins pass;
+ * workers must have the participant assigned. Uses 404 (not 403) so an
+ * unassigned worker cannot probe which participant ids exist.
+ * @param {import('express').Request} req
+ * @param {number} clientId
+ */
+export function assertClientAccess (req, clientId) {
+  if (!canAccessClient(req.currentUser, clientId)) {
+    throw new ApiError(404, 'NOT_FOUND', 'Not found')
+  }
+}
+
+/**
+ * Express `router.param` handler enforcing participant access for any route
+ * whose `:id` (or a named param) is a participant id. Register with
+ * `router.param('id', requireClientParam)`.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {Function} next
+ * @param {string} value the matched id
+ */
+export function requireClientParam (req, res, next, value) {
+  try {
+    assertClientAccess(req, Number(value))
+    next()
+  } catch (err) { next(err) }
 }
 
 /**

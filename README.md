@@ -8,8 +8,10 @@ to be run by a **single operator on their own infrastructure** — it is not a
 multi-tenant SaaS. All data is treated as sensitive health information and
 encrypted at rest.
 
-> A `users` table and roles exist so additional worker logins can be added
-> later, but the default deployment assumes one person.
+> The default deployment assumes one person, but CareLane supports **multiple
+> logins with scoped access**: an admin manages the practice and can add support
+> workers who each see only the participants assigned to them and only their own
+> roster, read-only. See _Team & access control_ below.
 
 ## Features
 
@@ -43,6 +45,15 @@ encrypted at rest.
   your phone for plan reviews due, incidents needing follow-up, unbilled shifts
   aging, and a reminder before each upcoming shift. Set the topic, toggles and
   timings in-app. See the [ntfy setup guide](docs/ntfy-notifications-setup.md).
+- **Team & access control** — add support-worker logins alongside the admin, and
+  assign each worker the participants they support (managed from the **Team**
+  page). A worker sees only their assigned participants — full record, but
+  **read-only**: they can view every note but not edit one or send a finalised
+  note back to draft. Rosters are per-worker: an admin assigns each scheduled
+  shift to a worker, and a worker sees (and clocks in/out of) only their own
+  shifts, and can write the note for a shift they worked. Everything else
+  (settings, billing catalogue, incidents/agreements/reports authoring, the
+  knowledge base, the audit log and deleted-items recycle bin) stays admin-only.
 - **Login hardening** — DB-backed brute-force throttling (per ip+username and a
   per-account global counter, surviving restarts), optional **TOTP two-factor**
   with one-time recovery codes, **passkeys (WebAuthn)** as a passwordless factor,

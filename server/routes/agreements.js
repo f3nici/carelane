@@ -4,6 +4,7 @@ import { validate, validatePartial } from '../middleware/validate.js'
 import { agreementSchema, agreementDraftSchema } from '../utils/validators.js'
 import * as agreementService from '../services/agreementService.js'
 import * as clientService from '../services/clientService.js'
+import { assertClientAccess } from '../middleware/auth.js'
 import { resolveTemplateForDraft } from '../services/templateService.js'
 import { draftAgreement, estimateAgreementTokens } from '../services/aiService.js'
 import { rateLimit } from '../middleware/rateLimit.js'
@@ -15,6 +16,19 @@ import { ApiError } from '../middleware/errorHandler.js'
 const router = Router()
 const aiLimiter = rateLimit({ name: 'ai-agreement', max: 20, windowMs: 60 * 1000 })
 
+// A worker may read agreements for their assigned participants but not create,
+// edit, draft or sign them (admin-only).
+router.param('id', (req, res, next, value) => {
+  try {
+    assertClientAccess(req, agreementService.getAgreement(Number(value)).client_id)
+    next()
+  } catch (err) { next(err) }
+})
+router.use((req, res, next) => {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method) || req.isAdmin) return next()
+  next(new ApiError(403, 'FORBIDDEN', 'Read-only access — ask an admin to make changes'))
+})
+
 /**
  * @openapi
  * /agreements:
@@ -23,7 +37,7 @@ const aiLimiter = rateLimit({ name: 'ai-agreement', max: 20, windowMs: 60 * 1000
  */
 router.get('/', (req, res) => {
   const pg = parsePagination(req.query)
-  const { rows, total } = agreementService.listAgreements(pg, req.query)
+  const { rows, total } = agreementService.listAgreements(pg, { ...req.query, client_ids: req.assignedClientIds })
   res.json(ok(rows, paginationMeta(pg.page, pg.perPage, total)))
 })
 

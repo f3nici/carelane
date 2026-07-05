@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useApi } from '../composables/useApi.js'
 import { useAuthStore } from '../stores/auth.js'
@@ -19,16 +19,22 @@ function openSearch () {
   emit('open-search')
 }
 
+// `admin: true` items are hidden from support-worker logins (they are operator
+// tools the server also refuses for a worker).
 const nav = [
   { name: 'dashboard', to: '/', label: 'Dashboard', icon: 'M3 12l9-9 9 9M5 10v10h5v-6h4v6h5V10', count: null },
   { name: 'clients', to: '/clients', label: 'Clients', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z', count: 'active_clients' },
   { name: 'roster', to: '/roster', label: 'Roster', icon: 'M8 7V3m8 4V3m-9 8h18M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', count: 'upcoming_shifts' },
   { name: 'shifts', to: '/shifts', label: 'Notes', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', count: 'unfinalised_notes' },
-  { name: 'documents', to: '/documents', label: 'Documents', icon: 'M9 12h6m-6 4h6M7 3h7l5 5v13H7a2 2 0 01-2-2V5a2 2 0 012-2z', count: null },
-  { name: 'knowledge', to: '/knowledge', label: 'Knowledge Base', icon: 'M12 6.25c-2.4-1.5-5.4-1.5-8 0v12c2.6-1.5 5.6-1.5 8 0 2.4-1.5 5.4-1.5 8 0v-12c-2.6-1.5-5.6-1.5-8 0zm0 0v12', count: 'documents_indexed' },
-  { name: 'deleted', to: '/deleted', label: 'Deleted Items', icon: 'M19 7l-.87 12.14A2 2 0 0116.14 21H7.86a2 2 0 01-1.99-1.86L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16', count: null },
-  { name: 'settings', to: '/settings', label: 'Settings', icon: 'M10.3 4.3a1.7 1.7 0 013.4 0 1.7 1.7 0 002.6 1.1 1.7 1.7 0 012.4 2.4 1.7 1.7 0 001 2.5 1.7 1.7 0 010 3.4 1.7 1.7 0 00-1 2.6 1.7 1.7 0 01-2.4 2.4 1.7 1.7 0 00-2.6 1 1.7 1.7 0 01-3.4 0 1.7 1.7 0 00-2.5-1 1.7 1.7 0 01-2.4-2.4 1.7 1.7 0 00-1.1-2.6 1.7 1.7 0 010-3.4 1.7 1.7 0 001.1-2.5 1.7 1.7 0 012.4-2.4 1.7 1.7 0 002.5-1.1zM15 12a3 3 0 11-6 0 3 3 0 016 0z', count: null }
+  { name: 'documents', to: '/documents', label: 'Documents', icon: 'M9 12h6m-6 4h6M7 3h7l5 5v13H7a2 2 0 01-2-2V5a2 2 0 012-2z', count: null, admin: true },
+  { name: 'knowledge', to: '/knowledge', label: 'Knowledge Base', icon: 'M12 6.25c-2.4-1.5-5.4-1.5-8 0v12c2.6-1.5 5.6-1.5 8 0 2.4-1.5 5.4-1.5 8 0v-12c-2.6-1.5-5.6-1.5-8 0zm0 0v12', count: 'documents_indexed', admin: true },
+  { name: 'team', to: '/team', label: 'Team', icon: 'M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6 0a3 3 0 10-2.5-4.5', count: null, admin: true },
+  { name: 'deleted', to: '/deleted', label: 'Deleted Items', icon: 'M19 7l-.87 12.14A2 2 0 0116.14 21H7.86a2 2 0 01-1.99-1.86L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16', count: null, admin: true },
+  { name: 'settings', to: '/settings', label: 'Settings', icon: 'M10.3 4.3a1.7 1.7 0 013.4 0 1.7 1.7 0 002.6 1.1 1.7 1.7 0 012.4 2.4 1.7 1.7 0 001 2.5 1.7 1.7 0 010 3.4 1.7 1.7 0 00-1 2.6 1.7 1.7 0 01-2.4 2.4 1.7 1.7 0 00-2.6 1 1.7 1.7 0 01-3.4 0 1.7 1.7 0 00-2.5-1 1.7 1.7 0 01-2.4-2.4 1.7 1.7 0 00-1.1-2.6 1.7 1.7 0 010-3.4 1.7 1.7 0 001.1-2.5 1.7 1.7 0 012.4-2.4 1.7 1.7 0 002.5-1.1zM15 12a3 3 0 11-6 0 3 3 0 016 0z', count: null, admin: true }
 ]
+
+// Support workers see only their own dashboard, clients, roster and notes.
+const visibleNav = computed(() => nav.filter(item => auth.isAdmin || !item.admin))
 
 // Close the mobile drawer whenever the route changes.
 watch(() => route.fullPath, () => { mobileOpen.value = false })
@@ -94,7 +100,7 @@ async function logout () {
     </div>
     <nav class="flex-1 overflow-y-auto flex flex-col px-3 gap-1">
       <router-link
-        v-for="item in nav"
+        v-for="item in visibleNav"
         :key="item.name"
         :to="item.to"
         class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-mid hover:text-white hover:bg-white/5 transition-colors"
@@ -108,6 +114,7 @@ async function logout () {
     </nav>
     <div class="px-5 py-4 border-t border-white/10 text-xs text-mid">
       <p class="truncate">{{ auth.user?.display_name }}</p>
+      <p class="text-[10px] uppercase tracking-wide text-mid/70 mb-1">{{ auth.isAdmin ? 'Admin' : 'Support worker' }}</p>
       <button class="text-accent hover:underline" @click="logout">Sign out</button>
     </div>
   </aside>

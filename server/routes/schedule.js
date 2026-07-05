@@ -5,6 +5,7 @@ import { scheduledShiftSchema, recurrenceSchema, scheduleNoteSchema, googleSetti
 import * as scheduleService from '../services/scheduleService.js'
 import * as recurrenceService from '../services/recurrenceService.js'
 import * as googleCalendar from '../services/googleCalendarService.js'
+import { requireAdmin } from '../middleware/auth.js'
 import { rateLimit } from '../middleware/rateLimit.js'
 import { updateSettings } from '../services/settingsService.js'
 import { logActivity, diffChanges } from '../services/activityService.js'
@@ -16,6 +17,24 @@ const id = req => Number(req.params.id)
 // Cap on-demand outbound calls to Google so they can't be hammered.
 const outboundLimiter = rateLimit({ name: 'google-out', max: 15, windowMs: 60 * 1000 })
 
+// Roster access control:
+//  - Recurring series and the Google Calendar connection are operator config —
+//    admin-only.
+//  - A support worker sees and acts on only their OWN scheduled shifts. The
+//    param guard enforces ownership on every `/:id` route (admins bypass it, so
+//    the `/recurrences/:id` and `/google` routes above are unaffected).
+router.use('/recurrences', requireAdmin)
+router.use('/google', requireAdmin)
+router.param('id', (req, res, next, value) => {
+  if (req.isAdmin) return next()
+  try {
+    const shift = scheduleService.getScheduled(Number(value))
+    if (shift.worker_id !== req.currentUser.id) throw new ApiError(404, 'NOT_FOUND', 'Not found')
+    req.scheduled = shift
+    next()
+  } catch (err) { next(err) }
+})
+
 /**
  * @openapi
  * /schedule:
@@ -23,20 +42,25 @@ const outboundLimiter = rateLimit({ name: 'google-out', max: 15, windowMs: 60 * 
  *   post: { tags: [Schedule], summary: Create a one-off scheduled shift }
  */
 router.get('/', (req, res) => {
-  res.json(ok(scheduleService.listScheduled(req.query)))
+  // Workers see only their own roster; admins see everyone's.
+  const filters = { ...req.query }
+  if (!req.isAdmin) filters.worker_id = req.currentUser.id
+  res.json(ok(scheduleService.listScheduled(filters)))
 })
 
-router.post('/', validate(scheduledShiftSchema), (req, res) => {
+// Only an admin rosters shifts (and assigns them to a worker).
+router.post('/', requireAdmin, validate(scheduledShiftSchema), (req, res) => {
   const shift = scheduleService.createScheduled(req.body, req.session.userId)
-  logActivity('scheduled_shift', shift.id, req.session.userId, 'created', { date: shift.scheduled_date })
+  logActivity('scheduled_shift', shift.id, req.session.userId, 'created', { date: shift.scheduled_date, worker_id: shift.worker_id })
   res.status(201).json(ok(shift))
 })
 
 /** Upcoming shifts and the currently clocked-in shift, for the dashboard. */
 router.get('/upcoming', (req, res) => {
+  const workerId = req.isAdmin ? null : req.currentUser.id
   res.json(ok({
-    upcoming: scheduleService.upcomingScheduled(Number(req.query.days) || 14),
-    active: scheduleService.activeShift()
+    upcoming: scheduleService.upcomingScheduled(Number(req.query.days) || 14, workerId),
+    active: scheduleService.activeShift(workerId)
   }))
 })
 
@@ -151,7 +175,7 @@ router.get('/:id', (req, res) => {
   res.json(ok(scheduleService.getScheduled(id(req))))
 })
 
-router.put('/:id', validatePartial(scheduledShiftSchema), (req, res) => {
+router.put('/:id', requireAdmin, validatePartial(scheduledShiftSchema), (req, res) => {
   const before = scheduleService.getScheduled(id(req))
   const shift = scheduleService.updateScheduled(id(req), req.body)
   logActivity('scheduled_shift', shift.id, req.session.userId, 'updated', {
@@ -160,7 +184,7 @@ router.put('/:id', validatePartial(scheduledShiftSchema), (req, res) => {
   res.json(ok(shift))
 })
 
-router.delete('/:id', (req, res) => {
+router.delete('/:id', requireAdmin, (req, res) => {
   scheduleService.deleteScheduled(id(req))
   logActivity('scheduled_shift', id(req), req.session.userId, 'deleted')
   res.json(ok({ deleted: true }))
@@ -171,7 +195,7 @@ router.delete('/:id', (req, res) => {
  * /schedule/{id}/cancel:
  *   post: { tags: [Schedule], summary: Cancel a scheduled shift }
  */
-router.post('/:id/cancel', (req, res) => {
+router.post('/:id/cancel', requireAdmin, (req, res) => {
   const shift = scheduleService.cancelScheduled(id(req))
   logActivity('scheduled_shift', shift.id, req.session.userId, 'cancelled')
   res.json(ok(shift))

@@ -6,7 +6,9 @@ import StatusBadge from './StatusBadge.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
 
 const props = defineProps({
-  clientId: { type: [String, Number], required: true }
+  clientId: { type: [String, Number], required: true },
+  // Support workers view goals + progress read-only (no add/edit/archive controls).
+  readonly: { type: Boolean, default: false }
 })
 const emit = defineEmits(['count'])
 
@@ -128,7 +130,7 @@ async function removeProgress (goalId, noteId) {
         <h3 class="font-semibold">Goals</h3>
         <p class="text-xs text-mid">Track discrete participant outcomes with dated progress notes. These feed AI-drafted progress reports.</p>
       </div>
-      <button class="btn-primary" @click="startNew">+ New goal</button>
+      <button v-if="!readonly" class="btn-primary" @click="startNew">+ New goal</button>
     </div>
 
     <form v-if="showNew" class="rounded-lg border border-white/10 p-4 mb-4 space-y-3" @submit.prevent="saveGoal">
@@ -170,9 +172,11 @@ async function removeProgress (goalId, noteId) {
           </div>
           <div class="flex gap-2 shrink-0 text-xs">
             <button class="text-accent hover:underline" @click="openGoal(g)">{{ expanded[g.id] ? 'hide' : 'progress' }}</button>
-            <button class="text-accent hover:underline" @click="startEdit(g)">edit</button>
-            <button v-if="g.status !== 'achieved'" class="text-success hover:underline" @click="setStatus(g, 'achieved')">achieved</button>
-            <button class="text-danger hover:underline" @click="confirmDelete(g)">archive</button>
+            <template v-if="!readonly">
+              <button class="text-accent hover:underline" @click="startEdit(g)">edit</button>
+              <button v-if="g.status !== 'achieved'" class="text-success hover:underline" @click="setStatus(g, 'achieved')">achieved</button>
+              <button class="text-danger hover:underline" @click="confirmDelete(g)">archive</button>
+            </template>
           </div>
         </div>
 
@@ -184,12 +188,12 @@ async function removeProgress (goalId, noteId) {
                 <span v-if="p.progress_rating" class="pill bg-accent/15 text-accent ml-2">{{ p.progress_rating }}/5</span>
                 <p class="whitespace-pre-wrap">{{ p.body }}</p>
               </div>
-              <button class="text-danger text-xs hover:underline shrink-0" @click="removeProgress(g.id, p.id)">remove</button>
+              <button v-if="!readonly" class="text-danger text-xs hover:underline shrink-0" @click="removeProgress(g.id, p.id)">remove</button>
             </li>
           </ul>
           <p v-else class="text-sm text-mid">No progress notes yet.</p>
 
-          <div v-if="progressForm[g.id]" class="rounded-lg bg-white/5 p-3 space-y-2">
+          <div v-if="progressForm[g.id] && !readonly" class="rounded-lg bg-white/5 p-3 space-y-2">
             <div class="grid sm:grid-cols-3 gap-2">
               <div><label class="label">Date</label><input v-model="progressForm[g.id].note_date" type="date" class="input" /></div>
               <div>

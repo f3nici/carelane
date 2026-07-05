@@ -166,8 +166,10 @@ export function createRecurrenceService (ctx, services) {
       return data[c] ?? null
     })
     const cols = [...COLUMNS, 'worker_id', 'created_at', 'updated_at']
+    // Roster the series (and every occurrence it materialises) to the assigned
+    // worker when the admin set one, else the acting user.
     const id = sqlite.prepare(`INSERT INTO shift_recurrences (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`)
-      .run(...values, workerId, ts, ts).lastInsertRowid
+      .run(...values, data.worker_id || workerId, ts, ts).lastInsertRowid
     const horizonEnd = fmt(addDays(parse(today()), HORIZON_DAYS))
     materialiseSeries(getRecurrence(id), horizonEnd)
     return getRecurrence(id)

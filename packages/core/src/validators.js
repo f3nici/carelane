@@ -124,6 +124,10 @@ const weekdays = z.array(z.number().int().min(0).max(6)).max(7)
 
 export const scheduledShiftSchema = z.object({
   client_id: z.number().int().positive(),
+  // Support worker this shift is rostered to. Optional (defaults to the acting
+  // user) so the single-operator flow is unchanged; an admin sets it to roster a
+  // shift to a specific worker.
+  worker_id: z.number().int().positive().nullish(),
   title: optStr,
   scheduled_date: isoDate,
   start_time: time.nullish(),
@@ -135,6 +139,7 @@ export const scheduledShiftSchema = z.object({
 
 export const recurrenceSchema = z.object({
   client_id: z.number().int().positive(),
+  worker_id: z.number().int().positive().nullish(),
   title: optStr,
   frequency: z.enum(['daily', 'weekly', 'fortnightly', 'monthly']).default('weekly'),
   interval: z.number().int().positive().max(52).default(1),
@@ -358,6 +363,40 @@ export const settingsSchema = z.object({
   ai_tone: z.string().trim().max(500),
   disclaimer: z.string().trim().max(4000)
 }).partial()
+
+// Multi-user account management (admin only). A worker login is a username +
+// display name + role, created with an initial password the worker can later
+// change. Usernames are lower-cased/trimmed to keep the login lookup stable.
+const username = z.string().trim().toLowerCase().min(3, 'must be at least 3 characters').max(60)
+  .regex(/^[a-z0-9._-]+$/, 'letters, numbers, dot, underscore and hyphen only')
+const userPassword = z.string().min(10, 'must be at least 10 characters').max(200)
+
+export const userCreateSchema = z.object({
+  username,
+  display_name: z.string().trim().min(1).max(120),
+  password: userPassword,
+  role: z.enum(['admin', 'worker']).default('worker')
+})
+
+export const userUpdateSchema = z.object({
+  display_name: z.string().trim().min(1).max(120).optional(),
+  role: z.enum(['admin', 'worker']).optional(),
+  active: bool01.optional()
+})
+
+export const userPasswordResetSchema = z.object({
+  new_password: userPassword
+})
+
+// Replace the full set of participant ids a worker is assigned to (admin only).
+export const assignmentsSchema = z.object({
+  client_ids: z.array(z.number().int().positive()).max(2000)
+})
+
+// Replace the full set of worker (user) ids assigned to a participant.
+export const clientWorkersSchema = z.object({
+  user_ids: z.array(z.number().int().positive()).max(2000)
+})
 
 export const askSchema = z.object({
   question: z.string().trim().min(3).max(2000)

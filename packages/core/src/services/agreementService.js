@@ -1,4 +1,5 @@
 import { ApiError } from '../errors.js'
+import { applyClientScope } from '../utils/sql.js'
 
 /**
  * Build the service-agreement service bound to a host context.
@@ -57,6 +58,7 @@ export function createAgreementService (ctx, services) {
   function listAgreements (pg, filters = {}) {
     const where = ['a.deleted_at IS NULL']
     const params = []
+    applyClientScope(where, params, 'a.client_id', filters.client_ids)
     if (filters.archived === 'true' || filters.archived === '1') where.push('a.archived_at IS NOT NULL')
     else if (filters.archived !== 'all') where.push('a.archived_at IS NULL')
     if (filters.client_id) { where.push('a.client_id = ?'); params.push(Number(filters.client_id)) }

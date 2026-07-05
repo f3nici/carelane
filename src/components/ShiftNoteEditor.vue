@@ -10,9 +10,19 @@ const props = defineProps({
   modelValue: { type: Object, default: () => ({}) },
   clients: { type: Array, default: () => [] },
   busy: { type: Boolean, default: false },
-  locked: { type: Boolean, default: false }
+  locked: { type: Boolean, default: false },
+  // Support workers view existing notes read-only: every field disabled and no
+  // save/finalise/reopen actions at all.
+  readonly: { type: Boolean, default: false },
+  // Finalising and reopening ("send back to draft") are admin-only actions.
+  canFinalise: { type: Boolean, default: true },
+  canReopen: { type: Boolean, default: true }
 })
 const emit = defineEmits(['submit', 'reopen'])
+
+// Fields are disabled when the note is finalised (locked) or the viewer is a
+// worker looking at an existing note (readonly).
+const inputDisabled = computed(() => props.locked || props.readonly)
 
 const form = reactive({
   client_id: null, shift_date: new Date().toISOString().slice(0, 10), start_time: '', end_time: '',
@@ -64,18 +74,18 @@ defineExpose({ form })
       <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div>
           <label class="label">Participant *</label>
-          <select v-model="form.client_id" class="input" :disabled="locked" required>
+          <select v-model="form.client_id" class="input" :disabled="inputDisabled" required>
             <option v-for="c in clients" :key="c.id" :value="c.id">{{ c.preferred_name || `${c.first_name} ${c.last_name}` }}</option>
           </select>
         </div>
-        <div><label class="label">Date *</label><input v-model="form.shift_date" type="date" class="input" :disabled="locked" required /></div>
-        <div><label class="label">Location</label><input v-model="form.location" class="input" :disabled="locked" /></div>
-        <div><label class="label">Start</label><input v-model="form.start_time" type="time" class="input" :disabled="locked" /></div>
-        <div><label class="label">End</label><input v-model="form.end_time" type="time" class="input" :disabled="locked" /></div>
+        <div><label class="label">Date *</label><input v-model="form.shift_date" type="date" class="input" :disabled="inputDisabled" required /></div>
+        <div><label class="label">Location</label><input v-model="form.location" class="input" :disabled="inputDisabled" /></div>
+        <div><label class="label">Start</label><input v-model="form.start_time" type="time" class="input" :disabled="inputDisabled" /></div>
+        <div><label class="label">End</label><input v-model="form.end_time" type="time" class="input" :disabled="inputDisabled" /></div>
         <div><label class="label">Duration (hours)</label><input :value="durationHours ?? '—'" type="text" class="input opacity-70 cursor-not-allowed" readonly title="Calculated automatically from the start and end times" /></div>
         <div class="lg:col-span-3">
           <label class="label">Support item delivered</label>
-          <BillingCodePicker v-model="form.billing_code_id" :client-id="form.client_id" :disabled="locked" />
+          <BillingCodePicker v-model="form.billing_code_id" :client-id="form.client_id" :disabled="inputDisabled" />
         </div>
       </div>
     </div>
@@ -85,39 +95,40 @@ defineExpose({ form })
       <div class="space-y-4">
         <div>
           <label class="label">Support provided (bullets{{ aiActive ? ' — used for the AI draft' : '' }})</label>
-          <textarea v-model="form.support_provided" class="input font-mono text-xs" rows="5" :disabled="locked" placeholder="- helped prepare lunch&#10;- practised bus route to TAFE&#10;- worked on budgeting goal" />
+          <textarea v-model="form.support_provided" class="input font-mono text-xs" rows="5" :disabled="inputDisabled" placeholder="- helped prepare lunch&#10;- practised bus route to TAFE&#10;- worked on budgeting goal" />
         </div>
         <div>
           <label class="label">Participant response</label>
-          <textarea v-model="form.participant_response" class="input" rows="2" :disabled="locked" />
+          <textarea v-model="form.participant_response" class="input" rows="2" :disabled="inputDisabled" />
         </div>
         <div>
           <label class="label">Progress note{{ aiActive ? ' (final wording — edit the AI draft here)' : '' }}</label>
-          <textarea v-model="form.body" class="input" rows="8" :disabled="locked" />
+          <textarea v-model="form.body" class="input" rows="8" :disabled="inputDisabled" />
         </div>
       </div>
     </div>
 
     <div class="card" :class="form.incident_flag ? 'border-danger/40' : ''">
       <div class="flex flex-wrap gap-6">
-        <label class="flex items-center gap-2 text-sm"><input v-model="form.incident_flag" type="checkbox" :true-value="1" :false-value="0" :disabled="locked" class="accent-danger" /> Incident occurred</label>
-        <label class="flex items-center gap-2 text-sm"><input v-model="form.follow_up_required" type="checkbox" :true-value="1" :false-value="0" :disabled="locked" class="accent-warning" /> Follow-up required</label>
-        <label class="flex items-center gap-2 text-sm"><input v-model="form.billed" type="checkbox" :true-value="1" :false-value="0" class="accent-accent" /> Billed / claimed</label>
+        <label class="flex items-center gap-2 text-sm"><input v-model="form.incident_flag" type="checkbox" :true-value="1" :false-value="0" :disabled="inputDisabled" class="accent-danger" /> Incident occurred</label>
+        <label class="flex items-center gap-2 text-sm"><input v-model="form.follow_up_required" type="checkbox" :true-value="1" :false-value="0" :disabled="inputDisabled" class="accent-warning" /> Follow-up required</label>
+        <label class="flex items-center gap-2 text-sm"><input v-model="form.billed" type="checkbox" :true-value="1" :false-value="0" :disabled="readonly" class="accent-accent" /> Billed / claimed</label>
       </div>
       <div v-if="form.incident_flag" class="mt-4">
         <label class="label">Incident details (retained permanently)</label>
-        <textarea v-model="form.incident_details" class="input" rows="3" :disabled="locked" />
+        <textarea v-model="form.incident_details" class="input" rows="3" :disabled="inputDisabled" />
       </div>
     </div>
 
-    <div class="flex gap-2">
+    <div v-if="!readonly" class="flex gap-2">
       <template v-if="locked">
-        <button type="button" class="btn-primary" :disabled="busy" title="Reopens the note for editing; you'll need to finalise it again afterwards" @click="emit('reopen')">{{ busy ? 'Reopening…' : 'Send back to draft' }}</button>
+        <button v-if="canReopen" type="button" class="btn-primary" :disabled="busy" title="Reopens the note for editing; you'll need to finalise it again afterwards" @click="emit('reopen')">{{ busy ? 'Reopening…' : 'Send back to draft' }}</button>
       </template>
       <template v-else>
         <button type="submit" class="btn-primary" :disabled="busy">{{ busy ? 'Saving…' : 'Save draft' }}</button>
-        <button type="button" class="btn-accent" :disabled="busy || !form.body" title="Finalising locks the note and attributes it to you" @click="submit(true)">Save & finalise</button>
+        <button v-if="canFinalise" type="button" class="btn-accent" :disabled="busy || !form.body" title="Finalising locks the note and attributes it to you" @click="submit(true)">Save & finalise</button>
       </template>
     </div>
+    <p v-else class="text-mid text-sm">You have view-only access to this note. Ask an admin to make changes.</p>
   </form>
 </template>

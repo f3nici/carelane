@@ -6,7 +6,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import config from './config.js'
 import { sqlite } from './db/connection.js'
-import { requireAuth, csrfProtect } from './middleware/auth.js'
+import { requireAuth, attachAccess, requireAdmin, csrfProtect } from './middleware/auth.js'
 import { errorHandler, notFound } from './middleware/errorHandler.js'
 import { mountSwagger } from './swagger.js'
 import { logger } from './services/logger.js'
@@ -29,6 +29,7 @@ import notificationRoutes from './routes/notifications.js'
 import templateRoutes from './routes/templates.js'
 import auditRoutes from './routes/audit.js'
 import deletedRoutes from './routes/deleted.js'
+import userRoutes from './routes/users.js'
 
 /**
  * Build the configured Express app (middleware + routes) without binding a
@@ -153,21 +154,28 @@ export function createApp () {
   const api = express.Router()
   api.use(csrfProtect)
   api.use('/auth', authRoutes)
-  api.use('/clients', requireAuth, clientRoutes)
-  api.use('/agreements', requireAuth, agreementRoutes)
-  api.use('/shifts', requireAuth, shiftRoutes)
-  api.use('/incidents', requireAuth, incidentRoutes)
-  api.use('/schedule', requireAuth, scheduleRoutes)
-  api.use('/reports', requireAuth, reportRoutes)
-  api.use('/billing-codes', requireAuth, billingRoutes)
-  api.use('/invoices', requireAuth, invoiceRoutes)
-  api.use('/documents', requireAuth, documentRoutes)
-  api.use('/dashboard', requireAuth, dashboardRoutes)
-  api.use('/settings', requireAuth, settingsRoutes)
-  api.use('/notifications', requireAuth, notificationRoutes)
-  api.use('/templates', requireAuth, templateRoutes)
-  api.use('/audit', requireAuth, auditRoutes)
-  api.use('/deleted', requireAuth, deletedRoutes)
+  // Everything past here needs a session; `attachAccess` then resolves the
+  // caller's role + assigned participants (and rejects a deactivated login).
+  const authed = [requireAuth, attachAccess]
+  api.use('/clients', authed, clientRoutes)
+  api.use('/agreements', authed, agreementRoutes)
+  api.use('/shifts', authed, shiftRoutes)
+  api.use('/incidents', authed, incidentRoutes)
+  api.use('/schedule', authed, scheduleRoutes)
+  api.use('/reports', authed, reportRoutes)
+  api.use('/billing-codes', authed, billingRoutes)
+  api.use('/dashboard', authed, dashboardRoutes)
+  api.use('/users', authed, userRoutes)
+  // Admin-only surfaces: knowledge base, invoicing, settings, notifications,
+  // drafting templates, the audit trail and the deleted-items recycle bin are
+  // operator tools a support worker never touches.
+  api.use('/invoices', authed, requireAdmin, invoiceRoutes)
+  api.use('/documents', authed, requireAdmin, documentRoutes)
+  api.use('/settings', authed, requireAdmin, settingsRoutes)
+  api.use('/notifications', authed, requireAdmin, notificationRoutes)
+  api.use('/templates', authed, requireAdmin, templateRoutes)
+  api.use('/audit', authed, requireAdmin, auditRoutes)
+  api.use('/deleted', authed, requireAdmin, deletedRoutes)
   app.use('/api/v1', api)
 
   // Interactive API docs (Swagger UI) describe the whole public API surface and

@@ -5,7 +5,9 @@ import crypto from 'node:crypto'
 import multer from 'multer'
 import { ZipArchive } from 'archiver'
 import { validate, validatePartial } from '../middleware/validate.js'
-import { clientSchema, clientBillingCodesSchema, clientDocumentMetaSchema, goalSchema, goalProgressSchema, restrictivePracticeSchema, medicationRecordSchema } from '../utils/validators.js'
+import { clientSchema, clientBillingCodesSchema, clientDocumentMetaSchema, goalSchema, goalProgressSchema, restrictivePracticeSchema, medicationRecordSchema, clientWorkersSchema } from '../utils/validators.js'
+import { requireClientParam } from '../middleware/auth.js'
+import * as accessService from '../services/accessService.js'
 import * as clientService from '../services/clientService.js'
 import * as agreementService from '../services/agreementService.js'
 import * as shiftService from '../services/shiftService.js'
@@ -22,6 +24,17 @@ import { ApiError } from '../middleware/errorHandler.js'
 import config from '../config.js'
 
 const router = Router()
+
+// Access control for the participant module:
+//  - a worker may only reach participants assigned to them (enforced on every
+//    `:id` route by the param guard);
+//  - the whole participant record is read-only for workers — creating,
+//    editing, deleting or uploading is admin-only.
+router.param('id', requireClientParam)
+router.use((req, res, next) => {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method) || req.isAdmin) return next()
+  next(new ApiError(403, 'FORBIDDEN', 'Read-only access — ask an admin to make changes'))
+})
 
 const ALLOWED_DOC_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
 const docUpload = multer({
@@ -49,7 +62,9 @@ const docUpload = multer({
  */
 router.get('/', (req, res) => {
   const pg = parsePagination(req.query)
-  const { rows, total } = clientService.listClients(pg, req.query)
+  // A worker only ever lists their assigned participants; an admin sees all
+  // (req.assignedClientIds is null → unrestricted).
+  const { rows, total } = clientService.listClients(pg, { ...req.query, client_ids: req.assignedClientIds })
   res.json(ok(rows, paginationMeta(pg.page, pg.perPage, total)))
 })
 
@@ -57,6 +72,22 @@ router.post('/', validate(clientSchema), (req, res) => {
   const client = clientService.createClient(req.body)
   logActivity('client', client.id, req.session.userId, 'created')
   res.status(201).json(ok(client))
+})
+
+/**
+ * @openapi
+ * /clients/{id}/workers:
+ *   get: { tags: [Clients], summary: List the support workers assigned to a participant (admin) }
+ *   put: { tags: [Clients], summary: Replace the support workers assigned to a participant (admin) }
+ */
+router.get('/:id/workers', (req, res) => {
+  res.json(ok(accessService.listClientWorkers(Number(req.params.id))))
+})
+
+router.put('/:id/workers', validate(clientWorkersSchema), (req, res) => {
+  const workers = accessService.setClientWorkers(Number(req.params.id), req.body.user_ids, req.session.userId)
+  logActivity('client', Number(req.params.id), req.session.userId, 'workers_updated', { count: workers.length })
+  res.json(ok(workers))
 })
 
 /**

@@ -6,7 +6,9 @@ import StatusBadge from './StatusBadge.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
 
 const props = defineProps({
-  clientId: { type: [String, Number], required: true }
+  clientId: { type: [String, Number], required: true },
+  // Support workers view care records read-only (no add/edit/archive controls).
+  readonly: { type: Boolean, default: false }
 })
 const emit = defineEmits(['count'])
 
@@ -96,7 +98,7 @@ async function doDelete () {
         <h3 class="font-semibold">Medication administration</h3>
         <p class="text-xs text-mid">A medication administration record (MAR). The reason and notes are encrypted at rest.</p>
       </div>
-      <button class="btn-primary" @click="startNew">+ Log administration</button>
+      <button v-if="!readonly" class="btn-primary" @click="startNew">+ Log administration</button>
     </div>
 
     <form v-if="showNew" class="rounded-lg border border-white/10 p-4 mb-4 space-y-3" @submit.prevent="save">
@@ -149,7 +151,7 @@ async function doDelete () {
           <p v-if="r.reason" class="text-xs text-mid mt-1">Reason: {{ r.reason }}</p>
           <p v-if="r.notes" class="text-xs text-mid mt-1 whitespace-pre-wrap">{{ r.notes }}</p>
         </div>
-        <div class="flex gap-3 shrink-0 text-xs">
+        <div v-if="!readonly" class="flex gap-3 shrink-0 text-xs">
           <button class="text-accent hover:underline" @click="startEdit(r)">edit</button>
           <button class="text-danger hover:underline" @click="confirmDelete(r)">archive</button>
         </div>

@@ -1,5 +1,6 @@
 import { ref, computed } from 'vue'
 import { useApi } from './useApi.js'
+import { useAuthStore } from '../stores/auth.js'
 
 // Shared, module-level integration status so the tip/advice boxes for an
 // optional integration only appear when it is actually switched on. Fetched
@@ -26,6 +27,10 @@ export function useIntegrations () {
 
   /** Fetch the latest integration status from the server. */
   async function refresh () {
+    // The status endpoint (like all of /settings) is admin-only, and AI drafting
+    // is an admin feature — a support worker never sees the AI UI, so skip the
+    // call (which would otherwise 403) and leave the integration gated off.
+    if (!useAuthStore().isAdmin) { aiConfigured.value = false; aiOn.value = false; return }
     try {
       // api.get() returns the { success, data, meta } envelope — the status
       // fields live under `.data`.

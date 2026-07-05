@@ -7,6 +7,7 @@ import { validate, validatePartial } from '../middleware/validate.js'
 import { shiftSchema, shiftDraftSchema } from '../utils/validators.js'
 import * as shiftService from '../services/shiftService.js'
 import * as clientService from '../services/clientService.js'
+import { assertClientAccess } from '../middleware/auth.js'
 import { draftShiftNote, estimateShiftNoteTokens } from '../services/aiService.js'
 import { rateLimit } from '../middleware/rateLimit.js'
 import { sniffFileType } from '../utils/fileType.js'
@@ -34,6 +35,25 @@ const photoUpload = multer({
   }
 })
 
+// Access control: every `:id` route is checked against the note's participant so
+// a worker can only reach notes for their assigned participants. Workers may
+// create a new note (their own shift) and view notes, but editing, finalising,
+// deleting, archiving, AI-drafting and photo changes are admin-only.
+router.param('id', (req, res, next, value) => {
+  try {
+    const shift = shiftService.getShift(Number(value))
+    assertClientAccess(req, shift.client_id)
+    req.shift = shift
+    next()
+  } catch (err) { next(err) }
+})
+router.use((req, res, next) => {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method) || req.isAdmin) return next()
+  // Workers may create a note (POST /shifts) but not mutate an existing one.
+  if (req.method === 'POST' && req.path === '/') return next()
+  next(new ApiError(403, 'FORBIDDEN', 'Support workers cannot edit, finalise or delete notes'))
+})
+
 /**
  * @openapi
  * /shifts:
@@ -42,11 +62,13 @@ const photoUpload = multer({
  */
 router.get('/', (req, res) => {
   const pg = parsePagination(req.query)
-  const { rows, total } = shiftService.listShifts(pg, req.query)
+  const { rows, total } = shiftService.listShifts(pg, { ...req.query, client_ids: req.assignedClientIds })
   res.json(ok(rows, paginationMeta(pg.page, pg.perPage, total)))
 })
 
 router.post('/', validate(shiftSchema), (req, res) => {
+  // A worker may only note a shift for a participant assigned to them.
+  assertClientAccess(req, Number(req.body.client_id))
   const shift = shiftService.createShift(req.body, req.session.userId)
   logActivity('shift', shift.id, req.session.userId, 'created', { incident: !!shift.incident_flag })
   res.status(201).json(ok(shift))

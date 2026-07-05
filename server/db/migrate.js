@@ -594,6 +594,28 @@ CREATE INDEX IF NOT EXISTS idx_throttle_hits_first ON throttle_hits (first_at);
   dropColumnIfExists('clients', 'plan_start')
   dropColumnIfExists('clients', 'plan_end')
 
+  // Multi-user access control (added post-launch). CareLane grew from a
+  // single-operator tool; these support additional support-worker logins with
+  // scoped access. `active` lets an admin deactivate a login without deleting
+  // it (users are not hard-deleted so their authored records keep a valid
+  // worker_id). `client_assignments` is the many-to-many grant that decides
+  // which participants a worker may see — an admin sees every participant, a
+  // worker only the ones assigned to them. Rosters are scoped by
+  // `scheduled_shifts.worker_id` instead (a worker sees only their own shifts).
+  addColumnIfMissing('users', 'active', 'INTEGER NOT NULL DEFAULT 1')
+  sqlite.exec(`
+CREATE TABLE IF NOT EXISTS client_assignments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  client_id INTEGER NOT NULL REFERENCES clients(id),
+  created_at TEXT,
+  created_by INTEGER REFERENCES users(id),
+  UNIQUE (user_id, client_id)
+);
+CREATE INDEX IF NOT EXISTS idx_client_assignments_user ON client_assignments (user_id);
+CREATE INDEX IF NOT EXISTS idx_client_assignments_client ON client_assignments (client_id);
+`)
+
   migrateChunkFts()
 }
 
