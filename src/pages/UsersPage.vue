@@ -10,6 +10,8 @@ const auth = useAuthStore()
 
 const users = ref([])
 const loading = ref(true)
+// Deactivated logins are hidden by default; the checkbox reveals them.
+const showDeactivated = ref(false)
 
 // New-member form.
 const draft = ref({ username: '', display_name: '', password: '', role: 'worker' })
@@ -98,6 +100,9 @@ async function saveAssignments () {
 }
 
 const workerCount = computed(() => users.value.filter(u => u.role === 'worker').length)
+const deactivatedCount = computed(() => users.value.filter(u => !u.active).length)
+// Active accounts always show; deactivated ones only when the checkbox is on.
+const visibleUsers = computed(() => users.value.filter(u => u.active || showDeactivated.value))
 
 onMounted(loadUsers)
 </script>
@@ -130,9 +135,17 @@ onMounted(loadUsers)
     </form>
 
     <!-- Members -->
+    <div v-if="!loading" class="flex items-center justify-between gap-3">
+      <h2 class="font-semibold">Members</h2>
+      <label class="flex items-center gap-2 text-sm text-mid cursor-pointer">
+        <input v-model="showDeactivated" type="checkbox" class="accent-accent" />
+        Show deactivated accounts<span v-if="deactivatedCount"> ({{ deactivatedCount }})</span>
+      </label>
+    </div>
     <p v-if="loading" class="text-mid text-sm">Loading…</p>
     <div v-else class="space-y-3">
-      <div v-for="u in users" :key="u.id" class="card flex flex-wrap items-center gap-3">
+      <p v-if="!visibleUsers.length" class="text-mid text-sm">No {{ showDeactivated ? '' : 'active ' }}accounts to show.</p>
+      <div v-for="u in visibleUsers" :key="u.id" class="card flex flex-wrap items-center gap-3">
         <div class="min-w-0 flex-1">
           <p class="font-medium truncate">
             {{ u.display_name }}
