@@ -13,6 +13,14 @@ const page = ref(1)
 const filter = ref(['all', 'incidents', 'unbilled'].includes(route.query.filter) ? route.query.filter : 'all')
 const showArchived = ref(false)
 
+// Search / filter / sort controls.
+const search = ref('')
+const clientId = ref('')
+const dateFrom = ref('')
+const dateTo = ref('')
+const sort = ref('date')
+const clients = ref([])
+
 // Incidents live as a sibling tab of the shift notes list, not a sidebar item.
 const noteTabs = [
   { to: '/shifts', label: 'Notes' },
@@ -24,13 +32,34 @@ async function load () {
   if (filter.value === 'incidents') params.incident = 'true'
   if (filter.value === 'unbilled') params.billed = 'false'
   if (showArchived.value) params.archived = 'true'
+  if (search.value.trim()) params.q = search.value.trim()
+  if (clientId.value) params.client_id = clientId.value
+  if (dateFrom.value) params.date_from = dateFrom.value
+  if (dateTo.value) params.date_to = dateTo.value
+  if (sort.value !== 'date') params.sort = sort.value
   const res = await api.get('/shifts', params)
   shifts.value = res.data
   meta.value = res.meta
 }
 
-watch([page, filter, showArchived], load)
-onMounted(load)
+// Reset to page 1 whenever a filter changes so results start from the top.
+watch([filter, showArchived, search, clientId, dateFrom, dateTo, sort], () => { page.value = 1 })
+watch([page, filter, showArchived, search, clientId, dateFrom, dateTo, sort], load)
+
+function clearFilters () {
+  search.value = ''
+  clientId.value = ''
+  dateFrom.value = ''
+  dateTo.value = ''
+  sort.value = 'date'
+}
+
+onMounted(async () => {
+  load()
+  // Populate the participant filter (scoped server-side to the worker's clients).
+  const res = await api.get('/clients', { active: 'true', per_page: 500 })
+  clients.value = res.data
+})
 </script>
 
 <template>
@@ -48,10 +77,45 @@ onMounted(load)
       <h1 class="text-2xl font-semibold">Shift notes</h1>
       <router-link to="/shifts/new" class="btn-primary">+ New shift note</router-link>
     </div>
+
     <div class="flex flex-wrap items-center gap-2">
-      <button v-for="f in ['all', 'incidents', 'unbilled']" :key="f" class="btn-ghost text-xs" :class="filter === f ? '!bg-primary/20 !text-white' : ''" @click="filter = f; page = 1">{{ f }}</button>
-      <button class="btn-ghost text-xs ml-auto" :class="showArchived ? '!bg-primary/20 !text-white' : ''" @click="showArchived = !showArchived; page = 1">{{ showArchived ? 'Viewing archived' : 'Show archived' }}</button>
+      <button v-for="f in ['all', 'incidents', 'unbilled']" :key="f" class="btn-ghost text-xs" :class="filter === f ? '!bg-primary/20 !text-white' : ''" @click="filter = f">{{ f }}</button>
+      <button class="btn-ghost text-xs ml-auto" :class="showArchived ? '!bg-primary/20 !text-white' : ''" @click="showArchived = !showArchived">{{ showArchived ? 'Viewing archived' : 'Show archived' }}</button>
     </div>
+
+    <div class="card grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <label class="text-xs text-mid space-y-1 lg:col-span-3">
+        <span>Search notes</span>
+        <input v-model="search" type="search" placeholder="Keywords in body, support provided, location, participant…" class="input w-full" />
+      </label>
+      <label class="text-xs text-mid space-y-1">
+        <span>Participant</span>
+        <select v-model="clientId" class="input w-full">
+          <option value="">All participants</option>
+          <option v-for="c in clients" :key="c.id" :value="c.id">{{ c.display_name || c.preferred_name || `${c.first_name || ''} ${c.last_name || ''}`.trim() || `Client #${c.id}` }}</option>
+        </select>
+      </label>
+      <label class="text-xs text-mid space-y-1">
+        <span>From date</span>
+        <input v-model="dateFrom" type="date" class="input w-full" />
+      </label>
+      <label class="text-xs text-mid space-y-1">
+        <span>To date</span>
+        <input v-model="dateTo" type="date" class="input w-full" />
+      </label>
+      <label class="text-xs text-mid space-y-1">
+        <span>Sort by</span>
+        <select v-model="sort" class="input w-full">
+          <option value="date">Date (newest first)</option>
+          <option value="date_asc">Date (oldest first)</option>
+          <option value="client">Participant (A–Z)</option>
+        </select>
+      </label>
+      <div class="flex items-end">
+        <button class="btn-ghost text-xs" @click="clearFilters">Clear filters</button>
+      </div>
+    </div>
+
     <p v-if="!shifts.length" class="text-sm text-mid">No shift notes found.</p>
     <div class="card !p-0 overflow-x-auto" v-if="shifts.length">
       <table class="w-full text-sm">
