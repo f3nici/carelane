@@ -47,10 +47,19 @@ export function requireAdmin (req, res, next) {
 }
 
 /**
- * Block a route while running as a public demo. Account-security and user-
- * management writes are disabled so a visitor cannot lock others out (change a
- * shared password / 2FA / passkey, or deactivate the demo login). A no-op when
- * demo mode is off, so it is safe to leave in place on a normal install.
+ * Block a route while running as a public demo. Guards actions a visitor could
+ * abuse against a shared, internet-facing host:
+ *  - account-security and user-management writes (change a shared password /
+ *    2FA / passkey, or deactivate the demo login) — so nobody locks others out;
+ *  - ntfy notification writes — so nobody drives outbound pushes from the host;
+ *  - file uploads (logo, price guide, knowledge PDFs, participant documents,
+ *    shift photos) — the periodic demo reset wipes DB rows but not on-disk
+ *    files, so uploads would accumulate unbounded and fill the disk;
+ *  - resource-heavy work that is trivial to spam: manual backups (copy the whole
+ *    DB + uploads dir) and the generative exports (full-record JSON/zip + PDF
+ *    renders for participants and incidents).
+ * A no-op when demo mode is off, so it is safe to leave in place on a normal
+ * install.
  */
 export function demoLock (req, res, next) {
   if (config.demoMode) {

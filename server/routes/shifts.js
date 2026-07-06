@@ -7,7 +7,7 @@ import { validate, validatePartial } from '../middleware/validate.js'
 import { shiftSchema, shiftDraftSchema } from '../utils/validators.js'
 import * as shiftService from '../services/shiftService.js'
 import * as clientService from '../services/clientService.js'
-import { assertClientAccess, requireAdmin } from '../middleware/auth.js'
+import { assertClientAccess, requireAdmin, demoLock } from '../middleware/auth.js'
 import { draftShiftNote, estimateShiftNoteTokens } from '../services/aiService.js'
 import { rateLimit } from '../middleware/rateLimit.js'
 import { sniffFileType } from '../utils/fileType.js'
@@ -137,7 +137,7 @@ router.post('/:id/unarchive', requireAdmin, (req, res) => {
  */
 const aiLimiter = rateLimit({ name: 'ai-draft', max: 20, windowMs: 60 * 1000 })
 
-router.post('/:id/draft', canEditNote, aiLimiter, validate(shiftDraftSchema), async (req, res, next) => {
+router.post('/:id/draft', demoLock, canEditNote, aiLimiter, validate(shiftDraftSchema), async (req, res, next) => {
   try {
     const shift = shiftService.getShift(Number(req.params.id))
     if (shift.finalised) throw new ApiError(409, 'FINALISED', 'Shift note is finalised')
@@ -191,7 +191,7 @@ const MEDIA_EXT = {
   'video/mp4': '.mp4', 'video/quicktime': '.mov', 'video/webm': '.webm', 'video/3gpp': '.3gp'
 }
 
-router.post('/:id/photos', canEditNote, photoUpload.single('photo'), (req, res, next) => {
+router.post('/:id/photos', demoLock, canEditNote, photoUpload.single('photo'), (req, res, next) => {
   if (!req.file) return next(new ApiError(400, 'UPLOAD_ERROR', 'No file uploaded (jpeg/png/webp/mp4/mov/webm only)'))
   // The fileFilter only sees the forgeable client Content-Type. Confirm the real
   // type from magic bytes, and normalise the on-disk extension to the detected

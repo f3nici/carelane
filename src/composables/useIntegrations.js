@@ -12,8 +12,10 @@ const aiOn = ref(false)
 let inflight = null
 
 // AI tips/UI show only when Claude is both configured (key present) AND switched
-// on by the operator — turning the integration off hides it everywhere.
-const aiActive = computed(() => aiConfigured.value && aiOn.value)
+// on by the operator — turning the integration off hides it everywhere. The
+// public demo hides the whole AI surface regardless of config, since drafting
+// spends the host operator's Claude tokens (the server hard-blocks it too).
+const aiActive = computed(() => aiConfigured.value && aiOn.value && !useAuthStore().isDemo)
 
 /**
  * Reactive helpers describing which optional integrations are active, so UI

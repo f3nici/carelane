@@ -117,7 +117,7 @@ const tabs = [
         <router-link :to="`/shifts/new?client=${id}`" class="btn-primary">+ Shift note</router-link>
         <template v-if="auth.isAdmin">
           <router-link :to="`/clients/${id}/edit`" class="btn-ghost">Edit</router-link>
-          <button class="btn-ghost" @click="exportData">Export data</button>
+          <button v-if="!auth.isDemo" class="btn-ghost" @click="exportData">Export data</button>
           <button class="btn-danger" @click="confirmDelete = true">Archive</button>
         </template>
       </div>

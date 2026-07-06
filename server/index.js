@@ -31,8 +31,13 @@ const app = createApp()
 
 app.listen(config.port, () => {
   logger.info('CareLane listening', { port: config.port, env: config.nodeEnv, metrics: config.metricsEnabled })
-  scheduleBackups()
-  warnIfBackupsStale()
+  // Skip scheduled backups in demo mode: the data is disposable and reset on a
+  // cadence, and backup snapshots aren't cleaned up by the reset — running them
+  // would just grow the disk on a throwaway public host.
+  if (!isDemo()) {
+    scheduleBackups()
+    warnIfBackupsStale()
+  }
   scheduleMaterialisation()
   // Push proactive ntfy nudges (digest + shift reminders); no-op until configured.
   scheduleNotifications()

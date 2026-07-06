@@ -2,6 +2,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useApi } from '../composables/useApi.js'
 import { useToastStore } from '../stores/toast.js'
+import { useAuthStore } from '../stores/auth.js'
 import StatusBadge from './StatusBadge.vue'
 
 const props = defineProps({
@@ -13,6 +14,7 @@ const emit = defineEmits(['count'])
 
 const api = useApi()
 const toast = useToastStore()
+const auth = useAuthStore()
 
 const documents = ref([])
 const uploading = ref(false)
@@ -115,14 +117,15 @@ function formatSize (bytes) {
   <div class="card">
     <div class="flex items-center justify-between mb-3 gap-3 flex-wrap">
       <h3 class="font-semibold">Completed documents &amp; consents</h3>
-      <label v-if="!readonly" class="btn-primary cursor-pointer" :class="{ 'opacity-50 cursor-not-allowed': uploading }">
+      <label v-if="!readonly && !auth.isDemo" class="btn-primary cursor-pointer" :class="{ 'opacity-50 cursor-not-allowed': uploading }">
         {{ uploading ? 'Uploading…' : '+ Upload document' }}
         <input type="file" class="hidden" accept="application/pdf,image/jpeg,image/png,image/webp" :disabled="uploading" @change="uploadDocument" />
       </label>
+      <span v-else-if="!readonly" class="text-xs text-mid">Uploads disabled in the demo</span>
     </div>
     <p class="text-xs text-mid mb-3">Store consent forms, signed agreements and other completed paperwork. Set a type and expiry so lapsing consents surface on the dashboard. Files are served only to you.</p>
 
-    <div v-if="!readonly" class="grid sm:grid-cols-3 gap-3 mb-4 rounded-lg bg-white/5 p-3">
+    <div v-if="!readonly && !auth.isDemo" class="grid sm:grid-cols-3 gap-3 mb-4 rounded-lg bg-white/5 p-3">
       <div>
         <label class="label">Type for next upload</label>
         <select v-model="upload.doc_type" class="input">

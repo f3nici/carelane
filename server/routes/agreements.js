@@ -4,7 +4,7 @@ import { validate, validatePartial } from '../middleware/validate.js'
 import { agreementSchema, agreementDraftSchema } from '../utils/validators.js'
 import * as agreementService from '../services/agreementService.js'
 import * as clientService from '../services/clientService.js'
-import { assertClientAccess } from '../middleware/auth.js'
+import { assertClientAccess, demoLock } from '../middleware/auth.js'
 import { resolveTemplateForDraft } from '../services/templateService.js'
 import { draftAgreement, estimateAgreementTokens } from '../services/aiService.js'
 import { rateLimit } from '../middleware/rateLimit.js'
@@ -93,7 +93,7 @@ router.post('/:id/unarchive', (req, res) => {
  *     tags: [Agreements]
  *     summary: AI-draft the agreement body from the stored questionnaire (draft only — worker must review)
  */
-router.post('/:id/draft', aiLimiter, validate(agreementDraftSchema), async (req, res, next) => {
+router.post('/:id/draft', demoLock, aiLimiter, validate(agreementDraftSchema), async (req, res, next) => {
   try {
     const agreement = agreementService.getAgreement(Number(req.params.id))
     if (!agreement.questionnaire_json) throw new ApiError(409, 'NO_QUESTIONNAIRE', 'Complete the questionnaire before drafting')
@@ -142,7 +142,7 @@ router.post('/:id/sign', (req, res) => {
  * /agreements/{id}/pdf:
  *   get: { tags: [Agreements], summary: Render/download the agreement PDF (auth-gated) }
  */
-router.get('/:id/pdf', async (req, res, next) => {
+router.get('/:id/pdf', demoLock, async (req, res, next) => {
   try {
     const agreement = agreementService.getAgreement(Number(req.params.id))
     if (!agreement.body_markdown) throw new ApiError(409, 'NO_BODY', 'Agreement has no body to render')

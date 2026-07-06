@@ -65,7 +65,11 @@ async function remove (id) {
       <template v-if="auth.isAdmin"> Upload documents below to add them to the searchable library.</template>
     </p>
 
-    <div v-if="auth.isAdmin" class="card flex flex-wrap items-end gap-3">
+    <div v-if="auth.isAdmin && auth.isDemo" class="card">
+      <p class="text-sm font-medium text-accent">Uploading documents is disabled in the demo</p>
+      <p class="text-xs text-mid">Adding PDFs to the library is turned off so the shared demo can't be used to fill the host's disk. It works normally on a real install — you can still search and download the example documents below.</p>
+    </div>
+    <div v-else-if="auth.isAdmin" class="card flex flex-wrap items-end gap-3">
       <div><label class="label">Title</label><input v-model="title" class="input w-64" placeholder="e.g. NDIS Pricing Arrangements 2025-26" /></div>
       <div>
         <label class="label">Category</label>

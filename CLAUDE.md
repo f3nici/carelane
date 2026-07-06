@@ -212,8 +212,25 @@ API docs at `/api/docs`, health at `/healthz`.
   a visitor can't lock others out. `demoLock` also guards the ntfy notification
   writes (settings save, test/send-now/clear-error) so a visitor can't drive
   outbound pushes from the host's IP; the SPA disables those controls in demo
-  mode too. Everything is gated on `config.demoMode` and a no-op otherwise —
-  **never enable it on real data.**
+  mode too. To stop a public visitor overloading the host's disk/CPU, `demoLock`
+  additionally blocks every **file upload** (logo, price-guide import, knowledge
+  PDFs, participant documents, shift photos — the periodic reset clears DB rows
+  but not on-disk files, so uploads would accumulate unbounded) and the
+  **resource-heavy, spammable work**: manual backups (`/settings/backups/run`,
+  which copies the whole DB + uploads) and the generative exports (participant
+  full-record JSON/`export.zip`, and the on-the-fly PDF renders for incidents,
+  reports and agreements). Lightweight auth-gated file *serving* (the branding
+  logo, plus the small seeded placeholder documents) stays available so the
+  download feature is still demonstrable; scheduled nightly backups are also
+  skipped in demo mode. `demoLock` also blocks the **AI drafting/Q&A** endpoints
+  (shift/report/agreement `…/draft` + knowledge `ask`) so a visitor can't spend
+  the host's Claude tokens even if a key is configured; the SPA hides the whole
+  AI surface in demo via `aiActive` (forced off when `auth.isDemo`). Because the
+  demo login is shared, `listUserSessions` **redacts each session's IP** in demo
+  mode so one visitor's address is never shown to another. The SPA hides/disables
+  all of these upload/export/backup/AI controls in demo mode too. Everything is
+  gated on `config.demoMode` and a no-op otherwise — **never enable it on real
+  data.**
 - RAG: PDF → per-page text → ~300-token chunks → local embeddings
   (`bge-small-en-v1.5`, query-instruction prefix) → `document_chunks.embedding`
   BLOB. Search is **hybrid**: vector (sqlite-vec or JS cosine) + BM25 keyword

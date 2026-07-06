@@ -4,7 +4,7 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import multer from 'multer'
 import { validate } from '../middleware/validate.js'
-import { requireAdmin } from '../middleware/auth.js'
+import { requireAdmin, demoLock } from '../middleware/auth.js'
 import { rateLimit } from '../middleware/rateLimit.js'
 import { askSchema } from '../utils/validators.js'
 import * as documentService from '../services/documentService.js'
@@ -44,7 +44,7 @@ router.get('/', (req, res) => {
   res.json(ok(documentService.listDocuments()))
 })
 
-router.post('/', requireAdmin, upload.single('file'), (req, res, next) => {
+router.post('/', requireAdmin, demoLock, upload.single('file'), (req, res, next) => {
   if (!req.file) return next(new ApiError(400, 'UPLOAD_ERROR', 'Upload a PDF file'))
   // Don't trust the client-declared Content-Type — confirm the saved file really
   // is a PDF from its magic bytes, deleting it on a mismatch.
@@ -77,7 +77,7 @@ router.get('/search', async (req, res, next) => {
  * /documents/ask:
  *   post: { tags: [Knowledge], summary: Grounded Q&A — retrieve top-k chunks locally, answer via Claude with citations }
  */
-router.post('/ask', askLimiter, validate(askSchema), async (req, res, next) => {
+router.post('/ask', demoLock, askLimiter, validate(askSchema), async (req, res, next) => {
   try {
     const result = await askGuidelines(req.body.question, req.session.userId)
     res.json(ok(result))

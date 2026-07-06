@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useApi } from '../composables/useApi.js'
 import { useIntegrations } from '../composables/useIntegrations.js'
 import { useToastStore } from '../stores/toast.js'
+import { useAuthStore } from '../stores/auth.js'
 import AgreementQuestionnaire from '../components/AgreementQuestionnaire.vue'
 import AgreementEditor from '../components/AgreementEditor.vue'
 import AiDraftPanel from '../components/AiDraftPanel.vue'
@@ -14,6 +15,7 @@ const api = useApi()
 const route = useRoute()
 const router = useRouter()
 const toast = useToastStore()
+const auth = useAuthStore()
 const { aiActive, ensureLoaded } = useIntegrations()
 const id = computed(() => route.params.id)
 
@@ -170,8 +172,8 @@ async function uploadSignedCopy (event) {
         <StatusBadge v-if="id" :status="status" />
         <span v-if="agreement.archived_at" class="pill bg-white/10 text-mid">Archived</span>
         <button v-if="id" class="btn-ghost" :disabled="busy" @click="toggleArchive">{{ agreement.archived_at ? 'Unarchive' : 'Archive' }}</button>
-        <button v-if="id && body" class="btn-ghost" @click="downloadPdf">PDF</button>
-        <label v-if="signed" class="btn-ghost cursor-pointer" :class="{ 'opacity-50 cursor-not-allowed': uploadingCopy }">
+        <button v-if="id && body && !auth.isDemo" class="btn-ghost" @click="downloadPdf">PDF</button>
+        <label v-if="signed && !auth.isDemo" class="btn-ghost cursor-pointer" :class="{ 'opacity-50 cursor-not-allowed': uploadingCopy }">
           {{ uploadingCopy ? 'Uploading…' : 'Upload signed copy' }}
           <input type="file" class="hidden" accept="application/pdf,image/jpeg,image/png,image/webp" :disabled="uploadingCopy" @change="uploadSignedCopy" />
         </label>

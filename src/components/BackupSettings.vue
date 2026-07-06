@@ -2,9 +2,11 @@
 import { ref, onMounted } from 'vue'
 import { useApi } from '../composables/useApi.js'
 import { useToastStore } from '../stores/toast.js'
+import { useAuthStore } from '../stores/auth.js'
 
 const api = useApi()
 const toast = useToastStore()
+const auth = useAuthStore()
 
 const freshness = ref(null)
 const backups = ref([])
@@ -57,7 +59,12 @@ function formatSize (bytes) {
   <div v-if="!loadError" class="card space-y-4">
     <div class="flex items-center justify-between gap-2">
       <h3 class="font-semibold">Backups</h3>
-      <button class="btn-ghost text-sm" :disabled="busy" @click="runNow">{{ busy ? 'Backing up…' : 'Back up now' }}</button>
+      <button class="btn-ghost text-sm" :disabled="busy || auth.isDemo" @click="runNow">{{ busy ? 'Backing up…' : 'Back up now' }}</button>
+    </div>
+
+    <div v-if="auth.isDemo" class="rounded-xl border border-accent/40 bg-accent/10 p-3 space-y-1">
+      <p class="text-sm font-medium text-accent">Backups are disabled in the demo</p>
+      <p class="text-xs text-mid">Running a backup copies the whole database and uploads, so it's turned off to stop the shared demo being used to hammer the host's disk. It works normally on a real install.</p>
     </div>
 
     <div v-if="freshness" class="text-sm">
