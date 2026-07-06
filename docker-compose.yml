@@ -27,6 +27,8 @@ services:
       LOG_FORMAT: ${LOG_FORMAT:-pretty}
       METRICS_ENABLED: ${METRICS_ENABLED:-false}
       METRICS_TOKEN: ${METRICS_TOKEN:-}
+      DEMO_MODE: ${DEMO_MODE:-false}
+      DEMO_RESET_HOURS: ${DEMO_RESET_HOURS:-6}
     volumes:
       - ./data:/app/data
       - ./uploads:/app/uploads
