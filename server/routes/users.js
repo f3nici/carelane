@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { validate } from '../middleware/validate.js'
 import { userCreateSchema, userUpdateSchema, userPasswordResetSchema, assignmentsSchema } from '../utils/validators.js'
-import { requireAdmin } from '../middleware/auth.js'
+import { requireAdmin, demoLock } from '../middleware/auth.js'
 import * as userService from '../services/userService.js'
 import * as accessService from '../services/accessService.js'
 import { logActivity } from '../services/activityService.js'
@@ -23,7 +23,7 @@ router.get('/', (req, res) => {
   res.json(ok(userService.listUsers()))
 })
 
-router.post('/', validate(userCreateSchema), (req, res) => {
+router.post('/', demoLock, validate(userCreateSchema), (req, res) => {
   const user = userService.createUser(req.body)
   logActivity('user', user.id, req.session.userId, 'created', { role: user.role })
   res.status(201).json(ok(user))
@@ -39,7 +39,7 @@ router.get('/:id', (req, res) => {
   res.json(ok(userService.getUser(id(req))))
 })
 
-router.put('/:id', validate(userUpdateSchema), (req, res) => {
+router.put('/:id', demoLock, validate(userUpdateSchema), (req, res) => {
   const user = userService.updateUser(id(req), req.body)
   logActivity('user', user.id, req.session.userId, 'updated', {
     role: 'role' in req.body ? user.role : undefined,
@@ -53,7 +53,7 @@ router.put('/:id', validate(userUpdateSchema), (req, res) => {
  * /users/{id}/reset-password:
  *   post: { tags: [Users], summary: Admin-reset a login's password (revokes its sessions) }
  */
-router.post('/:id/reset-password', validate(userPasswordResetSchema), (req, res) => {
+router.post('/:id/reset-password', demoLock, validate(userPasswordResetSchema), (req, res) => {
   userService.resetPassword(id(req), req.body.new_password)
   logActivity('user', id(req), req.session.userId, 'password_reset')
   res.json(ok({ reset: true }))
@@ -70,7 +70,7 @@ router.get('/:id/clients', (req, res) => {
   res.json(ok({ client_ids: accessService.listAssignedClientIds(id(req)) }))
 })
 
-router.put('/:id/clients', validate(assignmentsSchema), (req, res) => {
+router.put('/:id/clients', demoLock, validate(assignmentsSchema), (req, res) => {
   userService.getUser(id(req))
   const clientIds = accessService.setWorkerClients(id(req), req.body.client_ids, req.session.userId)
   logActivity('user', id(req), req.session.userId, 'assignments_updated', { count: clientIds.length })

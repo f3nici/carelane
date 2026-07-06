@@ -8,7 +8,8 @@ import {
   passkeyRegisterSchema, passkeyLoginSchema, passkeyRenameSchema, securityPolicySchema
 } from '../utils/validators.js'
 import { ApiError } from '../middleware/errorHandler.js'
-import { requireAuth, requireAdmin, ensureCsrfToken } from '../middleware/auth.js'
+import { requireAuth, requireAdmin, ensureCsrfToken, demoLock } from '../middleware/auth.js'
+import { isDemo, DEMO_ADMIN_USERNAME, DEMO_WORKER_USERNAME, DEMO_PASSWORD } from '../services/demoService.js'
 import { rateLimit } from '../middleware/rateLimit.js'
 import { logActivity } from '../services/activityService.js'
 import * as twoFactor from '../services/twoFactorService.js'
@@ -70,6 +71,7 @@ function establishSession (req, res, user, next, details) {
       display_name: user.display_name,
       role: user.role,
       must_enrol_2fa: mustEnrol,
+      demo: isDemo(),
       csrf_token: csrf
     }))
   })
@@ -151,8 +153,25 @@ router.get('/me', requireAuth, (req, res) => {
     ...user,
     totp_enabled: !!user.totp_enabled,
     must_enrol_2fa: mustEnrolSecondFactor(user),
+    demo: isDemo(),
     csrf_token: ensureCsrfToken(req.session)
   }))
+})
+
+/**
+ * @openapi
+ * /auth/config:
+ *   get:
+ *     tags: [Auth]
+ *     summary: Unauthenticated client bootstrap flags (e.g. public-demo status)
+ */
+router.get('/config', (req, res) => {
+  // Pre-login, so the sign-in screen can advertise the shared demo credentials
+  // and pre-fill them. Only exposes public demo details, and only when the demo
+  // is actually on.
+  res.json(ok(isDemo()
+    ? { demo: true, demo_username: DEMO_ADMIN_USERNAME, demo_password: DEMO_PASSWORD, demo_worker_username: DEMO_WORKER_USERNAME }
+    : { demo: false }))
 })
 
 /**
@@ -165,7 +184,7 @@ router.get('/security-policy', requireAuth, requireAdmin, (req, res) => {
   res.json(ok({ require_2fa: getRequire2fa() }))
 })
 
-router.put('/security-policy', requireAuth, requireAdmin, validate(securityPolicySchema), (req, res, next) => {
+router.put('/security-policy', requireAuth, requireAdmin, demoLock, validate(securityPolicySchema), (req, res, next) => {
   try {
     const actingUser = sqlite.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId)
     const result = setRequire2fa(req.body.require_2fa === 1, actingUser)
@@ -223,7 +242,7 @@ router.get('/2fa/status', requireAuth, (req, res) => {
  * /auth/2fa/setup:
  *   post: { tags: [Auth], summary: Begin TOTP enrolment (returns secret + QR data URL) }
  */
-router.post('/2fa/setup', requireAuth, async (req, res, next) => {
+router.post('/2fa/setup', requireAuth, demoLock, async (req, res, next) => {
   try {
     const { secret, otpauth_uri, issuer, account } = twoFactor.beginSetup(req.session.userId)
     const qr = await QRCode.toDataURL(otpauth_uri, { margin: 1, width: 220 })
@@ -236,7 +255,7 @@ router.post('/2fa/setup', requireAuth, async (req, res, next) => {
  * /auth/2fa/enable:
  *   post: { tags: [Auth], summary: Confirm TOTP enrolment with a code; returns one-time recovery codes }
  */
-router.post('/2fa/enable', requireAuth, validate(totpConfirmSchema), (req, res, next) => {
+router.post('/2fa/enable', requireAuth, demoLock, validate(totpConfirmSchema), (req, res, next) => {
   try {
     const { recovery_codes } = twoFactor.confirmSetup(req.session.userId, req.body.token)
     logActivity('auth', req.session.userId, req.session.userId, '2fa_enabled')
@@ -249,7 +268,7 @@ router.post('/2fa/enable', requireAuth, validate(totpConfirmSchema), (req, res, 
  * /auth/2fa/disable:
  *   post: { tags: [Auth], summary: Disable TOTP (requires password re-entry) }
  */
-router.post('/2fa/disable', requireAuth, validate(totpDisableSchema), (req, res, next) => {
+router.post('/2fa/disable', requireAuth, demoLock, validate(totpDisableSchema), (req, res, next) => {
   const user = sqlite.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId)
   if (!user || !bcrypt.compareSync(req.body.password, user.password_hash)) {
     return next(new ApiError(401, 'INVALID_CREDENTIALS', 'Password is incorrect'))
@@ -264,7 +283,7 @@ router.post('/2fa/disable', requireAuth, validate(totpDisableSchema), (req, res,
  * /auth/change-password:
  *   post: { tags: [Auth], summary: Change the current user's password (requires the current password) }
  */
-router.post('/change-password', requireAuth, validate(changePasswordSchema), (req, res, next) => {
+router.post('/change-password', requireAuth, demoLock, validate(changePasswordSchema), (req, res, next) => {
   try {
     changePassword(req.session.userId, req.body.current_password, req.body.new_password)
     // Invalidate every other session for this user so a password change (often
@@ -290,7 +309,7 @@ router.get('/passkeys', requireAuth, (req, res) => {
  * /auth/passkeys/register/options:
  *   post: { tags: [Auth], summary: Begin passkey enrolment (returns WebAuthn creation options) }
  */
-router.post('/passkeys/register/options', requireAuth, async (req, res, next) => {
+router.post('/passkeys/register/options', requireAuth, demoLock, async (req, res, next) => {
   try {
     const user = sqlite.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId)
     // Re-authenticate before issuing a new passwordless login factor: a hijacked
@@ -312,7 +331,7 @@ router.post('/passkeys/register/options', requireAuth, async (req, res, next) =>
  * /auth/passkeys/register/verify:
  *   post: { tags: [Auth], summary: Complete passkey enrolment with the authenticator response }
  */
-router.post('/passkeys/register/verify', requireAuth, validate(passkeyRegisterSchema), async (req, res, next) => {
+router.post('/passkeys/register/verify', requireAuth, demoLock, validate(passkeyRegisterSchema), async (req, res, next) => {
   try {
     const expectedChallenge = req.session.webauthnRegChallenge
     if (!expectedChallenge) throw new ApiError(400, 'NO_CHALLENGE', 'No passkey registration in progress')
@@ -347,7 +366,7 @@ router.put('/passkeys/:id', requireAuth, validate(passkeyRenameSchema), (req, re
  * /auth/passkeys/{id}:
  *   delete: { tags: [Auth], summary: Remove a registered passkey }
  */
-router.delete('/passkeys/:id', requireAuth, (req, res, next) => {
+router.delete('/passkeys/:id', requireAuth, demoLock, (req, res, next) => {
   try {
     // Removing a login factor is security-sensitive: require password re-entry so
     // a hijacked session can't strip the legitimate user's passkeys. Mirrors the

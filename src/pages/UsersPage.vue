@@ -117,8 +117,13 @@ onMounted(loadUsers)
       <span class="pill bg-white/10 text-mid">{{ workerCount }} support worker{{ workerCount === 1 ? '' : 's' }}</span>
     </div>
 
+    <div v-if="auth.isDemo" class="rounded-xl border border-accent/40 bg-accent/10 p-4 space-y-1">
+      <p class="text-sm font-medium text-accent">Team management is read-only in the demo</p>
+      <p class="text-xs text-mid">You can see how logins and participant access work, but adding, editing or deactivating accounts is disabled so the shared demo logins stay available for everyone. It all works normally on a real install.</p>
+    </div>
+
     <!-- Add member -->
-    <form class="card space-y-3" @submit.prevent="createUser">
+    <form v-if="!auth.isDemo" class="card space-y-3" @submit.prevent="createUser">
       <h2 class="font-semibold">Add a team member</h2>
       <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <input v-model="draft.username" class="input" placeholder="Username" autocomplete="off" required />
@@ -157,16 +162,19 @@ onMounted(loadUsers)
         <select
           class="input w-auto text-sm"
           :value="u.role"
+          :disabled="auth.isDemo"
           @change="changeRole(u, $event.target.value)"
         >
           <option value="worker">Support worker</option>
           <option value="admin">Admin</option>
         </select>
         <button v-if="u.role === 'worker'" class="btn-ghost text-sm" @click="openAssignments(u)">Clients</button>
-        <button class="btn-ghost text-sm" @click="resetPassword(u)">Reset password</button>
-        <button class="btn-ghost text-sm" :disabled="u.id === auth.user?.id" @click="toggleActive(u)">
-          {{ u.active ? 'Deactivate' : 'Reactivate' }}
-        </button>
+        <template v-if="!auth.isDemo">
+          <button class="btn-ghost text-sm" @click="resetPassword(u)">Reset password</button>
+          <button class="btn-ghost text-sm" :disabled="u.id === auth.user?.id" @click="toggleActive(u)">
+            {{ u.active ? 'Deactivate' : 'Reactivate' }}
+          </button>
+        </template>
       </div>
     </div>
 
@@ -187,8 +195,8 @@ onMounted(loadUsers)
           </label>
         </div>
         <div class="flex justify-end gap-2 pt-3">
-          <button class="btn-ghost" @click="assignFor = null">Cancel</button>
-          <button class="btn-primary" :disabled="savingAssign" @click="saveAssignments">{{ savingAssign ? 'Saving…' : 'Save access' }}</button>
+          <button class="btn-ghost" @click="assignFor = null">{{ auth.isDemo ? 'Close' : 'Cancel' }}</button>
+          <button v-if="!auth.isDemo" class="btn-primary" :disabled="savingAssign" @click="saveAssignments">{{ savingAssign ? 'Saving…' : 'Save access' }}</button>
         </div>
       </div>
     </div>

@@ -89,7 +89,19 @@ const config = {
   ntfyToken: env.NTFY_TOKEN || '',
   // Public base URL of this CareLane install (e.g. https://carelane.example.org).
   // When set, push notifications carry a deep link back to the relevant page.
-  appBaseUrl: (env.APP_BASE_URL || '').replace(/\/+$/, '')
+  appBaseUrl: (env.APP_BASE_URL || '').replace(/\/+$/, ''),
+  // Public demo mode. When on, the app boots a self-contained demo: two shared
+  // logins (a `demo` admin and a `demoworker` support worker, both password
+  // `demo`), a rich set of fabricated example data, and a scheduled wipe-and-
+  // reseed so any visitor's changes are rolled back on a fixed cadence. Account-
+  // security and user-management writes are blocked so a visitor cannot lock
+  // others out (change a password / 2FA / passkey, or deactivate the login).
+  // NEVER enable this on an install holding real participant data — a reset
+  // hard-deletes everything. See demoService.
+  demoMode: (env.DEMO_MODE || 'false') === 'true',
+  // How often (hours) the demo data is reset to its pristine state. Also runs
+  // once at boot. Ignored unless demoMode is on.
+  demoResetHours: parseInt(env.DEMO_RESET_HOURS || '6', 10)
 }
 
 /**

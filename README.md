@@ -8,6 +8,10 @@ to be run by a **single operator on their own infrastructure** — it is not a
 multi-tenant SaaS. All data is treated as sensitive health information and
 encrypted at rest.
 
+> **🔎 Try the live demo: <https://carelane.feni.ci>** — sign in with `demo` /
+> `demo` (just press **Sign in**; it's pre-filled). Example data only, and it
+> resets every few hours. See [Public demo mode](#public-demo-mode).
+
 > The default deployment assumes one person, but CareLane supports **multiple
 > logins with scoped access**: an admin manages the practice and can add support
 > workers who each see only the participants assigned to them and only their own
@@ -208,12 +212,40 @@ All configuration is via environment variables (see [`.env.example`](.env.exampl
 | `WEBAUTHN_RP_ID` / `WEBAUTHN_ORIGIN` | Pin the passkey relying-party id/origin. Auto-derived from the request when blank (correct for same-origin); set both behind a Host-rewriting proxy. |
 | `PUBLIC_API_ENABLED` | Toggle for the public API surface. |
 | `CORS_ORIGINS` | Allowed CORS origins (comma-separated). |
+| `DEMO_MODE` / `DEMO_RESET_HOURS` | Public demo mode (default off). See [Public demo mode](#public-demo-mode) below. |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_REDIRECT_URI` | Optional one-way Google Calendar sync. See the [Google Calendar setup guide](docs/google-calendar-setup.md). |
 | `SQUARE_ACCESS_TOKEN` / `SQUARE_ENVIRONMENT` | Optional Square draft-invoicing. The location is auto-detected on the first "Test connection" in Settings. See the [Square invoicing setup guide](docs/square-invoicing-setup.md). |
 | `NTFY_TOKEN` / `APP_BASE_URL` | Optional ntfy push notifications (topic/toggles/timings/request-timeout are all set in-app). Token is only for a protected/self-hosted server. See the [ntfy setup guide](docs/ntfy-notifications-setup.md). |
 
 > ⚠️ **`ENCRYPTION_SECRET` cannot be rotated casually.** Once data is encrypted
 > with it, changing it makes all existing PII unreadable. Back it up securely.
+
+### Public demo mode
+
+A live demo runs at **<https://carelane.feni.ci>**. Set `DEMO_MODE=true` to run
+CareLane as a throwaway public showcase like it — useful for letting people try
+the app without any real participant data.
+
+- **Two shared logins** are created and advertised (and pre-filled) on the sign-in
+  screen: a `demo` **admin** and a `demoworker` **support worker**, both with the
+  password `demo`. Just press **Sign in**.
+- **Rich example data** is seeded across every record type (participants, service
+  agreements, shift notes, an incident report, goals + progress, medication and
+  restrictive-practice logs, consent documents, a report and a roster), so every
+  page has something to look at. The worker login is scoped to a subset of
+  participants so you can see the difference between the two roles.
+- **Everything resets** to this pristine state on a fixed cadence
+  (`DEMO_RESET_HOURS`, default `6`) and once at boot, so visitors' changes are
+  rolled back automatically.
+- **Account-security and user-management writes are blocked** (changing a
+  password / 2FA / passkey, or creating/deactivating logins) so no visitor can
+  lock others out of the shared demo. These controls work normally on a real
+  install.
+
+> ⚠️ **Never enable `DEMO_MODE` on an install holding real data** — each reset
+> **hard-deletes** all operational records. For the cleanest demo, also set
+> `DEFAULT_USERNAME=demo` and `DEFAULT_PASSWORD=demo` so no separate
+> `admin`/`changeme` login is seeded on first boot.
 
 ## Architecture
 
