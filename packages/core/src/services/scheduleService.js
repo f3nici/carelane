@@ -226,15 +226,38 @@ export function createScheduleService (ctx, services) {
 
   /**
    * Cancel a scheduled shift (keeps the row, removes the Google event). Cannot
-   * cancel one that is already completed.
+   * cancel one that is already completed. A cancelled shift still leaves a paper
+   * trail: unless it already has a linked note, a shift note is auto-created with
+   * the shift's planned times and a "Cancelled shift" body, attributed to the
+   * rostered worker and linked back via `shift_note_id`.
    * @param {number} id
    */
   function cancelScheduled (id) {
     const shift = getScheduled(id)
     if (shift.status === 'completed') throw new ApiError(409, 'BAD_STATE', 'A completed shift cannot be cancelled')
+    const ts = now()
     sqlite.prepare("UPDATE scheduled_shifts SET status = 'cancelled', cancelled_at = ?, updated_at = ? WHERE id = ?")
-      .run(now(), now(), id)
+      .run(ts, ts, id)
     googleCalendar.removeScheduledShift(rawRow(id))
+    if (!shift.shift_note_id) {
+      const note = createShift({
+        client_id: shift.client_id,
+        // The planned times as set on the shift — the shift never ran, so there
+        // are no clock times to prefer.
+        shift_date: shift.scheduled_date,
+        start_time: shift.start_time,
+        end_time: shift.end_time,
+        billing_code_id: shift.billing_code_id,
+        location: shift.location,
+        body: 'Cancelled shift',
+        incident_flag: 0,
+        follow_up_required: 0,
+        billed: 0,
+        finalised: 0
+      }, shift.worker_id)
+      sqlite.prepare('UPDATE scheduled_shifts SET shift_note_id = ?, updated_at = ? WHERE id = ?')
+        .run(note.id, now(), id)
+    }
     return getScheduled(id)
   }
 

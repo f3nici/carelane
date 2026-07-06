@@ -83,6 +83,19 @@ describe('scheduleService roster lifecycle', () => {
     expect(() => scheduleService.updateScheduled(s.id, { location: 'x' })).toThrow(/cannot be edited/i)
   })
 
+  it('auto-creates a "Cancelled shift" note with the planned times on cancel', async () => {
+    const shiftService = await import('../server/services/shiftService.js')
+    const s = scheduleService.createScheduled(base({ start_time: '10:00', end_time: '13:30' }), workerId)
+    const cancelled = scheduleService.cancelScheduled(s.id)
+    expect(cancelled.shift_note_id).toBeTruthy()
+    const note = shiftService.getShift(cancelled.shift_note_id)
+    expect(note.start_time).toBe('10:00')
+    expect(note.end_time).toBe('13:30')
+    expect(note.worker_id).toBe(workerId)
+    expect(note.client_id).toBe(clientId)
+    expect(note.body).toBe('Cancelled shift')
+  })
+
   it('soft-deletes and restores a scheduled shift', () => {
     const s = scheduleService.createScheduled(base(), workerId)
     scheduleService.deleteScheduled(s.id)
