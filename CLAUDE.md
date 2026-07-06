@@ -148,7 +148,10 @@ API docs at `/api/docs`, health at `/healthz`.
   (expired/expiring/ok) and the dashboard surfaces lapsing items
   (`GET /dashboard/document-expiries`, `documents_expiring` stat) before they
   lapse. Metadata is editable without re-uploading (`PUT
-  /clients/:id/documents/:docId`). Files stay served auth-gated only.
+  /clients/:id/documents/:docId`). An expiring/expired document can be
+  **acknowledged** (`acknowledged` flag → `acknowledged_at`): it stays on the
+  participant record but drops off the dashboard list + count. Files stay served
+  auth-gated only.
 - Incident reports: `incident_reports` promote a shift note's free-text incident
   flag into a structured, exportable record — NDIS reportable-incident fields
   (type, severity, the five reportable categories, reported-to-Commission status)
@@ -206,8 +209,11 @@ API docs at `/api/docs`, health at `/healthz`.
   so the SPA hides the locked controls. A `demoLock` middleware returns 403
   `DEMO_LOCKED` on the account-security and user-management writes (password /
   2FA / passkey change, `require_2fa` policy, user create/update/reset/assign) so
-  a visitor can't lock others out. Everything is gated on `config.demoMode` and a
-  no-op otherwise — **never enable it on real data.**
+  a visitor can't lock others out. `demoLock` also guards the ntfy notification
+  writes (settings save, test/send-now/clear-error) so a visitor can't drive
+  outbound pushes from the host's IP; the SPA disables those controls in demo
+  mode too. Everything is gated on `config.demoMode` and a no-op otherwise —
+  **never enable it on real data.**
 - RAG: PDF → per-page text → ~300-token chunks → local embeddings
   (`bge-small-en-v1.5`, query-instruction prefix) → `document_chunks.embedding`
   BLOB. Search is **hybrid**: vector (sqlite-vec or JS cosine) + BM25 keyword

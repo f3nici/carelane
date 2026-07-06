@@ -2,9 +2,11 @@
 import { ref, onMounted } from 'vue'
 import { useApi } from '../composables/useApi.js'
 import { useToastStore } from '../stores/toast.js'
+import { useAuthStore } from '../stores/auth.js'
 
 const api = useApi()
 const toast = useToastStore()
+const auth = useAuthStore()
 const s = ref(null)
 const busy = ref(false)
 
@@ -79,6 +81,11 @@ async function clearError () {
       due, incidents needing follow-up, unbilled shifts aging, and upcoming shifts. Pick a hard-to-guess topic name, subscribe to it in the
       ntfy app on your phone, then enter the same topic here. Messages carry only short labels and counts — never plan or health notes.
     </p>
+
+    <div v-if="auth.isDemo" class="rounded-lg border border-accent/40 bg-accent/10 p-3">
+      <p class="text-sm font-medium text-accent">Push notifications are disabled in the demo</p>
+      <p class="text-xs text-mid">Sending to an ntfy server is turned off so the shared demo can't be used to hammer the host's IP. These controls work normally on a real install.</p>
+    </div>
 
     <!-- Live preview of what a digest would push right now (the dashboard counts). -->
     <div class="rounded-lg bg-white/5 p-3 text-sm grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -165,9 +172,9 @@ async function clearError () {
     </div>
 
     <div class="flex flex-wrap gap-2">
-      <button class="btn-primary" :disabled="busy" @click="save">Save</button>
-      <button class="btn-ghost" :disabled="busy || !s.configured" @click="test">Send test</button>
-      <button class="btn-ghost" :disabled="busy || !s.configured" @click="sendNow">Send digest now</button>
+      <button class="btn-primary" :disabled="busy || auth.isDemo" @click="save">Save</button>
+      <button class="btn-ghost" :disabled="busy || auth.isDemo || !s.configured" @click="test">Send test</button>
+      <button class="btn-ghost" :disabled="busy || auth.isDemo || !s.configured" @click="sendNow">Send digest now</button>
     </div>
   </div>
 </template>

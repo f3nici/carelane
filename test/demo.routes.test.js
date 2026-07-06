@@ -102,4 +102,28 @@ describe('public demo mode', () => {
     expect(res.status).toBe(403)
     expect(res.body.error.code).toBe('DEMO_LOCKED')
   })
+
+  it('blocks saving ntfy settings (DEMO_LOCKED)', async () => {
+    const { agent, csrf } = await loginAgent('demo')
+    const res = await agent.put('/api/v1/notifications/settings').set('x-csrf-token', csrf)
+      .send({ topic: 'attacker-topic', enabled: 1 })
+    expect(res.status).toBe(403)
+    expect(res.body.error.code).toBe('DEMO_LOCKED')
+  })
+
+  it('blocks sending a test push and the digest (DEMO_LOCKED)', async () => {
+    const { agent, csrf } = await loginAgent('demo')
+    const test = await agent.post('/api/v1/notifications/test').set('x-csrf-token', csrf).send({})
+    expect(test.status).toBe(403)
+    expect(test.body.error.code).toBe('DEMO_LOCKED')
+    const digest = await agent.post('/api/v1/notifications/send-now').set('x-csrf-token', csrf).send({})
+    expect(digest.status).toBe(403)
+    expect(digest.body.error.code).toBe('DEMO_LOCKED')
+  })
+
+  it('still allows reading ntfy status in the demo', async () => {
+    const { agent } = await loginAgent('demo')
+    const res = await agent.get('/api/v1/notifications/status')
+    expect(res.status).toBe(200)
+  })
 })

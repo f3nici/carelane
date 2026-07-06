@@ -450,6 +450,9 @@ CREATE INDEX IF NOT EXISTS idx_square_invoices_shift ON square_invoices (shift_n
   addColumnIfMissing('client_documents', 'issue_date', 'TEXT')
   addColumnIfMissing('client_documents', 'expiry_date', 'TEXT')
   addColumnIfMissing('client_documents', 'updated_at', 'TEXT')
+  // When set, the operator has acknowledged this (expiring/expired) document, so it
+  // stays in the participant record but drops off the dashboard "expiring" surfacing.
+  addColumnIfMissing('client_documents', 'acknowledged_at', 'TEXT')
   sqlite.exec('CREATE INDEX IF NOT EXISTS idx_client_documents_expiry ON client_documents (expiry_date)')
 
   // Structured incident reports (added post-launch). A shift note's free-text

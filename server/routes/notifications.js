@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { validate } from '../middleware/validate.js'
 import { ntfySettingsSchema } from '../utils/validators.js'
-import { requireAdmin } from '../middleware/auth.js'
+import { requireAdmin, demoLock } from '../middleware/auth.js'
 import { rateLimit } from '../middleware/rateLimit.js'
 import { updateSettings } from '../services/settingsService.js'
 import { logActivity } from '../services/activityService.js'
@@ -43,7 +43,7 @@ router.get('/status', (req, res) => {
  * /notifications/settings:
  *   put: { tags: [Notifications], summary: Update ntfy connection, toggles and timings (admin only) }
  */
-router.put('/settings', requireAdmin, validate(ntfySettingsSchema), (req, res) => {
+router.put('/settings', requireAdmin, demoLock, validate(ntfySettingsSchema), (req, res) => {
   const patch = {}
   for (const [field, key] of Object.entries(SETTING_KEYS)) {
     if (field in req.body) patch[key] = req.body[field]
@@ -58,7 +58,7 @@ router.put('/settings', requireAdmin, validate(ntfySettingsSchema), (req, res) =
  * /notifications/test:
  *   post: { tags: [Notifications], summary: Send a test push to the configured topic (admin only) }
  */
-router.post('/test', requireAdmin, outboundLimiter, async (req, res) => {
+router.post('/test', requireAdmin, demoLock, outboundLimiter, async (req, res) => {
   const result = await ntfy.sendTest(req.session.userId)
   res.json(ok(result))
 })
@@ -68,13 +68,13 @@ router.post('/test', requireAdmin, outboundLimiter, async (req, res) => {
  * /notifications/send-now:
  *   post: { tags: [Notifications], summary: Push the attention-needed digest now (admin only) }
  */
-router.post('/send-now', requireAdmin, outboundLimiter, async (req, res) => {
+router.post('/send-now', requireAdmin, demoLock, outboundLimiter, async (req, res) => {
   const result = await ntfy.sendDigest('manual', req.session.userId)
   res.json(ok(result))
 })
 
 /** Clear the live error banner (the audit-log history is untouched). */
-router.post('/clear-error', requireAdmin, (req, res) => {
+router.post('/clear-error', requireAdmin, demoLock, (req, res) => {
   res.json(ok(ntfy.clearError()))
 })
 

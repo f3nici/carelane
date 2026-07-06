@@ -239,7 +239,9 @@ export const clientDocumentMetaSchema = z.object({
   doc_type: z.enum(['media_consent', 'consent_to_share', 'consent_general', 'service_agreement',
     'behaviour_support_plan', 'risk_assessment', 'insurance', 'identification', 'other']).default('other'),
   issue_date: isoDate.nullish(),
-  expiry_date: isoDate.nullish()
+  expiry_date: isoDate.nullish(),
+  // Acknowledge an expiring/expired document so it stops surfacing on the dashboard.
+  acknowledged: bool01.optional()
 })
 
 // Structured participant goal. The free-text description is plain text (like

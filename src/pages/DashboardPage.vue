@@ -30,7 +30,7 @@ onMounted(async () => {
     api.get('/dashboard/agreement-expiries'),
     api.get('/dashboard/document-expiries'),
     api.get('/shifts', { per_page: 5 }),
-    api.get('/shifts', { incident: 'true', per_page: 5 }),
+    api.get('/shifts', { incident: 'open', per_page: 5 }),
     api.get('/audit/verify'),
     api.get('/dashboard/incident-followups')
   ])
@@ -42,6 +42,14 @@ onMounted(async () => {
   integrity.value = audit.data
   incidentFollowups.value = ifu.data
 })
+
+// Acknowledge an expiring/expired document straight from the dashboard: it stays
+// on the participant record but drops off this list (and the headline count).
+async function acknowledgeDocument (d) {
+  await api.put(`/clients/${d.client_id}/documents/${d.id}`, { acknowledged: 1 })
+  documentExpiries.value = documentExpiries.value.filter(x => x.id !== d.id)
+  if (stats.value.documents_expiring) stats.value.documents_expiring -= 1
+}
 
 const tiles = [
   { key: 'active_clients', label: 'Active clients', to: '/clients' },
@@ -139,6 +147,7 @@ const tiles = [
               <span class="text-mid">{{ d.expiry_date }}</span>
               <StatusBadge v-if="d.expiry_status === 'expired'" status="expired" />
               <StatusBadge v-else-if="d.expiry_status === 'expiring'" status="expiring" />
+              <button class="text-xs text-accent hover:underline" title="Acknowledge and hide from the dashboard" @click="acknowledgeDocument(d)">acknowledge</button>
             </span>
           </li>
         </ul>
