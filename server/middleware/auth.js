@@ -2,6 +2,7 @@ import crypto from 'node:crypto'
 import { ApiError } from './errorHandler.js'
 import { sqlite } from '../db/connection.js'
 import { listAssignedClientIds, canAccessClient } from '../services/accessService.js'
+import config from '../config.js'
 
 /**
  * Require an authenticated session. All `/api/v1` routes except auth/login
@@ -43,6 +44,19 @@ export function attachAccess (req, res, next) {
 export function requireAdmin (req, res, next) {
   if (req.isAdmin ?? req.session?.role === 'admin') return next()
   next(new ApiError(403, 'FORBIDDEN', "You don't have access to this"))
+}
+
+/**
+ * Block a route while running as a public demo. Account-security and user-
+ * management writes are disabled so a visitor cannot lock others out (change a
+ * shared password / 2FA / passkey, or deactivate the demo login). A no-op when
+ * demo mode is off, so it is safe to leave in place on a normal install.
+ */
+export function demoLock (req, res, next) {
+  if (config.demoMode) {
+    return next(new ApiError(403, 'DEMO_LOCKED', 'This action is disabled in the public demo.'))
+  }
+  next()
 }
 
 /**

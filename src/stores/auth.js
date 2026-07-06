@@ -37,6 +37,9 @@ export const useAuthStore = defineStore('auth', {
   getters: {
     isAuthenticated: state => !!state.user,
     isAdmin: state => state.user?.role === 'admin',
+    // True when the server is running as a public demo — the UI hides account-
+    // security and user-management controls that the server also blocks.
+    isDemo: state => !!state.user?.demo,
     // True when the require-2FA policy is on and this account has not yet set up
     // a second factor — the UI funnels them to Settings to enrol.
     mustEnrol2fa: state => !!state.user?.must_enrol_2fa

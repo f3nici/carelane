@@ -129,11 +129,17 @@ async function testAi () {
         <svg class="h-5 w-5 text-mid shrink-0 transition-transform" :class="open.security ? 'rotate-180' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
       </button>
       <div v-show="open.security" class="border-t border-white/10 p-5 space-y-6">
-        <PasswordSettings />
-        <TwoFactorSettings />
-        <PasskeySettings />
+        <div v-if="auth.isDemo" class="rounded-xl border border-accent/40 bg-accent/10 p-4 space-y-1">
+          <p class="text-sm font-medium text-accent">Account security is disabled in the demo</p>
+          <p class="text-xs text-mid">Changing the password, two-factor authentication or passkeys is turned off so the shared demo login can't be locked for other visitors. These controls work normally on a real install.</p>
+        </div>
+        <template v-else>
+          <PasswordSettings />
+          <TwoFactorSettings />
+          <PasskeySettings />
+          <SecurityPolicySettings />
+        </template>
         <SessionsSettings />
-        <SecurityPolicySettings />
       </div>
     </section>
 

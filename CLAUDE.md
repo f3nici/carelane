@@ -193,6 +193,21 @@ API docs at `/api/docs`, health at `/healthz`.
   field. CRUD nests under `clients/:id/goals` (+ `…/goals/:goalId/progress`).
 - Uploads (photos/documents/logos/pdfs) live under `uploads/` and are served
   **only via auth-gated routes** — never `express.static`.
+- Public demo mode (`demoService.js`, `DEMO_MODE` env, off by default): boots a
+  throwaway showcase with two shared logins (a `demo` admin + a `demoworker`
+  worker, both password `demo`) and a full fabricated dataset (participants,
+  agreements, shift notes, an incident, goals, meds, RP logs, consent docs, a
+  report, roster), seeded via the core services so encryption/blind-index/search
+  all run normally. `resetDemoData` **hard-deletes** all operational tables
+  (child→parent, dropping the append-only `activity_log` triggers to clear it)
+  and reseeds; `scheduleDemoReset` runs it at boot + every `DEMO_RESET_HOURS`
+  (default 6). The login screen reads `GET /auth/config` (unauthenticated) to
+  pre-fill + advertise the demo creds; `demo` is surfaced on `/auth/me` + login
+  so the SPA hides the locked controls. A `demoLock` middleware returns 403
+  `DEMO_LOCKED` on the account-security and user-management writes (password /
+  2FA / passkey change, `require_2fa` policy, user create/update/reset/assign) so
+  a visitor can't lock others out. Everything is gated on `config.demoMode` and a
+  no-op otherwise — **never enable it on real data.**
 - RAG: PDF → per-page text → ~300-token chunks → local embeddings
   (`bge-small-en-v1.5`, query-instruction prefix) → `document_chunks.embedding`
   BLOB. Search is **hybrid**: vector (sqlite-vec or JS cosine) + BM25 keyword

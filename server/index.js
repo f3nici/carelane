@@ -6,6 +6,7 @@ import { checkEmbeddingModel } from './services/ragService.js'
 import { scheduleBackups, warnIfBackupsStale } from './services/backupService.js'
 import { scheduleMaterialisation } from './services/recurrenceService.js'
 import { scheduleNotifications } from './services/ntfyService.js'
+import { scheduleDemoReset, isDemo } from './services/demoService.js'
 import { purgeExpired } from './services/loginThrottle.js'
 import { logger } from './services/logger.js'
 import { createApp } from './app.js'
@@ -35,6 +36,12 @@ app.listen(config.port, () => {
   scheduleMaterialisation()
   // Push proactive ntfy nudges (digest + shift reminders); no-op until configured.
   scheduleNotifications()
+  // Public demo: seed example data now and reset it on a fixed cadence. No-op
+  // unless DEMO_MODE is on.
+  if (isDemo()) {
+    logger.info('running in PUBLIC DEMO mode — data resets periodically', { every_hours: config.demoResetHours })
+    scheduleDemoReset()
+  }
   // Sweep stale throttle/rate-limit rows hourly so the DB-backed buckets don't
   // accumulate. unref() so this timer never keeps the process alive on its own.
   purgeExpired()

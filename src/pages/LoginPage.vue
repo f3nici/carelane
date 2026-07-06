@@ -1,5 +1,6 @@
 <script setup>
 import { ref, nextTick, onMounted } from 'vue'
+import axios from 'axios'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
 import BrandLogo from '../components/BrandLogo.vue'
@@ -16,8 +17,22 @@ const error = ref('')
 const busy = ref(false)
 const passkeyBusy = ref(false)
 const supportsPasskeys = ref(false)
+// Public-demo details (from GET /auth/config). When set, the form is pre-filled
+// and a note invites the visitor to just sign in.
+const demo = ref(null)
 
-onMounted(() => { supportsPasskeys.value = auth.supportsPasskeys() })
+onMounted(async () => {
+  supportsPasskeys.value = auth.supportsPasskeys()
+  try {
+    const res = await axios.get('/api/v1/auth/config', { withCredentials: true })
+    if (res.data.data?.demo) {
+      demo.value = res.data.data
+      // Pre-fill the shared demo credentials so the visitor can just press Sign in.
+      username.value = res.data.data.demo_username
+      password.value = res.data.data.demo_password
+    }
+  } catch { /* not a demo, or offline — sign in normally */ }
+})
 
 /**
  * Resolve the post-login redirect target safely. Only same-site, single-slash
@@ -74,6 +89,17 @@ async function signInWithPasskey () {
         <BrandLogo size="md" tags class="mb-3" />
         <p class="text-xs text-mid">NDIS support worker management</p>
       </div>
+
+      <div v-if="demo" class="mb-5 rounded-xl border border-accent/40 bg-accent/10 p-4 space-y-1">
+        <p class="text-sm font-medium text-accent">Welcome to the CareLane demo</p>
+        <p class="text-xs text-mid">
+          This is a public demo with example data — just press <span class="font-medium text-white">Sign in</span> to look around.
+          The demo login is <code>{{ demo.demo_username }}</code> / <code>{{ demo.demo_password }}</code> (already filled in).
+          There's also a support-worker view: sign in as <code>{{ demo.demo_worker_username }}</code> / <code>{{ demo.demo_password }}</code>.
+        </p>
+        <p class="text-xs text-mid">Everything resets periodically, so feel free to add and change things.</p>
+      </div>
+
       <form class="space-y-4" @submit.prevent="submit">
         <div>
           <label class="label" for="username">Username</label>
