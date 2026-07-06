@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { useApi } from '../composables/useApi.js'
 import { useToastStore } from '../stores/toast.js'
+import { useAuthStore } from '../stores/auth.js'
 
 defineProps({
   settings: { type: Object, required: true }
@@ -10,6 +11,7 @@ const emit = defineEmits(['save'])
 
 const api = useApi()
 const toast = useToastStore()
+const auth = useAuthStore()
 const logoBusy = ref(false)
 const logoVersion = ref(Date.now())
 
@@ -44,10 +46,11 @@ async function uploadLogo (event) {
     </div>
     <div class="flex items-center gap-4">
       <img v-if="settings.logo_filename" :src="`/api/v1/settings/logo?v=${logoVersion}`" alt="Business logo" class="h-12 rounded bg-white/5 p-1" />
-      <label class="btn-ghost cursor-pointer">
+      <label v-if="!auth.isDemo" class="btn-ghost cursor-pointer">
         <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" class="hidden" @change="uploadLogo" />
         {{ logoBusy ? 'Uploading…' : (settings.logo_filename ? 'Replace logo' : 'Upload logo') }}
       </label>
+      <p v-else class="text-xs text-mid">Logo upload is disabled in the demo.</p>
     </div>
     <button class="btn-primary" @click="emit('save')">Save branding</button>
   </div>

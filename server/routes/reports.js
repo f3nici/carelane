@@ -5,7 +5,7 @@ import { reportSchema, reportDraftSchema } from '../utils/validators.js'
 import * as reportService from '../services/reportService.js'
 import * as shiftService from '../services/shiftService.js'
 import * as clientService from '../services/clientService.js'
-import { assertClientAccess } from '../middleware/auth.js'
+import { assertClientAccess, demoLock } from '../middleware/auth.js'
 import { buildGoalsSummary } from '../services/goalService.js'
 import { resolveTemplateForDraft } from '../services/templateService.js'
 import { condenseShift, draftReport, estimateReportTokens } from '../services/aiService.js'
@@ -188,7 +188,7 @@ router.post('/:id/draft/estimate', (req, res, next) => {
  * /reports/{id}/pdf:
  *   get: { tags: [Reports], summary: Render/download the report PDF (auth-gated) }
  */
-router.get('/:id/pdf', async (req, res, next) => {
+router.get('/:id/pdf', demoLock, async (req, res, next) => {
   try {
     const report = reportService.getReport(Number(req.params.id))
     if (!report.body_markdown) throw new ApiError(409, 'NO_BODY', 'Report has no body to render')

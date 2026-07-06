@@ -3,6 +3,7 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useApi } from '../composables/useApi.js'
 import { useToastStore } from '../stores/toast.js'
+import { useAuthStore } from '../stores/auth.js'
 import StatusBadge from '../components/StatusBadge.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 
@@ -10,6 +11,7 @@ const api = useApi()
 const route = useRoute()
 const router = useRouter()
 const toast = useToastStore()
+const auth = useAuthStore()
 const id = computed(() => route.params.id)
 
 const clients = ref([])
@@ -117,7 +119,7 @@ async function remove () {
       </div>
       <div class="flex items-center gap-2">
         <StatusBadge v-if="id" :status="form.status" />
-        <button v-if="id" class="btn-ghost" @click="exportPdf">Export PDF</button>
+        <button v-if="id && !auth.isDemo" class="btn-ghost" @click="exportPdf">Export PDF</button>
         <button v-if="id" class="btn-danger" @click="confirmDelete = true">Archive</button>
       </div>
     </div>

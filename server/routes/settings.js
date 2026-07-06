@@ -5,7 +5,7 @@ import crypto from 'node:crypto'
 import multer from 'multer'
 import { validate } from '../middleware/validate.js'
 import { settingsSchema } from '../utils/validators.js'
-import { requireAdmin } from '../middleware/auth.js'
+import { requireAdmin, demoLock } from '../middleware/auth.js'
 import { getSettings, updateSettings, getSetting } from '../services/settingsService.js'
 import { logActivity } from '../services/activityService.js'
 import { runBackup, listBackups, verifyBackup, backupFreshness } from '../services/backupService.js'
@@ -75,7 +75,7 @@ router.post('/ai/test', requireAdmin, async (req, res, next) => {
  */
 const LOGO_EXT = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp', 'image/svg+xml': '.svg' }
 
-router.post('/logo', requireAdmin, upload.single('logo'), (req, res, next) => {
+router.post('/logo', requireAdmin, demoLock, upload.single('logo'), (req, res, next) => {
   if (!req.file) return next(new ApiError(400, 'UPLOAD_ERROR', 'Upload a png/jpeg/webp/svg logo'))
   // multer's fileFilter only saw the forgeable client Content-Type. Confirm the
   // real type from the file's contents — and normalise the on-disk extension to
@@ -127,7 +127,7 @@ router.get('/backups', requireAdmin, (req, res) => {
  * /settings/backups/run:
  *   post: { tags: [Settings], summary: Run a backup now (admin only) }
  */
-router.post('/backups/run', requireAdmin, async (req, res, next) => {
+router.post('/backups/run', requireAdmin, demoLock, async (req, res, next) => {
   try {
     const result = await runBackup()
     logActivity('backup', null, req.session.userId, 'created_manual')

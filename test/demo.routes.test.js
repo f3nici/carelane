@@ -126,4 +126,86 @@ describe('public demo mode', () => {
     const res = await agent.get('/api/v1/notifications/status')
     expect(res.status).toBe(200)
   })
+
+  // ── Abuse hardening: uploads, heavy exports and backups are locked so a
+  // public visitor cannot fill the host's disk or spam resource-heavy work.
+  it('blocks running a manual backup (DEMO_LOCKED)', async () => {
+    const { agent, csrf } = await loginAgent('demo')
+    const res = await agent.post('/api/v1/settings/backups/run').set('x-csrf-token', csrf).send({})
+    expect(res.status).toBe(403)
+    expect(res.body.error.code).toBe('DEMO_LOCKED')
+  })
+
+  it('still allows listing backups in the demo (read-only)', async () => {
+    const { agent } = await loginAgent('demo')
+    const res = await agent.get('/api/v1/settings/backups')
+    expect(res.status).toBe(200)
+  })
+
+  it('blocks uploading a logo (DEMO_LOCKED, before the file is written)', async () => {
+    const { agent, csrf } = await loginAgent('demo')
+    const res = await agent.post('/api/v1/settings/logo').set('x-csrf-token', csrf)
+      .attach('logo', Buffer.from('\x89PNG\r\n\x1a\n'), 'logo.png')
+    expect(res.status).toBe(403)
+    expect(res.body.error.code).toBe('DEMO_LOCKED')
+  })
+
+  it('blocks uploading a knowledge-base PDF (DEMO_LOCKED)', async () => {
+    const { agent, csrf } = await loginAgent('demo')
+    const res = await agent.post('/api/v1/documents').set('x-csrf-token', csrf)
+      .attach('file', Buffer.from('%PDF-1.4'), 'doc.pdf')
+    expect(res.status).toBe(403)
+    expect(res.body.error.code).toBe('DEMO_LOCKED')
+  })
+
+  it('blocks uploading a participant document, and heavy exports (DEMO_LOCKED)', async () => {
+    const { agent, csrf } = await loginAgent('demo')
+    const clients = (await agent.get('/api/v1/clients')).body.data
+    const clientId = clients[0].id
+
+    const upload = await agent.post(`/api/v1/clients/${clientId}/documents`).set('x-csrf-token', csrf)
+      .attach('file', Buffer.from('%PDF-1.4'), 'consent.pdf')
+    expect(upload.status).toBe(403)
+    expect(upload.body.error.code).toBe('DEMO_LOCKED')
+
+    const jsonExport = await agent.get(`/api/v1/clients/${clientId}/export`)
+    expect(jsonExport.status).toBe(403)
+    expect(jsonExport.body.error.code).toBe('DEMO_LOCKED')
+
+    const zipExport = await agent.get(`/api/v1/clients/${clientId}/export.zip`)
+    expect(zipExport.status).toBe(403)
+    expect(zipExport.body.error.code).toBe('DEMO_LOCKED')
+  })
+
+  it('blocks the generative PDF exports for incidents, reports and agreements (DEMO_LOCKED)', async () => {
+    const { agent } = await loginAgent('demo')
+    const incidentId = (await agent.get('/api/v1/incidents')).body.data[0].id
+    const reportId = (await agent.get('/api/v1/reports')).body.data[0].id
+    const agreementId = (await agent.get('/api/v1/agreements')).body.data[0].id
+
+    for (const url of [
+      `/api/v1/incidents/${incidentId}/export.pdf`,
+      `/api/v1/reports/${reportId}/pdf`,
+      `/api/v1/agreements/${agreementId}/pdf`
+    ]) {
+      const res = await agent.get(url)
+      expect(res.status, url).toBe(403)
+      expect(res.body.error.code, url).toBe('DEMO_LOCKED')
+    }
+  })
+
+  it('still serves a seeded participant document download in the demo', async () => {
+    const { agent } = await loginAgent('demo')
+    const clients = (await agent.get('/api/v1/clients')).body.data
+    let served = false
+    for (const c of clients) {
+      const docs = (await agent.get(`/api/v1/clients/${c.id}/documents`)).body.data
+      if (!docs.length) continue
+      const res = await agent.get(`/api/v1/clients/${c.id}/documents/${docs[0].id}/file`)
+      expect(res.status).toBe(200)
+      served = true
+      break
+    }
+    expect(served).toBe(true)
+  })
 })

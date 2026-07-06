@@ -8,6 +8,7 @@ import { extractPdfPages } from '../services/documentService.js'
 import { logActivity, diffChanges } from '../services/activityService.js'
 import { parsePagination, paginationMeta, ok } from '../utils/pagination.js'
 import { ApiError } from '../middleware/errorHandler.js'
+import { demoLock } from '../middleware/auth.js'
 import config from '../config.js'
 
 const router = Router()
@@ -61,7 +62,7 @@ router.delete('/:id', (req, res) => {
  *     tags: [Billing]
  *     summary: Parse an NDIS price guide (.docx preferred, PDF fallback) into preview rows. Parsing is fully local — nothing is sent to the Claude API.
  */
-router.post('/import', upload.single('file'), async (req, res, next) => {
+router.post('/import', demoLock, upload.single('file'), async (req, res, next) => {
   try {
     if (!req.file) throw new ApiError(400, 'UPLOAD_ERROR', 'Upload the price guide as .docx (preferred) or PDF')
     const name = (req.file.originalname || '').toLowerCase()

@@ -6,7 +6,7 @@ import multer from 'multer'
 import { ZipArchive } from 'archiver'
 import { validate, validatePartial } from '../middleware/validate.js'
 import { clientSchema, clientBillingCodesSchema, clientDocumentMetaSchema, goalSchema, goalProgressSchema, restrictivePracticeSchema, medicationRecordSchema, clientWorkersSchema } from '../utils/validators.js'
-import { requireClientParam, requireAdmin } from '../middleware/auth.js'
+import { requireClientParam, requireAdmin, demoLock } from '../middleware/auth.js'
 import * as accessService from '../services/accessService.js'
 import * as clientService from '../services/clientService.js'
 import * as agreementService from '../services/agreementService.js'
@@ -115,7 +115,7 @@ router.delete('/:id', (req, res) => {
 })
 
 /** Privacy: full data export for a client (data access request; admin only). */
-router.get('/:id/export', requireAdmin, (req, res) => {
+router.get('/:id/export', requireAdmin, demoLock, (req, res) => {
   const data = clientService.exportClient(Number(req.params.id))
   logActivity('client', Number(req.params.id), req.session.userId, 'exported')
   res.json(ok(data))
@@ -129,7 +129,7 @@ router.get('/:id/export', requireAdmin, (req, res) => {
  *     summary: One-click "download everything" for a participant — a zip of the
  *       full JSON export plus a branded PDF summary (data access request)
  */
-router.get('/:id/export.zip', requireAdmin, async (req, res, next) => {
+router.get('/:id/export.zip', requireAdmin, demoLock, async (req, res, next) => {
   const id = Number(req.params.id)
   try {
     const data = clientService.exportClient(id)
@@ -195,7 +195,7 @@ router.get('/:id/documents', (req, res) => {
   res.json(ok(clientDocumentService.listClientDocuments(Number(req.params.id))))
 })
 
-router.post('/:id/documents', docUpload.single('file'), (req, res, next) => {
+router.post('/:id/documents', demoLock, docUpload.single('file'), (req, res, next) => {
   if (!req.file) return next(new ApiError(400, 'UPLOAD_ERROR', 'Upload a PDF or image file'))
   // The multer fileFilter only sees the client-declared Content-Type, which is
   // forgeable. Verify the saved file's real type from its magic bytes and reject

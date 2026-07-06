@@ -2,10 +2,12 @@
 import { ref } from 'vue'
 import { useApi } from '../composables/useApi.js'
 import { useToastStore } from '../stores/toast.js'
+import { useAuthStore } from '../stores/auth.js'
 
 const emit = defineEmits(['imported'])
 const api = useApi()
 const toast = useToastStore()
+const auth = useAuthStore()
 
 const rows = ref([])
 const warning = ref('')
@@ -55,10 +57,11 @@ async function commit () {
       <h3 class="font-semibold">Import NDIS price guide</h3>
       <p class="text-xs text-mid mt-1">Upload the official Pricing Arrangements as <strong>.docx (preferred)</strong> or PDF (less reliable). Parsing is fully local — nothing is sent to the Claude API. Review the rows, then commit.</p>
     </div>
-    <label class="btn-ghost cursor-pointer w-fit">
+    <label v-if="!auth.isDemo" class="btn-ghost cursor-pointer w-fit">
       <input ref="fileInput" type="file" accept=".docx,.pdf" class="hidden" @change="parse" />
       {{ busy && !rows.length ? 'Parsing…' : 'Choose .docx / .pdf' }}
     </label>
+    <p v-else class="text-xs text-mid">Price-guide import is disabled in the demo.</p>
     <p v-if="warning" class="text-sm text-warning">{{ warning }}</p>
 
     <template v-if="rows.length">

@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { validate, validatePartial } from '../middleware/validate.js'
 import { incidentReportSchema } from '../utils/validators.js'
 import * as incidentService from '../services/incidentService.js'
-import { assertClientAccess } from '../middleware/auth.js'
+import { assertClientAccess, demoLock } from '../middleware/auth.js'
 import { logActivity, diffChanges } from '../services/activityService.js'
 import { renderPdf, pdfPath, safeFilename } from '../utils/pdfRenderer.js'
 import { parsePagination, paginationMeta, ok } from '../utils/pagination.js'
@@ -84,7 +84,7 @@ router.delete('/:id', (req, res) => {
  * /incidents/{id}/export.pdf:
  *   get: { tags: [Incidents], summary: Download the incident report as a branded PDF (auth-gated) }
  */
-router.get('/:id/export.pdf', async (req, res, next) => {
+router.get('/:id/export.pdf', demoLock, async (req, res, next) => {
   try {
     const incident = incidentService.getIncident(Number(req.params.id))
     const filename = await renderPdf({
