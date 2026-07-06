@@ -52,9 +52,9 @@ export function createClientDocumentService (ctx, services) {
     return expiryDate <= soon ? 'expiring' : 'ok'
   }
 
-  /** Attach the computed expiry_status to a document row. */
+  /** Attach the computed expiry_status + normalised acknowledged flag to a document row. */
   function withExpiry (row) {
-    return row && { ...row, expiry_status: expiryStatus(row.expiry_date) }
+    return row && { ...row, expiry_status: expiryStatus(row.expiry_date), acknowledged: row.acknowledged_at ? 1 : 0 }
   }
 
   /**
@@ -66,7 +66,7 @@ export function createClientDocumentService (ctx, services) {
    */
   function listClientDocuments (clientId) {
     return sqlite.prepare(`SELECT id, client_id, title, source_type, source_id, doc_type, issue_date, expiry_date,
-        original_name, mime_type, size_bytes, created_at, updated_at
+        original_name, mime_type, size_bytes, acknowledged_at, created_at, updated_at
       FROM client_documents WHERE client_id = ? AND deleted_at IS NULL
       ORDER BY (expiry_date IS NULL), expiry_date, created_at DESC`).all(clientId).map(withExpiry)
   }
@@ -111,7 +111,7 @@ export function createClientDocumentService (ctx, services) {
    * re-classifying a generic upload as a consent form.
    * @param {number} clientId
    * @param {number} id
-   * @param {{title?:string, doc_type?:string, issue_date?:string|null, expiry_date?:string|null}} meta validated metadata
+   * @param {{title?:string, doc_type?:string, issue_date?:string|null, expiry_date?:string|null, acknowledged?:number|boolean}} meta validated metadata
    * @returns {object} the updated document row
    */
   function updateClientDocument (clientId, id, meta = {}) {
@@ -122,6 +122,9 @@ export function createClientDocumentService (ctx, services) {
     if ('doc_type' in meta) { sets.push('doc_type = ?'); params.push(DOC_TYPES.has(meta.doc_type) ? meta.doc_type : 'other') }
     if ('issue_date' in meta) { sets.push('issue_date = ?'); params.push(cleanDate(meta.issue_date)) }
     if ('expiry_date' in meta) { sets.push('expiry_date = ?'); params.push(cleanDate(meta.expiry_date)) }
+    // Acknowledging an expiring/expired document keeps it in the record but drops
+    // it off the dashboard; un-acknowledging clears the timestamp so it resurfaces.
+    if ('acknowledged' in meta) { sets.push('acknowledged_at = ?'); params.push(meta.acknowledged ? now() : null) }
     sets.push('updated_at = ?')
     params.push(now(), id)
     sqlite.prepare(`UPDATE client_documents SET ${sets.join(', ')} WHERE id = ?`).run(...params)
@@ -139,7 +142,7 @@ export function createClientDocumentService (ctx, services) {
    */
   function listExpiringDocuments (withinDays = 90, clientIds) {
     const soon = new Date(Date.now() + withinDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
-    const where = ['d.deleted_at IS NULL AND c.deleted_at IS NULL AND d.expiry_date IS NOT NULL AND d.expiry_date <= ?']
+    const where = ['d.deleted_at IS NULL AND c.deleted_at IS NULL AND d.acknowledged_at IS NULL AND d.expiry_date IS NOT NULL AND d.expiry_date <= ?']
     const params = [soon]
     applyClientScope(where, params, 'd.client_id', clientIds)
     const rows = sqlite.prepare(`SELECT d.id, d.client_id, d.title, d.doc_type, d.expiry_date,
@@ -163,7 +166,7 @@ export function createClientDocumentService (ctx, services) {
    */
   function countExpiringDocuments (withinDays = 90, clientIds) {
     const soon = new Date(Date.now() + withinDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
-    const where = ['d.deleted_at IS NULL AND c.deleted_at IS NULL AND d.expiry_date IS NOT NULL AND d.expiry_date <= ?']
+    const where = ['d.deleted_at IS NULL AND c.deleted_at IS NULL AND d.acknowledged_at IS NULL AND d.expiry_date IS NOT NULL AND d.expiry_date <= ?']
     const params = [soon]
     applyClientScope(where, params, 'd.client_id', clientIds)
     return sqlite.prepare(`SELECT COUNT(*) AS c FROM client_documents d JOIN clients c ON c.id = d.client_id

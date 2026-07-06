@@ -58,6 +58,27 @@ describe('clientDocumentService — consent & expiry tracking', () => {
     expect(updated.expiry_date).toBe('2027-06-01')
   })
 
+  it('acknowledging an expired document hides it from the dashboard but keeps it on record', () => {
+    const c = makeClient()
+    const doc = docService.createClientDocument(c.id, file(), { title: 'Ack me', doc_type: 'consent_general', expiry_date: '2020-01-01' })
+    expect(doc.acknowledged).toBe(0)
+    const before = docService.countExpiringDocuments(90, [c.id])
+    expect(before).toBe(1)
+
+    const acked = docService.updateClientDocument(c.id, doc.id, { acknowledged: 1 })
+    expect(acked.acknowledged).toBe(1)
+    // Dropped from the dashboard list + count...
+    expect(docService.listExpiringDocuments(90, [c.id]).find(d => d.id === doc.id)).toBeUndefined()
+    expect(docService.countExpiringDocuments(90, [c.id])).toBe(0)
+    // ...but still present on the participant record.
+    expect(docService.getClientDocument(c.id, doc.id).acknowledged).toBe(1)
+    expect(docService.listClientDocuments(c.id).find(d => d.id === doc.id).acknowledged).toBe(1)
+
+    // Un-acknowledging brings it back onto the dashboard.
+    docService.updateClientDocument(c.id, doc.id, { acknowledged: 0 })
+    expect(docService.countExpiringDocuments(90, [c.id])).toBe(1)
+  })
+
   it('soft-deletes and restores a document via the deleted registry', () => {
     const c = makeClient()
     const doc = docService.createClientDocument(c.id, file(), { title: 'Bin me', doc_type: 'insurance' })

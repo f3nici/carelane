@@ -84,6 +84,14 @@ async function saveEdit () {
   toast.push('Document updated', 'success')
 }
 
+async function toggleAcknowledged (doc) {
+  const res = await api.put(`/clients/${props.clientId}/documents/${doc.id}`, {
+    acknowledged: doc.acknowledged ? 0 : 1
+  })
+  documents.value = documents.value.map(d => d.id === res.data.id ? res.data : d)
+  toast.push(res.data.acknowledged ? 'Acknowledged — hidden from the dashboard' : 'Acknowledgement cleared', 'success')
+}
+
 function downloadDocument (doc) {
   window.open(`/api/v1/clients/${props.clientId}/documents/${doc.id}/file`, '_blank')
 }
@@ -151,6 +159,7 @@ function formatSize (bytes) {
               {{ d.title }}
               <StatusBadge v-if="d.expiry_status === 'expired'" status="expired" />
               <StatusBadge v-else-if="d.expiry_status === 'expiring'" status="expiring" />
+              <span v-if="d.acknowledged" class="pill bg-white/10 text-mid">Acknowledged</span>
             </p>
             <p class="text-xs text-mid">
               {{ typeLabel(d.doc_type) }}
@@ -158,6 +167,13 @@ function formatSize (bytes) {
               <span v-if="d.expiry_date"> · expires {{ d.expiry_date }}</span>
               <span v-if="formatSize(d.size_bytes)"> · {{ formatSize(d.size_bytes) }}</span>
             </p>
+            <label
+              v-if="!readonly && (d.acknowledged || d.expiry_status === 'expired' || d.expiry_status === 'expiring')"
+              class="mt-1 flex items-center gap-2 text-xs text-mid cursor-pointer"
+            >
+              <input type="checkbox" class="accent-accent" :checked="!!d.acknowledged" @change="toggleAcknowledged(d)" />
+              Acknowledge — hide from dashboard
+            </label>
           </div>
           <div class="flex gap-3 shrink-0 text-xs">
             <button v-if="!readonly" class="text-accent hover:underline" @click="startEdit(d)">edit</button>

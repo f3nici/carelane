@@ -151,4 +151,25 @@ describe('shiftService business rules', () => {
     expect(shiftService.getShift(shift.id).archived_at).toBeNull()
     expect(shiftService.listShifts(pg, { client_id: clientId }).rows.some(r => r.id === shift.id)).toBe(true)
   })
+
+  it("drops a flagged note from the incident:'open' filter once its incident report is closed", async () => {
+    const incidentService = await import('../server/services/incidentService.js')
+    const pg = { page: 1, perPage: 100, offset: 0 }
+    const shift = shiftService.createShift(baseShift({ shift_date: '2026-08-01', incident_flag: 1, incident_details: 'Slip in bathroom.' }), workerId)
+    const open = () => shiftService.listShifts(pg, { client_id: clientId, incident: 'open' }).rows.some(r => r.id === shift.id)
+    const all = () => shiftService.listShifts(pg, { client_id: clientId, incident: 'true' }).rows.some(r => r.id === shift.id)
+
+    // Flagged, no report yet: appears in both.
+    expect(open()).toBe(true)
+    expect(all()).toBe(true)
+
+    const report = incidentService.createFromShift(shift.id, workerId)
+    // An open report still needs attention — still shown.
+    expect(open()).toBe(true)
+
+    incidentService.updateIncident(report.id, { status: 'closed' })
+    // Resolved: gone from the dashboard warning, but still in the full incident list.
+    expect(open()).toBe(false)
+    expect(all()).toBe(true)
+  })
 })

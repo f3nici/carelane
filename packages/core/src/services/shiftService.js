@@ -111,7 +111,9 @@ export function createShiftService (ctx, services) {
   }
 
   /**
-   * List shift notes with optional client / incident / billed / archived filters,
+   * List shift notes with optional client / incident (`true` = all flagged,
+   * `open` = flagged minus those whose incident report is closed) / billed /
+   * archived filters,
    * a date filter (exact `date`, or a `date_from`/`date_to` range), a free-text
    * `q` keyword search over the note body, incident details, support provided,
    * participant response and location, and a `sort` order (`date` newest-first —
@@ -137,6 +139,14 @@ export function createShiftService (ctx, services) {
     else if (filters.archived !== 'all') where.push('s.archived_at IS NULL')
     if (filters.client_id) { where.push('s.client_id = ?'); params.push(Number(filters.client_id)) }
     if (filters.incident === 'true') where.push('s.incident_flag = 1')
+    // 'open' = flagged notes still needing attention: exclude any whose promoted
+    // incident report has been closed (at most one report per note), so a resolved
+    // incident drops off the dashboard warning.
+    else if (filters.incident === 'open') {
+      where.push(`s.incident_flag = 1 AND NOT EXISTS (
+        SELECT 1 FROM incident_reports ir
+        WHERE ir.shift_note_id = s.id AND ir.deleted_at IS NULL AND ir.status = 'closed')`)
+    }
     if (filters.billed === 'false') where.push('s.billed = 0')
     if (filters.date) { where.push('s.shift_date = ?'); params.push(filters.date) }
     if (filters.date_from) { where.push('s.shift_date >= ?'); params.push(filters.date_from) }
