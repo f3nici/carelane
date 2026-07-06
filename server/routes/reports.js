@@ -99,7 +99,7 @@ router.post('/:id/unarchive', (req, res) => {
  *     tags: [Reports]
  *     summary: AI-draft the report (condense shifts with Haiku, draft with Sonnet; draft only)
  */
-router.post('/:id/draft', aiLimiter, validate(reportDraftSchema), async (req, res, next) => {
+router.post('/:id/draft', demoLock, aiLimiter, validate(reportDraftSchema), async (req, res, next) => {
   try {
     const report = reportService.getReport(Number(req.params.id))
     if (report.status === 'final') throw new ApiError(409, 'FINALISED', 'Final reports cannot be redrafted')

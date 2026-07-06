@@ -89,7 +89,7 @@ function formatDate (iso) {
             {{ deviceLabel(s.user_agent) }}
             <span v-if="s.current" class="pill bg-primary/20 text-primary text-xs">This device</span>
           </p>
-          <p class="text-xs text-mid truncate">{{ s.ip || 'unknown IP' }} · Last active {{ formatDate(s.last_seen_at) }}</p>
+          <p class="text-xs text-mid truncate">{{ s.ip || (auth.isDemo ? 'IP hidden in demo' : 'unknown IP') }} · Last active {{ formatDate(s.last_seen_at) }}</p>
         </div>
         <button class="btn-ghost text-xs text-danger shrink-0" :disabled="busy" @click="revoke(s)">
           {{ s.current ? 'Sign out' : 'Revoke' }}

@@ -137,7 +137,7 @@ router.post('/:id/unarchive', requireAdmin, (req, res) => {
  */
 const aiLimiter = rateLimit({ name: 'ai-draft', max: 20, windowMs: 60 * 1000 })
 
-router.post('/:id/draft', canEditNote, aiLimiter, validate(shiftDraftSchema), async (req, res, next) => {
+router.post('/:id/draft', demoLock, canEditNote, aiLimiter, validate(shiftDraftSchema), async (req, res, next) => {
   try {
     const shift = shiftService.getShift(Number(req.params.id))
     if (shift.finalised) throw new ApiError(409, 'FINALISED', 'Shift note is finalised')

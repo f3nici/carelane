@@ -194,6 +194,39 @@ describe('public demo mode', () => {
     }
   })
 
+  it('blocks AI drafting on shifts, reports and agreements (DEMO_LOCKED)', async () => {
+    const { agent, csrf } = await loginAgent('demo')
+    const shiftId = (await agent.get('/api/v1/shifts')).body.data[0].id
+    const reportId = (await agent.get('/api/v1/reports')).body.data[0].id
+    const agreementId = (await agent.get('/api/v1/agreements')).body.data[0].id
+
+    for (const url of [
+      `/api/v1/shifts/${shiftId}/draft`,
+      `/api/v1/reports/${reportId}/draft`,
+      `/api/v1/agreements/${agreementId}/draft`
+    ]) {
+      const res = await agent.post(url).set('x-csrf-token', csrf).send({})
+      expect(res.status, url).toBe(403)
+      expect(res.body.error.code, url).toBe('DEMO_LOCKED')
+    }
+  })
+
+  it('blocks grounded Q&A (Ask Claude) in the demo (DEMO_LOCKED)', async () => {
+    const { agent, csrf } = await loginAgent('demo')
+    const res = await agent.post('/api/v1/documents/ask').set('x-csrf-token', csrf)
+      .send({ question: 'What are the reporting rules?' })
+    expect(res.status).toBe(403)
+    expect(res.body.error.code).toBe('DEMO_LOCKED')
+  })
+
+  it('redacts session IP addresses in the demo (shared login must not leak visitor IPs)', async () => {
+    const { agent } = await loginAgent('demo')
+    const res = await agent.get('/api/v1/auth/sessions')
+    expect(res.status).toBe(200)
+    expect(res.body.data.sessions.length).toBeGreaterThan(0)
+    for (const s of res.body.data.sessions) expect(s.ip).toBeNull()
+  })
+
   it('still serves a seeded participant document download in the demo', async () => {
     const { agent } = await loginAgent('demo')
     const clients = (await agent.get('/api/v1/clients')).body.data

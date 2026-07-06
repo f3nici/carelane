@@ -77,7 +77,7 @@ router.get('/search', async (req, res, next) => {
  * /documents/ask:
  *   post: { tags: [Knowledge], summary: Grounded Q&A — retrieve top-k chunks locally, answer via Claude with citations }
  */
-router.post('/ask', askLimiter, validate(askSchema), async (req, res, next) => {
+router.post('/ask', demoLock, askLimiter, validate(askSchema), async (req, res, next) => {
   try {
     const result = await askGuidelines(req.body.question, req.session.userId)
     res.json(ok(result))

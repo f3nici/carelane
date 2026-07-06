@@ -93,7 +93,7 @@ router.post('/:id/unarchive', (req, res) => {
  *     tags: [Agreements]
  *     summary: AI-draft the agreement body from the stored questionnaire (draft only — worker must review)
  */
-router.post('/:id/draft', aiLimiter, validate(agreementDraftSchema), async (req, res, next) => {
+router.post('/:id/draft', demoLock, aiLimiter, validate(agreementDraftSchema), async (req, res, next) => {
   try {
     const agreement = agreementService.getAgreement(Number(req.params.id))
     if (!agreement.questionnaire_json) throw new ApiError(409, 'NO_QUESTIONNAIRE', 'Complete the questionnaire before drafting')

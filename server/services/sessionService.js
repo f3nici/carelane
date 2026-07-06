@@ -1,5 +1,6 @@
 import { sqlite } from '../db/connection.js'
 import { ApiError } from '../middleware/errorHandler.js'
+import config from '../config.js'
 
 /**
  * Active login sessions ("devices") for the current operator, backed by the
@@ -85,7 +86,10 @@ export function listUserSessions (userId, currentSid) {
       current: r.sid === currentSid,
       created_at: r.sess.createdAt || null,
       last_seen_at: r.sess.lastSeenAt || null,
-      ip: r.sess.ip || null,
+      // In the public demo the login is shared, so every visitor's session hangs
+      // off the same user — never expose one visitor's IP to another. Redacted on
+      // read so it still leaves the raw value in the store for the real operator.
+      ip: config.demoMode ? null : (r.sess.ip || null),
       user_agent: r.sess.ua || null,
       expires: r.expire
     }))
