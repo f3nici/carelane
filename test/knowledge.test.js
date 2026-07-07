@@ -108,9 +108,10 @@ describe('keyword (BM25) search over FTS5', () => {
 describe('embedding-model drift warning', () => {
   it('warns once per stale document and clears when re-stamped to the current model', async () => {
     const config = (await import('../server/config.js')).default
+    const { logger } = await import('../server/services/logger.js')
     const id = seedDoc({ title: 'Stale doc', filename: 'stale.pdf', chunks: ['anything'] })
     // seedDoc leaves embedding_model NULL → counts as stale.
-    let warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    let warn = vi.spyOn(logger, 'warn').mockImplementation(() => {})
     rag.checkEmbeddingModel()
     expect(warn).toHaveBeenCalled()
     warn.mockRestore()
@@ -118,7 +119,7 @@ describe('embedding-model drift warning', () => {
     sqlite.prepare('UPDATE documents SET embedding_model = ? WHERE id = ?').run(config.embeddingModel, id)
     // Re-stamp every other seeded doc too so none remain stale.
     sqlite.prepare('UPDATE documents SET embedding_model = ? WHERE indexed = 1').run(config.embeddingModel)
-    warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    warn = vi.spyOn(logger, 'warn').mockImplementation(() => {})
     rag.checkEmbeddingModel()
     expect(warn).not.toHaveBeenCalled()
     warn.mockRestore()
