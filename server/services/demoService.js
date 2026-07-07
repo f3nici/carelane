@@ -314,19 +314,52 @@ function seedExampleData (adminId, workerId) {
   })
 
   // ── Roster / scheduled shifts ───────────────────────────────────────────
-  // Upcoming shifts for the worker's participants, plus a couple for Grace
-  // (admin), and one already completed to show a full lifecycle.
-  const mkScheduled = (clientId, over) => schedule.createScheduled({
-    client_id: clientId, worker_id: over.worker_id ?? workerId, billing_code_id: selfCare,
-    location: 'Participant home', title: 'Support shift', ...over
-  }, adminId)
+  // The demo can be opened at any time and the roster calendar can be paged to
+  // any month, so a fixed weekly pattern of shifts is cloned into every month
+  // across a wide window either side of today — past months render as completed
+  // history (green on the calendar), current/future months as upcoming plans
+  // (which also populate the "next 14 days" list). Because the demo reseeds
+  // relative to "now" on every reset, this rolling window keeps the roster full
+  // no matter when the demo is opened — effectively forever.
+  const ROSTER_MONTHS_EACH_WAY = 24
+  const todayIso = isoDate(0)
+  const base = new Date()
+  const baseY = base.getUTCFullYear()
+  const baseM = base.getUTCMonth()
+  // Date (YYYY-MM-DD) on `day` of the month `monthOffset` months from now.
+  // Date.UTC normalises month overflow/underflow, so offsets wrap years cleanly.
+  const monthDayIso = (monthOffset, day) =>
+    new Date(Date.UTC(baseY, baseM + monthOffset, day)).toISOString().slice(0, 10)
 
-  mkScheduled(aisha.id, { scheduled_date: isoDate(1), start_time: '09:00', end_time: '12:00' })
-  mkScheduled(aisha.id, { scheduled_date: isoDate(3), start_time: '13:00', end_time: '16:00', billing_code_id: community, location: 'Fremantle Arts Centre', title: 'Art class' })
-  mkScheduled(tom.id, { scheduled_date: isoDate(2), start_time: '10:00', end_time: '13:00', billing_code_id: community, location: 'Subiaco', title: 'Community access' })
-  mkScheduled(tom.id, { scheduled_date: isoDate(5), start_time: '15:00', end_time: '18:00' })
-  mkScheduled(grace.id, { scheduled_date: isoDate(2), start_time: '09:30', end_time: '12:30', worker_id: adminId, location: 'Como' })
-  mkScheduled(grace.id, { scheduled_date: isoDate(6), start_time: '09:30', end_time: '12:30', worker_id: adminId, location: 'Como' })
+  const mkScheduled = (clientId, scheduledDate, over) => {
+    const created = schedule.createScheduled({
+      client_id: clientId, worker_id: over.worker_id ?? workerId, billing_code_id: selfCare,
+      location: 'Participant home', title: 'Support shift', scheduled_date: scheduledDate, ...over
+    }, adminId)
+    // A shift before today reads as completed history; today/future stay
+    // scheduled so they still surface in the upcoming list and clock-in flow.
+    if (scheduledDate < todayIso) {
+      sqlite.prepare("UPDATE scheduled_shifts SET status = 'completed', updated_at = ? WHERE id = ?")
+        .run(nowIso(), created.id)
+    }
+    return created
+  }
+
+  // Weekly pattern as day-of-month (1–28, present in every month) + overrides,
+  // mirroring the example shift notes above. Cloned into each month in range.
+  const rosterTemplate = [
+    [aisha.id, 4, { start_time: '09:00', end_time: '12:00' }],
+    [aisha.id, 8, { start_time: '13:00', end_time: '16:00', billing_code_id: community, location: 'Fremantle Arts Centre', title: 'Art class' }],
+    [tom.id, 12, { start_time: '10:00', end_time: '13:00', billing_code_id: community, location: 'Subiaco', title: 'Community access' }],
+    [tom.id, 15, { start_time: '15:00', end_time: '18:00' }],
+    [grace.id, 20, { start_time: '09:30', end_time: '12:30', worker_id: adminId, location: 'Como' }],
+    [grace.id, 24, { start_time: '09:30', end_time: '12:30', worker_id: adminId, location: 'Como' }]
+  ]
+  for (let m = -ROSTER_MONTHS_EACH_WAY; m <= ROSTER_MONTHS_EACH_WAY; m++) {
+    for (const [clientId, day, over] of rosterTemplate) {
+      mkScheduled(clientId, monthDayIso(m, day), over)
+    }
+  }
 }
 
 /**
