@@ -10,6 +10,7 @@ import AgreementEditor from '../components/AgreementEditor.vue'
 import AiDraftPanel from '../components/AiDraftPanel.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
+import ShareLinkManager from '../components/ShareLinkManager.vue'
 
 const api = useApi()
 const route = useRoute()
@@ -169,6 +170,15 @@ async function uploadFinalCopy (event) {
     <AgreementEditor v-model="body" :locked="isFinal" />
 
     <button class="btn-primary" :disabled="busy" @click="save()">{{ busy ? 'Saving…' : 'Save report' }}</button>
+
+    <ShareLinkManager
+      v-if="id && setup.client_id"
+      resource-type="report"
+      :resource-id="id"
+      :client-id="setup.client_id"
+      :shareable="isFinal"
+      unshareable-reason="Finalise this report before sharing it — only finalised reports can be shared with a plan manager or participant."
+    />
 
     <ConfirmDialog
       :open="confirmFinalise"

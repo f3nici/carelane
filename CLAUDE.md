@@ -123,6 +123,30 @@ API docs at `/api/docs`, health at `/healthz`.
   times, never plan/health notes. The secret path is redacted from the access log
   (and never appears in metrics, which are path-free). UI: a "Calendar
   subscription" panel on the Roster page.
+- Client-facing share links (`shareLinkService`, `share_links` table): a
+  time-limited, audited, read-only link that lets a plan manager or the
+  participant fetch ONE specific **finalised report** or **completed PDF
+  document** without a CareLane account. Only PDFs are ever shared — a report
+  renders to PDF and a document must be a PDF (image/other file types are
+  refused). Like the calendar feed, the unguessable token in
+  the URL is the only credential, so the public endpoints are served
+  **unauthenticated** and OUTSIDE the `/api` session+CSRF stack — `GET /share/:token`
+  is a minimal branded landing page (a safe resource title + short participant
+  label, never report/health content, so a link-preview scanner pulls nothing)
+  and `GET /share/:token/download` is the actual fetch. Every download is counted
+  (`view_count`/`last_viewed_at`) and written to the append-only audit trail
+  (`share_link` entity, `accessed` action, no acting user); the secret path is
+  redacted from the access log. Each link is bound to a single resource +
+  participant, carries an `expires_at` (default 14 days) and an optional
+  `max_views` cap — `linkState` derives active/expired/revoked/exhausted. Only
+  finalised reports are shareable (a draft is never exposed). Reports render their
+  PDF on the fly at fetch time (reflecting edits); PDF documents stream the stored
+  file. Creating/listing/revoking links is **admin-only** (`/api/v1/share-links`,
+  behind `requireAdmin`) — sharing exposes participant data externally, so a
+  worker never does it; links are revoked (soft), never hard-deleted, so the
+  audit history stays. `demoLock` blocks link creation and the public download in
+  demo mode. UI: a "Client share links" panel on the report detail page and a
+  per-document "share" action in the participant documents tab.
 - Square Invoicing (optional): `squareService` turns a completed shift note into a
   **draft** invoice in the operator's Square account (never sent — sending it is a
   manual step in Square). The access token is a secret read from env

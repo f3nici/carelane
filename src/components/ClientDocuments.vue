@@ -4,6 +4,7 @@ import { useApi } from '../composables/useApi.js'
 import { useToastStore } from '../stores/toast.js'
 import { useAuthStore } from '../stores/auth.js'
 import StatusBadge from './StatusBadge.vue'
+import ShareLinkManager from './ShareLinkManager.vue'
 
 const props = defineProps({
   clientId: { type: [String, Number], required: true },
@@ -19,6 +20,8 @@ const auth = useAuthStore()
 const documents = ref([])
 const uploading = ref(false)
 const editingId = ref(null)
+// Which document's share-link panel is currently expanded (admin only).
+const sharingId = ref(null)
 
 const DOC_TYPES = [
   { value: 'media_consent', label: 'Media consent' },
@@ -181,9 +184,17 @@ function formatSize (bytes) {
           <div class="flex gap-3 shrink-0 text-xs">
             <button v-if="!readonly" class="text-accent hover:underline" @click="startEdit(d)">edit</button>
             <button class="text-accent hover:underline" @click="downloadDocument(d)">download</button>
+            <button v-if="auth.isAdmin && !auth.isDemo && d.mime_type === 'application/pdf'" class="text-accent hover:underline" @click="sharingId = sharingId === d.id ? null : d.id">{{ sharingId === d.id ? 'close' : 'share' }}</button>
             <button v-if="!readonly" class="text-danger hover:underline" @click="removeDocument(d)">remove</button>
           </div>
         </div>
+        <ShareLinkManager
+          v-if="sharingId === d.id"
+          class="mt-3"
+          resource-type="client_document"
+          :resource-id="d.id"
+          :client-id="clientId"
+        />
       </li>
     </ul>
   </div>

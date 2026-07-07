@@ -627,6 +627,36 @@ CREATE INDEX IF NOT EXISTS idx_client_assignments_user ON client_assignments (us
 CREATE INDEX IF NOT EXISTS idx_client_assignments_client ON client_assignments (client_id);
 `)
 
+  // Client-facing share links (added post-launch). A time-limited, audited,
+  // read-only link lets a plan manager or the participant themselves fetch ONE
+  // specific finalised report or completed document without a CareLane account —
+  // the unguessable token in the URL is the only credential (mirroring the
+  // calendar feed). Each link is scoped to a single resource + participant,
+  // carries an expiry (and an optional view cap), and every fetch is counted and
+  // written to the append-only audit trail. Links are revoked (not hard-deleted)
+  // so the audit history of a shared item stays intact. See shareLinkService.
+  sqlite.exec(`
+CREATE TABLE IF NOT EXISTS share_links (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  token TEXT NOT NULL UNIQUE,
+  resource_type TEXT NOT NULL,
+  resource_id INTEGER NOT NULL,
+  client_id INTEGER NOT NULL REFERENCES clients(id),
+  label TEXT,
+  created_by INTEGER REFERENCES users(id),
+  expires_at TEXT NOT NULL,
+  max_views INTEGER,
+  view_count INTEGER NOT NULL DEFAULT 0,
+  last_viewed_at TEXT,
+  revoked_at TEXT,
+  created_at TEXT,
+  updated_at TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_share_links_token ON share_links (token);
+CREATE INDEX IF NOT EXISTS idx_share_links_resource ON share_links (resource_type, resource_id);
+CREATE INDEX IF NOT EXISTS idx_share_links_client ON share_links (client_id);
+`)
+
   migrateChunkFts()
 
   // Blind-index keyword search over shift notes (added post-launch). The note

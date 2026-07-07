@@ -212,6 +212,19 @@ export const reportSchema = z.object({
   status: z.enum(['draft', 'final']).default('draft')
 })
 
+// Client-facing share link. A time-limited, audited, read-only link to ONE
+// finalised report or completed document, for a plan manager or the participant
+// to fetch without an account. `expires_in_days` bounds its lifetime (default 2
+// weeks); an optional `max_views` caps how many times the item can be fetched.
+export const shareLinkSchema = z.object({
+  resource_type: z.enum(['report', 'client_document']),
+  resource_id: z.coerce.number().int().positive(),
+  client_id: z.coerce.number().int().positive(),
+  label: z.string().trim().max(200).nullish().transform(v => v || null),
+  expires_in_days: z.coerce.number().int().min(1).max(365).default(14),
+  max_views: z.coerce.number().int().min(1).max(10000).nullish().transform(v => v ?? null)
+})
+
 export const billingCodeSchema = z.object({
   code: z.string().trim().min(1),
   name: z.string().trim().min(1),
