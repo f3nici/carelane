@@ -7,6 +7,7 @@ import { useApi } from '../composables/useApi.js'
 import { useAuthStore } from '../stores/auth.js'
 import ScheduledShiftModal from '../components/ScheduledShiftModal.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+import CalendarFeedSettings from '../components/CalendarFeedSettings.vue'
 
 const api = useApi()
 const router = useRouter()
@@ -144,6 +145,8 @@ function goWriteNote (scheduledId) {
         </ul>
       </div>
     </div>
+
+    <CalendarFeedSettings />
 
     <ScheduledShiftModal
       v-if="modalOpen"
