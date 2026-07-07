@@ -45,7 +45,7 @@ function isoDate (days = 0) {
 // foreign-key constraints (enabled on the connection) are satisfied. Reference
 // data (billing_codes, templates, settings, users) is intentionally preserved.
 const WIPE_ORDER = [
-  'goal_progress_notes', 'client_goals', 'shift_photos', 'square_invoices',
+  'share_links', 'goal_progress_notes', 'client_goals', 'shift_photos', 'square_invoices',
   'medication_records', 'restrictive_practice_records', 'incident_reports',
   'reports', 'client_documents', 'agreement_line_items', 'service_agreements',
   'client_billing_codes', 'scheduled_shifts', 'shift_recurrences', 'shift_notes',

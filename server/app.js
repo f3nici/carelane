@@ -31,6 +31,8 @@ import auditRoutes from './routes/audit.js'
 import deletedRoutes from './routes/deleted.js'
 import userRoutes from './routes/users.js'
 import calendarFeedRoutes from './routes/calendarFeed.js'
+import shareLinkRoutes from './routes/shareLinks.js'
+import sharePublicRoutes from './routes/sharePublic.js'
 
 /**
  * Build the configured Express app (middleware + routes) without binding a
@@ -51,9 +53,11 @@ export function createApp () {
     const start = process.hrtime.bigint()
     res.on('finish', () => {
       const ms = Number(process.hrtime.bigint() - start) / 1e6
-      // The iCal feed path embeds a secret token — log a redacted form so the
-      // subscribe URL never lands in the access log.
-      const loggedPath = req.path.startsWith('/calendar/') ? '/calendar/:token.ics' : req.path
+      // The iCal feed and share-link paths embed a secret token — log a redacted
+      // form so the subscribe / share URL never lands in the access log.
+      const loggedPath = req.path.startsWith('/calendar/')
+        ? '/calendar/:token.ics'
+        : req.path.startsWith('/share/') ? '/share/:token' : req.path
       const fields = { method: req.method, path: loggedPath, status: res.statusCode, ms: Math.round(ms) }
       if (res.statusCode >= 500) logger.error('request', fields)
       else if (res.statusCode >= 400) logger.warn('request', fields)
@@ -160,6 +164,11 @@ export function createApp () {
   // URL whose secret token is the only credential (see routes/calendarFeed.js).
   app.use('/calendar', calendarFeedRoutes)
 
+  // Public, unauthenticated client-facing share links (landing page + download).
+  // Mounted before the /api stack for the same reason as the calendar feed — the
+  // recipient has no account and the secret token in the path is the credential.
+  app.use('/share', sharePublicRoutes)
+
   const api = express.Router()
   api.use(csrfProtect)
   api.use('/auth', authRoutes)
@@ -193,6 +202,10 @@ export function createApp () {
   api.use('/templates', authed, requireAdmin, templateRoutes)
   api.use('/audit', authed, requireAdmin, auditRoutes)
   api.use('/deleted', authed, requireAdmin, deletedRoutes)
+  // Client-facing share links expose participant data outside the app, so
+  // creating/managing them is an admin-only operator surface (the public side is
+  // the unauthenticated /share routes mounted above).
+  api.use('/share-links', authed, requireAdmin, shareLinkRoutes)
   app.use('/api/v1', api)
 
   // Interactive API docs (Swagger UI) describe the whole public API surface and
