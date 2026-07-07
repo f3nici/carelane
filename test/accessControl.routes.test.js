@@ -215,6 +215,23 @@ describe('multi-user access control', () => {
     expect(edit.status).toBe(403)
   })
 
+  it('strips operator-only settings (ntfy/square/google) from a worker but keeps branding + AI', async () => {
+    // The seeded defaults include operator-integration settings; the admin sees them all.
+    const adminView = (await admin.agent.get('/api/v1/settings')).body.data
+    expect(adminView.ntfy_server_url).toBeDefined()
+    expect(adminView.square_currency).toBeDefined()
+
+    // The worker sees branding + AI status it needs, but not the operator config.
+    const workerView = (await worker.agent.get('/api/v1/settings')).body.data
+    expect(workerView.business_name).toBeDefined()
+    expect(workerView.brand_primary_color).toBeDefined()
+    expect(workerView.claude_enabled).toBeDefined()
+    expect(workerView.ntfy_server_url).toBeUndefined()
+    expect(workerView.ntfy_topic).toBeUndefined()
+    expect(workerView.square_currency).toBeUndefined()
+    expect(Object.keys(workerView).some(k => k.startsWith('google_'))).toBe(false)
+  })
+
   it('scopes the worker dashboard to their assignments', async () => {
     const res = await worker.agent.get('/api/v1/dashboard/stats')
     // Only one participant is assigned to this worker.

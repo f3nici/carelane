@@ -30,6 +30,18 @@ const upload = multer({
   fileFilter: (req, file, cb) => cb(null, ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'].includes(file.mimetype))
 })
 
+// Operator-only settings a support worker never needs and shouldn't see:
+// outbound-integration config (the ntfy topic is effectively a publish
+// capability; Square/Google config is operator-managed). Branding, business
+// details, AI status and the disclaimer stay readable by everyone — the app
+// needs them app-wide. Admins always get the full object.
+const OPERATOR_SETTING_PREFIXES = ['ntfy_', 'square_', 'google_']
+
+/** Whether a settings key is operator-only (stripped from a worker's read). */
+function isOperatorSetting (key) {
+  return OPERATOR_SETTING_PREFIXES.some(prefix => key.startsWith(prefix))
+}
+
 /**
  * @openapi
  * /settings:
@@ -37,7 +49,10 @@ const upload = multer({
  *   put: { tags: [Settings], summary: Update settings (admin only) }
  */
 router.get('/', (req, res) => {
-  res.json(ok(getSettings()))
+  const all = getSettings()
+  if (req.isAdmin) return res.json(ok(all))
+  const scoped = Object.fromEntries(Object.entries(all).filter(([key]) => !isOperatorSetting(key)))
+  res.json(ok(scoped))
 })
 
 router.put('/', requireAdmin, validate(settingsSchema), (req, res) => {
