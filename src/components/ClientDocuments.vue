@@ -184,7 +184,7 @@ function formatSize (bytes) {
           <div class="flex gap-3 shrink-0 text-xs">
             <button v-if="!readonly" class="text-accent hover:underline" @click="startEdit(d)">edit</button>
             <button class="text-accent hover:underline" @click="downloadDocument(d)">download</button>
-            <button v-if="auth.isAdmin && !auth.isDemo" class="text-accent hover:underline" @click="sharingId = sharingId === d.id ? null : d.id">{{ sharingId === d.id ? 'close' : 'share' }}</button>
+            <button v-if="auth.isAdmin && !auth.isDemo && d.mime_type === 'application/pdf'" class="text-accent hover:underline" @click="sharingId = sharingId === d.id ? null : d.id">{{ sharingId === d.id ? 'close' : 'share' }}</button>
             <button v-if="!readonly" class="text-danger hover:underline" @click="removeDocument(d)">remove</button>
           </div>
         </div>

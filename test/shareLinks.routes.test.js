@@ -135,6 +135,31 @@ describe('client-facing share links', () => {
     expect((await request(app).get('/share/not-a-real-token/download')).status).toBe(404)
   })
 
+  it('shares a PDF document and streams the stored file', async () => {
+    const doc = (await admin.agent.post(`/api/v1/clients/${adminClient.id}/documents`).set('x-csrf-token', admin.csrf)
+      .field('title', 'Signed consent')
+      .field('doc_type', 'consent_general')
+      .attach('file', Buffer.from('%PDF-1.4 signed consent'), 'consent.pdf')).body.data
+    const created = (await admin.agent.post('/api/v1/share-links').set('x-csrf-token', admin.csrf)
+      .send({ resource_type: 'client_document', resource_id: doc.id, client_id: adminClient.id })).body.data
+    const dl = await request(app).get(`/share/${tokenOf(created.url)}/download`)
+    expect(dl.status).toBe(200)
+    expect(dl.headers['content-type']).toMatch(/application\/pdf/)
+    expect(dl.headers['content-disposition']).toMatch(/attachment/)
+  })
+
+  it('refuses to share a non-PDF document', async () => {
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0])
+    const doc = (await admin.agent.post(`/api/v1/clients/${adminClient.id}/documents`).set('x-csrf-token', admin.csrf)
+      .field('title', 'Scanned ID')
+      .field('doc_type', 'identification')
+      .attach('file', png, 'id.png')).body.data
+    const res = await admin.agent.post('/api/v1/share-links').set('x-csrf-token', admin.csrf)
+      .send({ resource_type: 'client_document', resource_id: doc.id, client_id: adminClient.id })
+    expect(res.status).toBe(409)
+    expect(res.body.error.code).toBe('NOT_PDF')
+  })
+
   it('refuses to share a draft report', async () => {
     const draft = (await admin.agent.post('/api/v1/reports').set('x-csrf-token', admin.csrf)
       .send({ client_id: adminClient.id, report_type: 'progress', body_markdown: 'draft', status: 'draft' })).body.data

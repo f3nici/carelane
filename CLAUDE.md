@@ -125,8 +125,10 @@ API docs at `/api/docs`, health at `/healthz`.
   subscription" panel on the Roster page.
 - Client-facing share links (`shareLinkService`, `share_links` table): a
   time-limited, audited, read-only link that lets a plan manager or the
-  participant fetch ONE specific **finalised report** or **completed document**
-  without a CareLane account. Like the calendar feed, the unguessable token in
+  participant fetch ONE specific **finalised report** or **completed PDF
+  document** without a CareLane account. Only PDFs are ever shared — a report
+  renders to PDF and a document must be a PDF (image/other file types are
+  refused). Like the calendar feed, the unguessable token in
   the URL is the only credential, so the public endpoints are served
   **unauthenticated** and OUTSIDE the `/api` session+CSRF stack — `GET /share/:token`
   is a minimal branded landing page (a safe resource title + short participant
@@ -138,7 +140,7 @@ API docs at `/api/docs`, health at `/healthz`.
   participant, carries an `expires_at` (default 14 days) and an optional
   `max_views` cap — `linkState` derives active/expired/revoked/exhausted. Only
   finalised reports are shareable (a draft is never exposed). Reports render their
-  PDF on the fly at fetch time (reflecting edits); documents stream the stored
+  PDF on the fly at fetch time (reflecting edits); PDF documents stream the stored
   file. Creating/listing/revoking links is **admin-only** (`/api/v1/share-links`,
   behind `requireAdmin`) — sharing exposes participant data externally, so a
   worker never does it; links are revoked (soft), never hard-deleted, so the

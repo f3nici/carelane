@@ -84,6 +84,11 @@ function resolveResource (resourceType, resourceId, clientId) {
   if (resourceType === 'client_document') {
     // getClientDocument scopes by client_id, so a mismatch throws 404 here.
     const doc = getClientDocument(clientId, resourceId)
+    // Only PDF documents are shareable — an image or other file type is never
+    // exposed through a public link.
+    if (doc.mime_type !== 'application/pdf') {
+      throw new ApiError(409, 'NOT_PDF', 'Only PDF documents can be shared')
+    }
     return { title: doc.title || 'Document' }
   }
   throw new ApiError(400, 'VALIDATION_ERROR', 'Unknown resource type')
