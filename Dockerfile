@@ -14,6 +14,9 @@ RUN npm run build
 FROM node:22-bookworm-slim
 ENV NODE_ENV=production
 WORKDIR /app
+# gosu lets the entrypoint fix ownership of bind-mounted volumes while running as
+# root, then drop to the unprivileged `node` user for the application process.
+RUN apt-get update && apt-get install -y --no-install-recommends gosu && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/server ./server
@@ -23,8 +26,14 @@ COPY --from=builder /app/packages ./packages
 COPY --from=builder /app/package.json ./
 # version.js is a single-source root module imported at runtime by server/swagger.js.
 COPY --from=builder /app/version.js ./version.js
-RUN mkdir -p /app/data /app/uploads
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN mkdir -p /app/data /app/uploads \
+  && chown -R node:node /app/data /app/uploads \
+  && chmod +x /usr/local/bin/docker-entrypoint.sh
 EXPOSE 3778
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s \
   CMD node -e "fetch('http://localhost:'+(process.env.PORT||3778)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+# The entrypoint fixes volume ownership as root, then execs the app as `node`
+# (the container is therefore unprivileged for all application work).
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["node", "server/index.js"]
