@@ -1,6 +1,6 @@
 {
   "name": "carelane",
-  "version": "0.8.0",
+  "version": "1.0.0",
   "description": "NDIS independent support worker management system",
   "main": "index.js",
   "scripts": {
