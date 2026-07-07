@@ -607,6 +607,13 @@ CREATE INDEX IF NOT EXISTS idx_throttle_hits_first ON throttle_hits (first_at);
   // worker only the ones assigned to them. Rosters are scoped by
   // `scheduled_shifts.worker_id` instead (a worker sees only their own shifts).
   addColumnIfMissing('users', 'active', 'INTEGER NOT NULL DEFAULT 1')
+  // Per-user iCal subscription token (added post-launch). A random, unguessable
+  // token grants read-only access to that user's roster as an .ics feed served
+  // at `/calendar/<token>.ics` — the URL is the credential, so it is never shown
+  // to another user and can be rotated to revoke old subscriptions. NULL until
+  // the user generates one; see calendarFeedService.
+  addColumnIfMissing('users', 'calendar_feed_token', 'TEXT')
+  sqlite.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_calendar_feed_token ON users (calendar_feed_token) WHERE calendar_feed_token IS NOT NULL')
   sqlite.exec(`
 CREATE TABLE IF NOT EXISTS client_assignments (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

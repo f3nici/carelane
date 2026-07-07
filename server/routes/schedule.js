@@ -5,6 +5,7 @@ import { scheduledShiftSchema, recurrenceSchema, scheduleNoteSchema, googleSetti
 import * as scheduleService from '../services/scheduleService.js'
 import * as recurrenceService from '../services/recurrenceService.js'
 import * as googleCalendar from '../services/googleCalendarService.js'
+import * as calendarFeed from '../services/calendarFeedService.js'
 import { requireAdmin } from '../middleware/auth.js'
 import { rateLimit } from '../middleware/rateLimit.js'
 import { updateSettings } from '../services/settingsService.js'
@@ -167,6 +168,35 @@ router.put('/google/settings', validate(googleSettingsSchema), (req, res) => {
   updateSettings(patch)
   logActivity('google_calendar', null, req.session.userId, 'updated', { keys: Object.keys(patch) })
   res.json(ok(googleCalendar.status()))
+})
+
+/* ---- iCal subscription feed (defined before /:id) ---- */
+
+/**
+ * @openapi
+ * /schedule/calendar-feed:
+ *   get: { tags: [Schedule], summary: Get the current user's iCal subscription URL }
+ *   post: { tags: [Schedule], summary: Generate or rotate the iCal feed token }
+ *   delete: { tags: [Schedule], summary: Disable the iCal feed (revoke the token) }
+ */
+
+// Per-user, not operator config: every authenticated user (admin or worker) may
+// subscribe to their OWN roster, so these are not behind requireAdmin. The feed
+// is scoped to the caller by calendarFeedService.
+router.get('/calendar-feed', (req, res) => {
+  res.json(ok(calendarFeed.getFeedStatus(req.currentUser, req)))
+})
+
+router.post('/calendar-feed/rotate', (req, res) => {
+  const status = calendarFeed.rotateToken(req.currentUser, req)
+  logActivity('calendar_feed', req.currentUser.id, req.session.userId, 'rotated')
+  res.json(ok(status))
+})
+
+router.delete('/calendar-feed', (req, res) => {
+  const status = calendarFeed.disableFeed(req.currentUser, req)
+  logActivity('calendar_feed', req.currentUser.id, req.session.userId, 'disabled')
+  res.json(ok(status))
 })
 
 /* ---- Single scheduled shift ---- */

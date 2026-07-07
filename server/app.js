@@ -30,6 +30,7 @@ import templateRoutes from './routes/templates.js'
 import auditRoutes from './routes/audit.js'
 import deletedRoutes from './routes/deleted.js'
 import userRoutes from './routes/users.js'
+import calendarFeedRoutes from './routes/calendarFeed.js'
 
 /**
  * Build the configured Express app (middleware + routes) without binding a
@@ -50,7 +51,10 @@ export function createApp () {
     const start = process.hrtime.bigint()
     res.on('finish', () => {
       const ms = Number(process.hrtime.bigint() - start) / 1e6
-      const fields = { method: req.method, path: req.path, status: res.statusCode, ms: Math.round(ms) }
+      // The iCal feed path embeds a secret token — log a redacted form so the
+      // subscribe URL never lands in the access log.
+      const loggedPath = req.path.startsWith('/calendar/') ? '/calendar/:token.ics' : req.path
+      const fields = { method: req.method, path: loggedPath, status: res.statusCode, ms: Math.round(ms) }
       if (res.statusCode >= 500) logger.error('request', fields)
       else if (res.statusCode >= 400) logger.warn('request', fields)
       else logger.info('request', fields)
@@ -150,6 +154,11 @@ export function createApp () {
   // session/auth stack so a scraper needs no cookie; access is gated by
   // METRICS_TOKEN when set (see metricsHandler).
   if (config.metricsEnabled) app.get('/metrics', metricsHandler(config))
+
+  // Public read-only iCal subscription feed. Mounted before the /api stack so it
+  // needs no session or CSRF token — a calendar client subscribes with a bare
+  // URL whose secret token is the only credential (see routes/calendarFeed.js).
+  app.use('/calendar', calendarFeedRoutes)
 
   const api = express.Router()
   api.use(csrfProtect)

@@ -109,6 +109,20 @@ API docs at `/api/docs`, health at `/healthz`.
   (a protected key). All sync is best-effort and a no-op until configured +
   connected + enabled — shift CRUD never blocks on it. Events carry only a short
   participant label (preferred name/initials) + location, never plan/health notes.
+- Calendar feed (read-only iCal/.ics): `calendarFeedService` exposes each user's
+  roster as a subscribable feed any calendar app (Google/Apple/Outlook) can add.
+  Auth is a per-user secret token (`users.calendar_feed_token`, unique) carried in
+  the URL — the feed is served **unauthenticated** at `GET /calendar/:token.ics`,
+  mounted before the `/api` session+CSRF stack (a calendar client sends no cookie;
+  the token *is* the credential). The token is generated/rotated/cleared via
+  `/schedule/calendar-feed` (any authenticated user, not admin-only — a worker
+  subscribes to their own roster); rotating revokes old links. The feed is scoped
+  exactly like the roster list (admin → all shifts, worker → own via `worker_id`),
+  windowed to a bounded past/future range, excludes cancelled/deleted shifts, and
+  — like the Google push — carries only a short participant label + location +
+  times, never plan/health notes. The secret path is redacted from the access log
+  (and never appears in metrics, which are path-free). UI: a "Calendar
+  subscription" panel on the Roster page.
 - Square Invoicing (optional): `squareService` turns a completed shift note into a
   **draft** invoice in the operator's Square account (never sent — sending it is a
   manual step in Square). The access token is a secret read from env
