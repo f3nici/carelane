@@ -8,7 +8,7 @@ let rerankerPromise = null
  */
 function getReranker () {
   if (!rerankerPromise) {
-    rerankerPromise = import('@xenova/transformers').then(async ({ AutoTokenizer, AutoModelForSequenceClassification }) => {
+    rerankerPromise = import('@huggingface/transformers').then(async ({ AutoTokenizer, AutoModelForSequenceClassification }) => {
       const [tokenizer, model] = await Promise.all([
         AutoTokenizer.from_pretrained(config.rerankerModel),
         AutoModelForSequenceClassification.from_pretrained(config.rerankerModel)
