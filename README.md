@@ -41,8 +41,9 @@ encrypted at rest.
 - **Backups** — scheduled SQLite backups with retention, integrity verification,
   a stale-backup startup warning, and an offline restore CLI (`npm run restore`).
 - **Scheduling / roster** — forward-looking shift plan (one-off or recurring
-  series materialised on a rolling horizon), clock in/out lifecycle, and an
-  optional one-way push of shifts to Google Calendar.
+  series materialised on a rolling horizon), clock in/out lifecycle, an optional
+  one-way push of shifts to Google Calendar, and a read-only iCal (`.ics`) feed
+  each user can subscribe to from any calendar app.
 - **Square invoicing (optional)** — turn a completed shift note into a *draft*
   invoice in your Square account (sending stays a manual step in Square).
 - **Push notifications (optional)** — proactive [ntfy](https://ntfy.sh) nudges to
