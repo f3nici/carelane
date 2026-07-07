@@ -1,6 +1,6 @@
 {
   "name": "@carelane/core",
-  "version": "0.8.0",
+  "version": "1.0.0",
   "description": "CareLane portable domain logic — runs unmodified in Node (server) and React Native (app)",
   "type": "module",
   "main": "./src/index.js",
