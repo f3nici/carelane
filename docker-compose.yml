@@ -11,10 +11,6 @@ services:
       ENCRYPTION_SECRET: ${ENCRYPTION_SECRET:?set ENCRYPTION_SECRET in .env}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       DEFAULT_USERNAME: ${DEFAULT_USERNAME:-admin}
-      # Required (like the two secrets above): the app refuses to start in
-      # production with an unset or 'changeme' password, so fail fast here with a
-      # clear message instead of booting into that refusal. Keep it set to your
-      # chosen value even after rotating the password in-app, or restarts fail.
       DEFAULT_PASSWORD: ${DEFAULT_PASSWORD:?set DEFAULT_PASSWORD in .env}
       BACKUP_ENABLED: ${BACKUP_ENABLED:-true}
       BACKUP_RETENTION: ${BACKUP_RETENTION:-14}
