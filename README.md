@@ -286,10 +286,6 @@ Key design points:
 See [`CLAUDE.md`](CLAUDE.md) for the full development guide, hard rules and code
 style conventions.
 
-## Roadmap
-
-Planned work is tracked in the [Roadmap issue (#7)](https://github.com/f3nici/carelane/issues/7).
-
 ## Data & privacy
 
 This application stores sensitive health information. Operators are responsible
