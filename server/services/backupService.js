@@ -6,6 +6,7 @@ import Database from 'better-sqlite3'
 import cron from 'node-cron'
 import { sqlite } from '../db/connection.js'
 import { logActivity } from './activityService.js'
+import { logger } from './logger.js'
 import config from '../config.js'
 
 const execFileAsync = promisify(execFile)
@@ -29,7 +30,7 @@ export async function runBackup () {
       await execFileAsync('tar', ['-cf', uploadsFile, '-C', path.dirname(path.resolve(config.uploadPath)), path.basename(config.uploadPath)])
     } catch (err) {
       uploadsFile = null
-      console.error('uploads backup failed:', err.message)
+      logger.error('uploads backup failed', { error: err.message })
     }
   }
   applyRetention()
@@ -112,7 +113,7 @@ export function warnIfBackupsStale () {
   const msg = f.count === 0
     ? 'No database backups found yet — the first nightly backup has not run.'
     : `Latest database backup is ${f.age_hours}h old (threshold ${config.backupStaleHours}h).`
-  console.warn(`⚠️  BACKUP WARNING: ${msg}`)
+  logger.warn(`backup warning: ${msg}`, { age_hours: f.age_hours, count: f.count })
   logActivity('backup', null, null, 'stale_warning', { age_hours: f.age_hours, count: f.count })
 }
 
@@ -134,9 +135,9 @@ export function scheduleBackups () {
   const [hh, mm] = config.backupTime.split(':').map(Number)
   cron.schedule(`${mm || 0} ${hh || 2} * * *`, () => {
     runBackup().catch(err => {
-      console.error('nightly backup failed:', err)
+      logger.error('nightly backup failed', { error: err.message })
       logActivity('backup', null, null, 'failed', { error: err.message?.slice(0, 100) })
     })
   })
-  console.log(`nightly backups scheduled at ${config.backupTime}, retention ${config.backupRetention} days`)
+  logger.info('nightly backups scheduled', { time: config.backupTime, retention_days: config.backupRetention })
 }
