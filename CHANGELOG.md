@@ -10,9 +10,9 @@ release page:
 Pull a specific version by its tag — e.g.:
 
 ```bash
-git checkout 0.6.3                      # from source
-docker pull <your-dockerhub-user>/carelane:0.6.3   # or the published image
+git checkout 1.0.0                      # from source
+docker pull <your-dockerhub-user>/carelane:1.0.0   # or the published image
 ```
 
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html);
-tags are the bare version number (e.g. `0.6.3`, no `v` prefix).
+tags are the bare version number (e.g. `1.0.0`, no `v` prefix).

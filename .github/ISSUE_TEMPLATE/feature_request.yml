@@ -1,0 +1,77 @@
+name: "✨ Feature request"
+description: Suggest a new capability or an improvement to an existing one.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement to CareLane.
+
+        Bigger-picture planned work is tracked on the
+        [Roadmap issue (#7)](https://github.com/f3nici/carelane/issues/7) — it's
+        worth a look before filing, in case your idea is already planned.
+
+        > CareLane is **self-hosted, single-operator** software for an
+        > independent NDIS support worker — not multi-tenant SaaS. Requests are
+        > weighed against that scope.
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Before you file
+      options:
+        - label: I searched [existing issues](https://github.com/f3nici/carelane/issues) and the [Roadmap (#7)](https://github.com/f3nici/carelane/issues/7) and this is not already requested.
+          required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: The motivation. What are you trying to do today, and where does CareLane get in the way?
+      placeholder: |
+        As a support worker, when I ... I currently have to ...
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: What would you like CareLane to do? Describe the behaviour, not necessarily the implementation.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which area does this touch?
+      options:
+        - Participants / clients
+        - Service agreements
+        - Shift notes
+        - Incident reports
+        - Restrictive-practice / medication logs
+        - Billing / invoicing
+        - Reports
+        - Knowledge base (RAG) / AI drafting
+        - Scheduling / roster / calendar
+        - Notifications (ntfy)
+        - Team & access control
+        - Backups / data export
+        - Settings / integrations
+        - Security / login / audit
+        - Deployment / Docker / docs
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any workarounds you're using now, or other approaches you thought about.
+    validations:
+      required: false
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Mockups, examples from other tools, relevant NDIS requirements, etc.
+    validations:
+      required: false

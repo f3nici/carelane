@@ -1,0 +1,93 @@
+name: "🐞 Bug report"
+description: Report something in CareLane that is broken or not working as documented.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug.
+
+        > ⚠️ **Do not include any participant data or other PII.** CareLane holds
+        > sensitive health information. Redact names, NDIS numbers, addresses,
+        > note bodies and anything else identifying before pasting screenshots,
+        > logs or examples.
+        >
+        > 🔒 **Found a security vulnerability?** Do **not** file it here — report
+        > it privately per [`SECURITY.md`](https://github.com/f3nici/carelane/security/policy).
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Before you file
+      options:
+        - label: I searched [existing issues](https://github.com/f3nici/carelane/issues) and this is not a duplicate.
+          required: true
+        - label: This is a bug, not a security vulnerability (those go through [`SECURITY.md`](https://github.com/f3nici/carelane/security/policy)).
+          required: true
+        - label: I have removed all participant data / PII from anything I paste below.
+          required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug and what you expected to happen instead.
+      placeholder: |
+        When I finalise a shift note, ...
+        I expected ... but instead ...
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The exact steps someone else can follow to see the bug.
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. See error
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: CareLane version
+      description: Shown in the app sidebar and at `/api/docs`. If running from source, include the commit if you can.
+      placeholder: "1.0.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: How are you running CareLane?
+      options:
+        - Docker Compose (published image)
+        - Docker (published image, manual run)
+        - Docker (self-built image)
+        - From source (npm)
+        - Public demo (carelane.feni.ci)
+        - Other (describe below)
+    validations:
+      required: true
+  - type: input
+    id: runtime
+    attributes:
+      label: Environment
+      description: Host OS, and Node.js version if running from source. Browser + version if it's a UI bug.
+      placeholder: "e.g. Ubuntu 24.04, Node 22, Firefox 128"
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs or errors
+      description: Server logs, browser console errors, or screenshots. Remember to redact any PII.
+      render: shell
+    validations:
+      required: false
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Any other context that might help — recent changes, config, integrations enabled, etc.
+    validations:
+      required: false
