@@ -12,8 +12,10 @@ let embedderPromise = null
  */
 function getEmbedder () {
   if (!embedderPromise) {
-    embedderPromise = import('@xenova/transformers').then(async ({ pipeline }) =>
-      pipeline('feature-extraction', config.embeddingModel))
+    embedderPromise = import('@huggingface/transformers').then(async ({ env, pipeline }) => {
+      env.cacheDir = config.modelCachePath
+      return pipeline('feature-extraction', config.embeddingModel)
+    })
   }
   return embedderPromise
 }
