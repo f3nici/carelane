@@ -80,11 +80,11 @@ router.post('/', validate(clientSchema), (req, res) => {
  *   get: { tags: [Clients], summary: List the support workers assigned to a participant (admin) }
  *   put: { tags: [Clients], summary: Replace the support workers assigned to a participant (admin) }
  */
-router.get('/:id/workers', (req, res) => {
+router.get('/:id/workers', requireAdmin, (req, res) => {
   res.json(ok(accessService.listClientWorkers(Number(req.params.id))))
 })
 
-router.put('/:id/workers', validate(clientWorkersSchema), (req, res) => {
+router.put('/:id/workers', requireAdmin, validate(clientWorkersSchema), (req, res) => {
   const workers = accessService.setClientWorkers(Number(req.params.id), req.body.user_ids, req.session.userId)
   logActivity('client', Number(req.params.id), req.session.userId, 'workers_updated', { count: workers.length })
   res.json(ok(workers))

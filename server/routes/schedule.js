@@ -6,6 +6,7 @@ import * as scheduleService from '../services/scheduleService.js'
 import * as recurrenceService from '../services/recurrenceService.js'
 import * as googleCalendar from '../services/googleCalendarService.js'
 import * as calendarFeed from '../services/calendarFeedService.js'
+import * as accessService from '../services/accessService.js'
 import { requireAdmin } from '../middleware/auth.js'
 import { rateLimit } from '../middleware/rateLimit.js'
 import { updateSettings } from '../services/settingsService.js'
@@ -17,6 +18,22 @@ const router = Router()
 const id = req => Number(req.params.id)
 // Cap on-demand outbound calls to Google so they can't be hammered.
 const outboundLimiter = rateLimit({ name: 'google-out', max: 15, windowMs: 60 * 1000 })
+
+/**
+ * Rostering a worker to a participant's shift implies they may see that
+ * participant's record — otherwise they could create a clock-out note they then
+ * can't read back. Ensure the assignment exists (no-op for admins / existing
+ * grants) and log it when a new grant is created so the access change is audited.
+ * @param {number} workerId
+ * @param {number} clientId
+ * @param {number} actingUserId
+ */
+function ensureRosterAccess (workerId, clientId, actingUserId) {
+  if (!workerId || !clientId) return
+  if (accessService.grantClientAccess(workerId, clientId, actingUserId)) {
+    logActivity('user', workerId, actingUserId, 'assignment_auto_granted', { client_id: clientId, reason: 'rostered_shift' })
+  }
+}
 
 // Roster access control:
 //  - Recurring series and the Google Calendar connection are operator config —
@@ -52,6 +69,7 @@ router.get('/', (req, res) => {
 // Only an admin rosters shifts (and assigns them to a worker).
 router.post('/', requireAdmin, validate(scheduledShiftSchema), (req, res) => {
   const shift = scheduleService.createScheduled(req.body, req.session.userId)
+  ensureRosterAccess(shift.worker_id, shift.client_id, req.session.userId)
   logActivity('scheduled_shift', shift.id, req.session.userId, 'created', { date: shift.scheduled_date, worker_id: shift.worker_id })
   res.status(201).json(ok(shift))
 })
@@ -79,6 +97,7 @@ router.get('/recurrences', (req, res) => {
 
 router.post('/recurrences', validate(recurrenceSchema), (req, res) => {
   const rec = recurrenceService.createRecurrence(req.body, req.session.userId)
+  ensureRosterAccess(rec.worker_id, rec.client_id, req.session.userId)
   logActivity('shift_recurrence', rec.id, req.session.userId, 'created', { frequency: rec.frequency })
   res.status(201).json(ok(rec))
 })

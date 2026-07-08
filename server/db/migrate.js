@@ -1,4 +1,5 @@
 import { sqlite } from './connection.js'
+import { encrypt, encryptionSecretMatches } from '../services/cryptoService.js'
 import { backfillAuditHashes } from '../services/activityService.js'
 import { reindexSearch as reindexShiftSearch } from '../services/shiftService.js'
 
@@ -29,6 +30,44 @@ function dropColumnIfExists (table, column) {
   const cols = sqlite.prepare(`PRAGMA table_info(${table})`).all()
   if (!cols.some(c => c.name === column)) return
   sqlite.exec(`ALTER TABLE ${table} DROP COLUMN ${column}`)
+}
+
+// Columns promoted to at-rest encryption post-launch. Existing rows hold plain
+// text, so back-fill them: any value not already an `enc:` ciphertext is
+// re-encrypted in place. Table + column names are internal constants (never user
+// input); the value is bound. Runs in every `migrate()` and is idempotent — once
+// every row is sealed the guarded SELECT matches nothing.
+const ENCRYPT_BACKFILL = [
+  { table: 'clients', columns: ['primary_disability', 'communication_needs', 'support_goals'] },
+  { table: 'reports', columns: ['body_markdown'] },
+  { table: 'service_agreements', columns: ['supports_summary', 'body_markdown'] }
+]
+
+/**
+ * Re-encrypt any legacy plaintext in the newly-encrypted columns. A no-op once
+ * every value carries the `enc:` prefix. Assumes the ENCRYPTION_SECRET is the one
+ * existing ciphertext was written with (the same assumption `reindexSearch` and
+ * the boot canary already rely on); it only encrypts plaintext, never decrypts,
+ * so it cannot corrupt data if run before the canary check.
+ */
+function encryptLegacyPlaintextColumns () {
+  // Never write fresh ciphertext under a wrong secret: if a canary already exists
+  // and no longer matches, skip and let the boot canary abort startup cleanly.
+  // (On first run there is no canary yet and no legacy ciphertext to mismatch.)
+  if (!encryptionSecretMatches()) return
+  const tx = sqlite.transaction(() => {
+    for (const { table, columns } of ENCRYPT_BACKFILL) {
+      for (const col of columns) {
+        const rows = sqlite.prepare(
+          `SELECT id, ${col} AS v FROM ${table} WHERE ${col} IS NOT NULL AND ${col} != '' AND ${col} NOT LIKE 'enc:%'`
+        ).all()
+        if (!rows.length) continue
+        const upd = sqlite.prepare(`UPDATE ${table} SET ${col} = ? WHERE id = ?`)
+        for (const r of rows) upd.run(encrypt(r.v), r.id)
+      }
+    }
+  })
+  tx()
 }
 
 /**
@@ -669,6 +708,10 @@ CREATE INDEX IF NOT EXISTS idx_share_links_client ON share_links (client_id);
   // note missing a row (all of them on first run) and is a no-op once in sync.
   sqlite.exec('CREATE VIRTUAL TABLE IF NOT EXISTS shift_notes_fts USING fts5(tokens)')
   reindexShiftSearch()
+
+  // Seal any legacy plaintext in columns promoted to at-rest encryption
+  // (client health fields, report + agreement bodies). Idempotent.
+  encryptLegacyPlaintextColumns()
 }
 
 /**

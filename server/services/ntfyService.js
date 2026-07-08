@@ -1,4 +1,5 @@
 import cron from 'node-cron'
+import { isPublicHttpUrl } from '@carelane/core'
 import { sqlite } from '../db/connection.js'
 import config from '../config.js'
 import { getSetting, updateSettings } from './settingsService.js'
@@ -192,6 +193,14 @@ export async function publish ({ title, message, tags, priority, click } = {}) {
   const topic = String(setting('ntfy_topic') || '').trim()
   if (!topic) return { ok: false, error: 'No ntfy topic configured' }
   const base = String(setting('ntfy_server_url') || NTFY_DEFAULTS.ntfy_server_url).replace(/\/+$/, '')
+  // Defence in depth: the settings write already rejects a non-public URL, but a
+  // value persisted before that guard existed must not be used to reach the
+  // host's own network / a metadata endpoint (SSRF).
+  if (!isPublicHttpUrl(base)) {
+    const msg = 'ntfy server URL is not a permitted public http(s) address'
+    recordError(msg)
+    return { ok: false, error: msg }
+  }
   const url = `${base}/${encodeURIComponent(topic)}`
 
   const controller = new AbortController()

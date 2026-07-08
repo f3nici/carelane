@@ -9,15 +9,29 @@ import { applyClientScope } from '../utils/sql.js'
 export function createReportService (ctx, services) {
   const { sqlite } = ctx
   const { clientDisplayName } = services.client
+  const { encrypt, decrypt } = services.crypto
 
   const COLUMNS = ['client_id', 'report_type', 'period_start', 'period_end', 'body_markdown', 'source_shift_ids', 'status']
+  // The report body aggregates the same health narrative as the (encrypted)
+  // shift notes it is drafted from, so it is encrypted at rest too.
+  const ENCRYPTED = ['body_markdown']
 
   const now = () => new Date(ctx.now()).toISOString()
 
+  /** Decrypt the encrypted columns of a report row (returns a shallow copy). */
+  function toReport (row) {
+    if (!row) return row
+    const out = { ...row }
+    for (const f of ENCRYPTED) if (f in out) out[f] = decrypt(out[f])
+    return out
+  }
+
   /**
-   * Add `client_display_name` to a list row and drop the raw joined name columns.
+   * Add `client_display_name` to a (decrypted) list row and drop the raw joined
+   * name columns.
    */
   function toListRow (row) {
+    row = toReport(row)
     row.client_display_name = clientDisplayName(row)
     delete row.client_first_name
     delete row.client_last_name
@@ -56,7 +70,7 @@ export function createReportService (ctx, services) {
   function getReport (id) {
     const row = sqlite.prepare('SELECT * FROM reports WHERE id = ? AND deleted_at IS NULL').get(id)
     if (!row) throw new ApiError(404, 'NOT_FOUND', 'Report not found')
-    return row
+    return toReport(row)
   }
 
   /**
@@ -67,6 +81,7 @@ export function createReportService (ctx, services) {
     const ts = now()
     const values = COLUMNS.map(c => {
       if (c === 'source_shift_ids') return data.source_shift_ids ? JSON.stringify(data.source_shift_ids) : null
+      if (ENCRYPTED.includes(c)) return encrypt(data[c] ?? null)
       return data[c] ?? null
     })
     const cols = [...COLUMNS, 'created_at', 'updated_at']
@@ -92,7 +107,7 @@ export function createReportService (ctx, services) {
       sets.push(`${col} = ?`)
       params.push(col === 'source_shift_ids'
         ? (data.source_shift_ids ? JSON.stringify(data.source_shift_ids) : null)
-        : (data[col] ?? null))
+        : ENCRYPTED.includes(col) ? encrypt(data[col] ?? null) : (data[col] ?? null))
     }
     if (!sets.length) return existing
     sets.push('updated_at = ?')

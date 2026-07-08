@@ -45,7 +45,11 @@ encrypted at rest.
   one-way push of shifts to Google Calendar, and a read-only iCal (`.ics`) feed
   each user can subscribe to from any calendar app.
 - **Square invoicing (optional)** — turn a completed shift note into a *draft*
-  invoice in your Square account (sending stays a manual step in Square).
+  invoice in your Square account (sending stays a manual step in Square). Unlike
+  the other integrations, enabling this sends the participant's **name, email and
+  phone** to Square (Block, Inc.) to create the invoice recipient — invoicing
+  needs a real addressee, so these fields are not minimised. Leave it off if you
+  don't want participant contact details leaving your host.
 - **Push notifications (optional)** — proactive [ntfy](https://ntfy.sh) nudges to
   your phone for plan reviews due, incidents needing follow-up, unbilled shifts
   aging, and a reminder before each upcoming shift. Set the topic, toggles and
@@ -301,15 +305,17 @@ for:
 CareLane runs fully self-hosted, but several **optional** features call out to
 third-party services. Each is disabled until you configure it. When you enable
 one, you are using that provider under **their** terms — review them before
-sending any data, and remember CareLane only ever sends minimised inputs (see
-[Data & privacy](#data--privacy)):
+sending any data. CareLane minimises what it sends (initials/short labels, top-k
+excerpts — see [Data & privacy](#data--privacy)), with **one exception**: Square
+invoicing sends the participant's name, email and phone, because an invoice needs
+a real recipient (called out in the table below):
 
 | Service | Used for | Required? | Terms / policies |
 |---------|----------|-----------|------------------|
 | **Anthropic (Claude API)** | AI drafting of agreements, reports, note cleanup and Q&A | Optional (no AI features without `ANTHROPIC_API_KEY`) | [Commercial Terms](https://www.anthropic.com/legal/commercial-terms) · [Usage Policy](https://www.anthropic.com/legal/aup) · [Privacy Policy](https://www.anthropic.com/legal/privacy) |
 | **Hugging Face** | Downloading the local embedding & reranker models (`@xenova/transformers`) on first run | Effectively required for the knowledge base (models cached locally after download; inference runs on your own machine) | [Terms of Service](https://huggingface.co/terms-of-service) · [Privacy Policy](https://huggingface.co/privacy) |
 | **Google Calendar** | One-way push of scheduled shifts to your calendar | Optional ([setup guide](docs/google-calendar-setup.md)) | [Google Terms of Service](https://policies.google.com/terms) · [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy) · [Privacy Policy](https://policies.google.com/privacy) |
-| **Square** | Creating draft invoices from completed shifts | Optional ([setup guide](docs/square-invoicing-setup.md)) | [Developer Terms of Service](https://developer.squareup.com/us/en/terms) · [General Terms](https://squareup.com/au/en/legal/general/ua) · [Privacy Notice](https://squareup.com/au/en/legal/general/privacy) |
+| **Square** | Creating draft invoices from completed shifts. **Sends the participant's name, email and phone** to Square as the invoice recipient (not minimised — invoicing needs a real addressee) | Optional ([setup guide](docs/square-invoicing-setup.md)) | [Developer Terms of Service](https://developer.squareup.com/us/en/terms) · [General Terms](https://squareup.com/au/en/legal/general/ua) · [Privacy Notice](https://squareup.com/au/en/legal/general/privacy) |
 | **ntfy** | Push notifications for plan reviews, incident follow-ups, unbilled shifts and shift reminders | Optional ([setup guide](docs/ntfy-notifications-setup.md)); defaults to the public `ntfy.sh`, or point at your own server | [Terms / Privacy](https://ntfy.sh/) |
 | **Docker Hub** | Pulling/publishing the container image (deployment only) | Optional (only if you use the published image) | [Terms of Service](https://www.docker.com/legal/docker-terms-service/) · [Privacy Policy](https://www.docker.com/legal/docker-privacy-policy/) |
 
