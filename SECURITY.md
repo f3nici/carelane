@@ -5,9 +5,9 @@ reports are taken seriously and are very welcome.
 
 ## Supported versions
 
-CareLane is pre-1.0 and ships from `main`. Security fixes are applied to the
-latest release and the `main` branch only. Older tagged versions are not
-back-patched — self-hosters should track the latest release.
+Security fixes are applied to the latest release and the `main` branch only. 
+Older tagged versions are notback-patched — self-hosters should track the 
+latest release.
 
 | Version | Supported          |
 |---------|--------------------|
@@ -57,7 +57,7 @@ Out of scope:
 - Findings that require an already-compromised host or operator credentials.
 - Misconfiguration of a self-hosted instance (e.g. a weak `ENCRYPTION_SECRET`,
   exposing the database file, or running without TLS) — see the hardening notes
-  in [`README.md`](README.md) and [`CLAUDE.md`](CLAUDE.md).
+  in [`README.md`](README.md)
 
 ## Operator responsibilities
 
@@ -67,5 +67,4 @@ Because CareLane is self-hosted, the operator owns the runtime security posture:
   (`ENCRYPTION_SECRET` cannot be rotated without making existing data unreadable).
 - Serve the app over TLS and restrict network access to trusted users.
 - Secure the host, the SQLite database file, and the `uploads/` directory.
-- Verify scheduled backups and keep dependencies up to date (Dependabot is
-  enabled to help — see [`.github/dependabot.yml`](.github/dependabot.yml)).
+- Verify scheduled backups and keep dependencies up to date.
