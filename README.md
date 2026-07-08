@@ -140,7 +140,7 @@ docker compose up -d
 ```
 
 > The compose file pins `f3nici/carelane:latest`. For a reproducible deployment,
-> pin a specific version tag instead (e.g. `image: f3nici/carelane:0.5.2`) — see
+> pin a specific version tag instead (e.g. `image: f3nici/carelane:1.0.0`) — see
 > [Releases](https://github.com/f3nici/carelane/releases).
 
 ## Running from source (development)
@@ -330,9 +330,9 @@ Found a vulnerability? Please report it privately — see
 
 Releases are tracked on
 [GitHub Releases](https://github.com/f3nici/carelane/releases), each with a
-version tag you can pull (e.g. `git checkout 0.5.2`) and auto-generated notes.
-See [`CHANGELOG.md`](CHANGELOG.md) for unreleased changes and where to find the
-full history.
+version tag you can pull (e.g. `git checkout 1.0.0`) and auto-generated notes.
+See [`CHANGELOG.md`](CHANGELOG.md) for how releases are versioned and where to
+find the full history.
 
 ## License
 
