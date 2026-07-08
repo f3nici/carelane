@@ -8,10 +8,6 @@ body:
       value: |
         Thanks for suggesting an improvement to CareLane.
 
-        Bigger-picture planned work is tracked on the
-        [Roadmap issue (#7)](https://github.com/f3nici/carelane/issues/7) — it's
-        worth a look before filing, in case your idea is already planned.
-
         > CareLane is **self-hosted, single-operator** software for an
         > independent NDIS support worker — not multi-tenant SaaS. Requests are
         > weighed against that scope.
