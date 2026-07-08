@@ -39,6 +39,11 @@ const config = {
   // cannot load (e.g. offline first run) — results fall back to the fused order.
   rerankEnabled: (env.RERANK_ENABLED || 'true') === 'true',
   rerankerModel: env.RERANKER_MODEL || 'Xenova/ms-marco-MiniLM-L-6-v2',
+  // Where transformers.js caches the downloaded embedding/reranker models. It
+  // defaults inside node_modules, which the non-root container user cannot write
+  // to; point it under the (writable, bind-mounted) data dir instead so the
+  // cache also persists across restarts rather than re-downloading each deploy.
+  modelCachePath: env.MODEL_CACHE_PATH || './data/models',
   defaultPriceRegion: env.DEFAULT_PRICE_REGION || 'standard',
   backupEnabled: (env.BACKUP_ENABLED || 'true') === 'true',
   backupPath: env.BACKUP_PATH || './data/backups',

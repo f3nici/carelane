@@ -8,7 +8,8 @@ let rerankerPromise = null
  */
 function getReranker () {
   if (!rerankerPromise) {
-    rerankerPromise = import('@huggingface/transformers').then(async ({ AutoTokenizer, AutoModelForSequenceClassification }) => {
+    rerankerPromise = import('@huggingface/transformers').then(async ({ env, AutoTokenizer, AutoModelForSequenceClassification }) => {
+      env.cacheDir = config.modelCachePath
       const [tokenizer, model] = await Promise.all([
         AutoTokenizer.from_pretrained(config.rerankerModel),
         AutoModelForSequenceClassification.from_pretrained(config.rerankerModel)
