@@ -3,9 +3,6 @@ contact_links:
   - name: 🔒 Report a security vulnerability
     url: https://github.com/f3nici/carelane/security/advisories/new
     about: Do NOT open a public issue for security problems. Report privately via a GitHub Security Advisory (see SECURITY.md).
-  - name: 🗺️ Roadmap & planned work
-    url: https://github.com/f3nici/carelane/issues/7
-    about: Check what's already planned before filing a feature request.
   - name: 🔎 Try the live demo
     url: https://carelane.feni.ci
     about: Explore CareLane with example data (sign in with demo / demo) before reporting a UI issue.
