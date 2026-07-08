@@ -16,7 +16,7 @@ body:
     attributes:
       label: Before you file
       options:
-        - label: I searched [existing issues](https://github.com/f3nici/carelane/issues) and the [Roadmap (#7)](https://github.com/f3nici/carelane/issues/7) and this is not already requested.
+        - label: I searched [existing issues](https://github.com/f3nici/carelane/issues) and this is not already requested.
           required: true
   - type: textarea
     id: problem
