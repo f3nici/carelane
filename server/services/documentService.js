@@ -4,6 +4,7 @@ import { PDFParse } from 'pdf-parse'
 import { sqlite } from '../db/connection.js'
 import { ApiError } from '../middleware/errorHandler.js'
 import { indexDocument } from './ragService.js'
+import { logger } from './logger.js'
 import config from '../config.js'
 
 const now = () => new Date().toISOString()
@@ -53,7 +54,7 @@ export function createDocument (file, meta) {
     VALUES (?, ?, ?, ?, 0, ?)`)
     .run(meta.title || file.originalname, meta.category || 'guideline', file.filename, file.originalname, now())
   const id = result.lastInsertRowid
-  reindexDocument(id).catch(err => console.error(`indexing document ${id} failed:`, err.message))
+  reindexDocument(id).catch(err => logger.error('document indexing failed', { document_id: id, error: err.message }))
   return getDocument(id)
 }
 

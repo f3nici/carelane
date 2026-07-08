@@ -3,6 +3,7 @@
 // wrapper stays server-side.
 import cron from 'node-cron'
 import { services } from './_core.js'
+import { logger } from './logger.js'
 
 export const {
   occurrenceDates,
@@ -21,8 +22,8 @@ export const {
  * with node-cron here rather than in `@carelane/core`.
  */
 export function scheduleMaterialisation () {
-  try { materialiseDueOccurrences() } catch (err) { console.error('occurrence materialisation failed:', err) }
+  try { materialiseDueOccurrences() } catch (err) { logger.error('occurrence materialisation failed', { error: err.message }) }
   cron.schedule('30 0 * * *', () => {
-    try { materialiseDueOccurrences() } catch (err) { console.error('nightly occurrence materialisation failed:', err) }
+    try { materialiseDueOccurrences() } catch (err) { logger.error('nightly occurrence materialisation failed', { error: err.message }) }
   })
 }

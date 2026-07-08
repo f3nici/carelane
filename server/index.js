@@ -18,8 +18,10 @@ seed()
 // Refuse to start if ENCRYPTION_SECRET no longer matches existing ciphertext.
 try {
   const { created } = assertEncryptionCanary()
-  if (created) console.log('encryption canary sealed (first run)')
+  if (created) logger.info('encryption canary sealed (first run)')
 } catch (err) {
+  // Fatal pre-listen abort: print unconditionally (mirrors the secrets check in
+  // config.js) so it surfaces even if logging is misconfigured, then exit.
   console.error('Refusing to start:\n  - ' + err.message)
   process.exit(1)
 }

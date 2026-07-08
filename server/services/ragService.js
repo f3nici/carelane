@@ -1,6 +1,7 @@
 import { sqlite, vecAvailable } from '../db/connection.js'
 import { scorePassages } from './rerankService.js'
 import { escapeLike } from '../utils/sql.js'
+import { logger } from './logger.js'
 import config from '../config.js'
 
 let embedderPromise = null
@@ -209,7 +210,7 @@ export async function searchChunks (query, k = 5) {
       ordered = withScore.map(w => w.row)
       rerankScores = new Map(withScore.map(w => [w.row.id, 1 / (1 + Math.exp(-w.score))]))
     } catch (err) {
-      console.warn('reranker unavailable, using fused order:', err.message)
+      logger.warn('reranker unavailable, using fused order', { error: err.message })
     }
   }
 
@@ -254,7 +255,7 @@ export function checkEmbeddingModel () {
   const stale = sqlite.prepare(`SELECT COUNT(*) AS c FROM documents
     WHERE indexed = 1 AND (embedding_model IS NULL OR embedding_model <> ?)`).get(config.embeddingModel).c
   if (stale > 0) {
-    console.warn(`${stale} knowledge-base document(s) were embedded with a different model than ` +
-      `${config.embeddingModel}. Run "npm run reindex" (or re-index them in the UI) to refresh.`)
+    logger.warn(`${stale} knowledge-base document(s) were embedded with a different model than ` +
+      `${config.embeddingModel}. Run "npm run reindex" (or re-index them in the UI) to refresh.`, { stale, model: config.embeddingModel })
   }
 }
