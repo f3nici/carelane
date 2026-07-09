@@ -9,11 +9,25 @@ import { applyClientScope } from '../utils/sql.js'
 export function createAgreementService (ctx, services) {
   const { sqlite } = ctx
   const { clientDisplayName } = services.client
+  const { encrypt, decrypt } = services.crypto
 
   const COLUMNS = ['client_id', 'title', 'status', 'start_date', 'end_date', 'review_date',
     'supports_summary', 'hourly_rate', 'total_budget', 'questionnaire_json', 'body_markdown']
+  // The supports summary and the drafted agreement body carry participant health
+  // and support detail, so they are encrypted at rest like shift/report bodies.
+  // (questionnaire_json stays plain — it is structured intake answers the drafter
+  // reads directly; encrypting it is a separate, larger change.)
+  const ENCRYPTED = ['supports_summary', 'body_markdown']
 
   const now = () => new Date(ctx.now()).toISOString()
+
+  /** Decrypt the encrypted columns of an agreement row (returns a shallow copy). */
+  function toAgreement (row) {
+    if (!row) return row
+    const out = { ...row }
+    for (const f of ENCRYPTED) if (f in out) out[f] = decrypt(out[f])
+    return out
+  }
 
   /**
    * The date that makes an active agreement "due for attention" within a window:
@@ -42,6 +56,7 @@ export function createAgreementService (ctx, services) {
    * Add `client_display_name` to a list row and drop the raw joined name columns.
    */
   function toListRow (row) {
+    row = toAgreement(row)
     row.client_display_name = clientDisplayName(row)
     delete row.client_first_name
     delete row.client_last_name
@@ -78,8 +93,9 @@ export function createAgreementService (ctx, services) {
    * @param {number} id
    */
   function getAgreement (id) {
-    const row = sqlite.prepare('SELECT * FROM service_agreements WHERE id = ? AND deleted_at IS NULL').get(id)
-    if (!row) throw new ApiError(404, 'NOT_FOUND', 'Agreement not found')
+    const raw = sqlite.prepare('SELECT * FROM service_agreements WHERE id = ? AND deleted_at IS NULL').get(id)
+    if (!raw) throw new ApiError(404, 'NOT_FOUND', 'Agreement not found')
+    const row = toAgreement(raw)
     row.line_items = sqlite.prepare(`SELECT li.*, bc.code, bc.name AS code_name, bc.unit
       FROM agreement_line_items li LEFT JOIN billing_codes bc ON bc.id = li.billing_code_id
       WHERE li.agreement_id = ?`).all(id)
@@ -110,7 +126,11 @@ export function createAgreementService (ctx, services) {
    */
   function createAgreement (data) {
     const ts = now()
-    const values = COLUMNS.map(c => c === 'questionnaire_json' ? serialiseQuestionnaire(data) : (data[c] ?? null))
+    const values = COLUMNS.map(c => {
+      if (c === 'questionnaire_json') return serialiseQuestionnaire(data)
+      if (ENCRYPTED.includes(c)) return encrypt(data[c] ?? null)
+      return data[c] ?? null
+    })
     const cols = [...COLUMNS, 'created_at', 'updated_at']
     const tx = sqlite.transaction(() => {
       const result = sqlite.prepare(`INSERT INTO service_agreements (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`)
@@ -139,7 +159,9 @@ export function createAgreementService (ctx, services) {
     for (const col of COLUMNS) {
       if (!(col in data) || col === 'client_id') continue
       sets.push(`${col} = ?`)
-      params.push(col === 'questionnaire_json' ? serialiseQuestionnaire(data) : (data[col] ?? null))
+      params.push(col === 'questionnaire_json'
+        ? serialiseQuestionnaire(data)
+        : ENCRYPTED.includes(col) ? encrypt(data[col] ?? null) : (data[col] ?? null))
     }
     const tx = sqlite.transaction(() => {
       if (sets.length) {

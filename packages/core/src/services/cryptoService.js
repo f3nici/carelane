@@ -126,5 +126,20 @@ export function createCryptoService (ctx) {
     return { created: false }
   }
 
-  return { encrypt, decrypt, blindIndex, encryptFields, decryptFields, assertEncryptionCanary }
+  /**
+   * Non-throwing counterpart to {@link assertEncryptionCanary}: does the current
+   * `encryptionSecret` match the sealed canary? Returns true when no canary
+   * exists yet (first run — nothing to mismatch) or it decrypts to the expected
+   * value; false when a canary exists but the secret no longer matches. Lets a
+   * data migration avoid writing fresh ciphertext under a wrong secret before the
+   * boot canary aborts startup.
+   * @returns {boolean}
+   */
+  function encryptionSecretMatches () {
+    const row = sqlite.prepare('SELECT value FROM settings WHERE key = ?').get(CANARY_KEY)
+    if (!row || !row.value) return true
+    try { return decrypt(row.value) === CANARY_PLAINTEXT } catch { return false }
+  }
+
+  return { encrypt, decrypt, blindIndex, encryptFields, decryptFields, assertEncryptionCanary, encryptionSecretMatches }
 }

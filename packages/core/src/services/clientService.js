@@ -1,10 +1,14 @@
 import { escapeLike, applyClientScope } from '../utils/sql.js'
 import { ApiError } from '../errors.js'
 
-/** Snake_case column names that are encrypted at rest. */
+// Snake_case column names that are encrypted at rest. Health-relevant free text
+// (primary disability, communication needs, support goals) is encrypted like the
+// other PII — none of these are used as a search/sort key, so encrypting them is
+// transparent to the list query (which searches preferred_name/suburb/postcode
+// and the NDIS blind index only).
 const ENCRYPTED = ['first_name', 'last_name', 'ndis_number', 'date_of_birth', 'phone', 'email',
   'address', 'plan_manager_name', 'plan_manager_contact', 'emergency_contact_name',
-  'emergency_contact_phone', 'notes']
+  'emergency_contact_phone', 'notes', 'primary_disability', 'communication_needs', 'support_goals']
 
 const COLUMNS = ['first_name', 'last_name', 'preferred_name', 'ndis_number', 'date_of_birth',
   'phone', 'email', 'address', 'suburb', 'state', 'postcode',
@@ -151,10 +155,14 @@ export function createClientService (ctx, services) {
    */
   function exportClient (id) {
     const client = getClient(id)
+    // Report/agreement bodies are encrypted at rest (like shift bodies), so
+    // decrypt them here — the export must contain plaintext, not ciphertext.
     const agreements = sqlite.prepare('SELECT * FROM service_agreements WHERE client_id = ? AND deleted_at IS NULL').all(id)
+      .map(a => decryptFields(a, ['supports_summary', 'body_markdown']))
     const shifts = sqlite.prepare('SELECT * FROM shift_notes WHERE client_id = ? AND deleted_at IS NULL').all(id)
       .map(s => decryptFields(s, ['body', 'incident_details']))
     const reportRows = sqlite.prepare('SELECT * FROM reports WHERE client_id = ? AND deleted_at IS NULL').all(id)
+      .map(r => decryptFields(r, ['body_markdown']))
     // Consent forms & other completed documents (on-disk filename omitted — files
     // are reached only through the auth-gated download route).
     const documents = sqlite.prepare(`SELECT id, title, doc_type, source_type, issue_date, expiry_date,

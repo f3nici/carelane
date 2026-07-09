@@ -5,6 +5,52 @@ const time = z.string().regex(/^\d{2}:\d{2}$/, 'must be HH:MM')
 const optStr = z.string().trim().max(2000).nullish().transform(v => v || null)
 const bool01 = z.union([z.boolean(), z.literal(0), z.literal(1)]).transform(v => (v === true || v === 1) ? 1 : 0)
 
+/**
+ * Whether a host literal is a private, loopback, link-local or otherwise
+ * non-public address. Used to keep an operator-set outbound URL (e.g. the ntfy
+ * server) from targeting the host's own internal network or a cloud metadata
+ * endpoint (169.254.169.254). This checks the literal only — it does not resolve
+ * DNS, so a public hostname that resolves to a private IP is not caught here (a
+ * documented limitation; full SSRF protection needs a resolve-time check).
+ * @param {string} host hostname or IP literal (no port/brackets)
+ * @returns {boolean}
+ */
+export function isPrivateHost (host) {
+  const h = String(host || '').toLowerCase().replace(/^\[|\]$/g, '')
+  if (!h) return true
+  if (h === 'localhost' || h.endsWith('.localhost')) return true
+  // IPv4 (incl. IPv4-mapped IPv6 like ::ffff:10.0.0.1)
+  const v4 = h.match(/(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
+  if (v4) {
+    const [a, b] = v4.slice(1).map(Number)
+    if (a === 10 || a === 127 || a === 0) return true // private / loopback / this-host
+    if (a === 172 && b >= 16 && b <= 31) return true // 172.16.0.0/12
+    if (a === 192 && b === 168) return true // 192.168.0.0/16
+    if (a === 169 && b === 254) return true // link-local (incl. cloud metadata)
+    if (a === 100 && b >= 64 && b <= 127) return true // 100.64.0.0/10 CGNAT
+    return false
+  }
+  // IPv6
+  if (h === '::1' || h === '::') return true // loopback / unspecified
+  if (/^f[cd][0-9a-f]{2}:/.test(h)) return true // fc00::/7 unique-local
+  if (/^fe[89ab][0-9a-f]:/.test(h)) return true // fe80::/10 link-local
+  return false
+}
+
+/**
+ * Whether a URL is a public http(s) address safe to use as an operator-set
+ * outbound target. Rejects non-http(s) schemes and private/loopback/link-local
+ * hosts (see {@link isPrivateHost}).
+ * @param {string} value
+ * @returns {boolean}
+ */
+export function isPublicHttpUrl (value) {
+  let u
+  try { u = new URL(String(value)) } catch { return false }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return false
+  return !isPrivateHost(u.hostname)
+}
+
 export const loginSchema = z.object({
   username: z.string().trim().min(1),
   password: z.string().min(1),
@@ -182,7 +228,10 @@ export const googleSettingsSchema = z.object({
 // clears the connection. Timings drive the digest time and reminder lead.
 export const ntfySettingsSchema = z.object({
   enabled: bool01.optional(),
-  server_url: z.string().trim().url().max(300).optional(),
+  // Restricted to a public http(s) host so a visitor/operator can't point the
+  // outbound push at the host's own network or a cloud metadata endpoint (SSRF).
+  server_url: z.string().trim().url().max(300)
+    .refine(isPublicHttpUrl, 'server URL must be a public http(s) address').optional(),
   topic: z.string().trim().regex(/^[-_A-Za-z0-9]{0,64}$/, 'topic may use letters, numbers, - and _').optional(),
   priority: z.enum(['min', 'low', 'default', 'high', 'max']).optional(),
   notify_plan_reviews: bool01.optional(),

@@ -10,5 +10,6 @@ export const {
   blindIndex,
   encryptFields,
   decryptFields,
-  assertEncryptionCanary
+  assertEncryptionCanary,
+  encryptionSecretMatches
 } = services.crypto

@@ -48,6 +48,29 @@ export function listClientWorkers (clientId) {
 }
 
 /**
+ * Additively grant one worker access to one participant (idempotent). Used when
+ * an admin rosters a shift to a worker: rostering someone to support a
+ * participant implies they may see that participant's record, so we ensure the
+ * `client_assignments` grant exists rather than leaving the worker able to create
+ * a shift note they then cannot read back. Only active `worker` accounts and
+ * existing (non-deleted) participants are granted; admins need no grant. Returns
+ * true when a new grant was created (false when it already existed or was a
+ * no-op), so the caller can decide whether to write an audit entry.
+ * @param {number} userId the worker
+ * @param {number} clientId the participant
+ * @param {number} actingUserId admin performing the roster (audit column)
+ * @returns {boolean}
+ */
+export function grantClientAccess (userId, clientId, actingUserId) {
+  const result = sqlite.prepare(`INSERT OR IGNORE INTO client_assignments (user_id, client_id, created_at, created_by)
+    SELECT ?, ?, ?, ?
+    WHERE EXISTS (SELECT 1 FROM users WHERE id = ? AND role = 'worker' AND active = 1)
+      AND EXISTS (SELECT 1 FROM clients WHERE id = ? AND deleted_at IS NULL)`)
+    .run(userId, clientId, now(), actingUserId, userId, clientId)
+  return result.changes > 0
+}
+
+/**
  * Replace the full set of participants a worker is assigned to. Ignores ids for
  * participants that do not exist / are soft-deleted so a stale UI selection can't
  * create dangling grants. Runs in a transaction so the swap is atomic.

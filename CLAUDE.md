@@ -75,8 +75,15 @@ API docs at `/api/docs`, health at `/healthz`.
   `UNAUTHENTICATED` ("not authenticated") or 403 `FORBIDDEN` ("you don't have
   access"). The SPA hides admin-only nav/controls (`auth.isAdmin`, router
   `meta.adminOnly`).
-- Encrypted columns: clients PII fields, shift `body`/`incident_details`.
-  NDIS number also gets an HMAC blind index (`ndis_number_hash`) for search.
+- Encrypted columns: clients PII fields (incl. `primary_disability`,
+  `communication_needs`, `support_goals`), shift `body`/`incident_details`,
+  report `body_markdown`, and agreement `supports_summary`/`body_markdown` — the
+  drafted report/agreement bodies aggregate the same health narrative as the
+  notes they are built from, so they are sealed too. NDIS number also gets an
+  HMAC blind index (`ndis_number_hash`) for search. A boot-time migration
+  (`encryptLegacyPlaintextColumns`) re-encrypts any pre-existing plaintext in
+  columns promoted to encryption; adding a field to a service's `ENCRYPTED` list
+  is transparent to reads (legacy plaintext passes through `decrypt`).
 - Shift-note keyword search: the note list (`listShifts`) supports a free-text
   `q` (plus participant, date/date-range filters and a date/participant `sort`).
   Because `body`/`incident_details` are encrypted at rest, search runs over a
