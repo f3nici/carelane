@@ -17,9 +17,15 @@ every outbound call are all implemented carefully and match the documentation.
 The findings are gaps against the application's own stated security model, not
 general sloppiness.
 
+## Status
+
+All findings and observations below have since been **resolved** in this branch
+(see the "Resolution" note under each, and the accompanying tests). The full
+suite passes (240 tests) with lint clean.
+
 ## Findings
 
-### 1. Deactivated / role-changed accounts can still establish a fresh session — Medium
+### 1. Deactivated / role-changed accounts can still establish a fresh session — Medium — FIXED
 
 `attachAccess` (`server/middleware/auth.js`) reloads the user on every
 `/api/v1` request and rejects inactive accounts, so **data** routes are safe.
@@ -43,11 +49,13 @@ admin session therefore survives a live demotion for the admin-only
 `/auth/security-policy` routes, inconsistent with the "role change takes effect
 on the next request" guarantee that holds elsewhere.
 
-Suggested fix: reject `!user.active` in the login handler and in `finishLogin`;
-optionally re-derive admin status from a fresh user read on the `/auth`
-admin-only routes rather than trusting `session.role`.
+Resolution: `POST /auth/login` now rejects a deactivated account with 403
+`ACCOUNT_INACTIVE`; `finishLogin` refuses a passkey assertion for an inactive
+account; and the admin-only `/auth/security-policy` routes now run `attachAccess`
+so the role is re-derived from a fresh user read instead of the login-time
+session stamp. Covered by `test/deactivatedLogin.routes.test.js`.
 
-### 2. A support worker can set `billed = 1` on their own draft note — Low
+### 2. A support worker can set `billed = 1` on their own draft note — Low — FIXED
 
 `billed` is in the shift-note `COLUMNS`
 (`packages/core/src/services/shiftService.js`) and `canEditNote`
@@ -57,22 +65,27 @@ worker can flip the billing flag (reproduced: `PUT /shifts/:id {billed:1}` →
 hidden from workers. No data exposure, but the billing flag ideally should not
 be worker-writable.
 
-Suggested fix: strip `billed` (and other operator-only columns) from a worker's
-allowed update set, or gate the flag behind `requireAdmin`.
+Resolution: the shift-note update route now strips `billed` from a non-admin
+caller's payload, so a worker can still write their own draft but cannot change
+its billing status. Covered by `test/deactivatedLogin.routes.test.js`.
 
-### Lower-severity observations
+### Lower-severity observations (all resolved)
 
 - **SSRF on operator-set URLs is literal-only** (`isPrivateHost` in
   `packages/core/src/validators.js`): a public hostname that resolves to a
-  private IP is not caught. Documented as a known limitation, and ntfy re-checks
-  at publish time — acceptable, but worth revisiting if more outbound
-  integrations are added.
-- **`/metrics` is unauthenticated when `METRICS_TOKEN` is unset** — intentional
-  and warned about at boot; fine for a firewalled scrape target, a risk only if
-  the port is exposed.
+  private IP was not caught. **Fixed** — `ntfyService.publish` now resolves the
+  configured host via DNS and refuses to send if any answer is a private /
+  loopback / link-local address, closing the documented gap. Covered by
+  `test/ntfySsrf.test.js`. (A residual TOCTOU between resolve and fetch remains,
+  inherent to resolve-time SSRF checks.)
+- **`/metrics` was fully open when `METRICS_TOKEN` is unset** — **Fixed** —
+  token-less scrapes are now served only to a private / loopback source address
+  (the endpoint's intended internal-scrape use); a public client without a token
+  is refused. Set `METRICS_TOKEN` to scrape from a public address. Covered by
+  `test/metrics.test.js`.
 - **Google OAuth `state` compared with `!==`** (`server/routes/schedule.js`) —
-  non-constant-time, but it is a random CSRF nonce, not a secret, so timing is
-  immaterial.
+  **Fixed** — the state nonce is now compared with the constant-time
+  `timingSafeStrEqual` helper, mirroring the CSRF-token check.
 
 ## Verified correct (spot-checks that passed)
 

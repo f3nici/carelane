@@ -38,7 +38,7 @@ app.listen(config.port, () => {
   // scrape target, but a risk if the port is reachable. Warn so an accidental
   // exposure is visible in the logs rather than silent.
   if (config.metricsEnabled && !config.metricsToken) {
-    logger.warn('/metrics is enabled without METRICS_TOKEN — the endpoint is unauthenticated. Set METRICS_TOKEN unless it is only reachable on a trusted internal network.')
+    logger.warn('/metrics is enabled without METRICS_TOKEN — token-less scrapes are served only to private/loopback source addresses. Set METRICS_TOKEN to scrape from a public address.')
   }
   // Skip scheduled backups in demo mode: the data is disposable and reset on a
   // cadence, and backup snapshots aren't cleaned up by the reset — running them

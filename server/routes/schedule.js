@@ -7,7 +7,7 @@ import * as recurrenceService from '../services/recurrenceService.js'
 import * as googleCalendar from '../services/googleCalendarService.js'
 import * as calendarFeed from '../services/calendarFeedService.js'
 import * as accessService from '../services/accessService.js'
-import { requireAdmin } from '../middleware/auth.js'
+import { requireAdmin, timingSafeStrEqual } from '../middleware/auth.js'
 import { rateLimit } from '../middleware/rateLimit.js'
 import { updateSettings } from '../services/settingsService.js'
 import { logActivity, diffChanges } from '../services/activityService.js'
@@ -141,7 +141,11 @@ router.get('/google/connect', (req, res, next) => {
 /** OAuth redirect target. Verifies state, stores the token, returns to settings. */
 router.get('/google/callback', async (req, res) => {
   const { code, state } = req.query
-  if (!code || !state || state !== req.session.googleOauthState) {
+  // Constant-time compare of the OAuth state nonce (mirrors the CSRF-token check)
+  // so it can't be probed byte-by-byte via response timing.
+  const stateOk = req.session.googleOauthState && state &&
+    timingSafeStrEqual(String(state), req.session.googleOauthState)
+  if (!code || !stateOk) {
     return res.redirect('/settings?google=error')
   }
   delete req.session.googleOauthState

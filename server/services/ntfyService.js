@@ -1,5 +1,6 @@
 import cron from 'node-cron'
-import { isPublicHttpUrl } from '@carelane/core'
+import dns from 'node:dns/promises'
+import { isPublicHttpUrl, isPrivateHost } from '@carelane/core'
 import { sqlite } from '../db/connection.js'
 import config from '../config.js'
 import { getSetting, updateSettings } from './settingsService.js'
@@ -201,6 +202,20 @@ export async function publish ({ title, message, tags, priority, click } = {}) {
     recordError(msg)
     return { ok: false, error: msg }
   }
+  // The literal check above only rejects a private *host literal*. A public
+  // hostname can still resolve to a private/loopback/metadata address, so also
+  // resolve DNS and refuse if any answer is non-public — closing the SSRF gap the
+  // literal check documents as its limitation. A resolution failure is left for
+  // fetch to surface as a normal network error.
+  try {
+    const { hostname } = new URL(base)
+    const answers = await dns.lookup(hostname, { all: true })
+    if (answers.some(a => isPrivateHost(a.address))) {
+      const msg = 'ntfy server hostname resolves to a private (non-public) address'
+      recordError(msg)
+      return { ok: false, error: msg }
+    }
+  } catch { /* DNS failure — let the fetch below surface it */ }
   const url = `${base}/${encodeURIComponent(topic)}`
 
   const controller = new AbortController()
