@@ -156,7 +156,8 @@ export function createApp () {
 
   // Prometheus metrics scrape (opt-in via METRICS_ENABLED). Mounted before the
   // session/auth stack so a scraper needs no cookie; access is gated by
-  // METRICS_TOKEN when set (see metricsHandler).
+  // METRICS_TOKEN when set, and otherwise restricted to a private/loopback source
+  // address (see metricsHandler).
   if (config.metricsEnabled) app.get('/metrics', metricsHandler(config))
 
   // Public read-only iCal subscription feed. Mounted before the /api stack so it

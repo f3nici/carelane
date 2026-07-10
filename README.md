@@ -213,7 +213,7 @@ All configuration is via environment variables (see [`.env.example`](.env.exampl
 | `BACKUP_ENABLED` / `BACKUP_PATH` / `BACKUP_RETENTION` / `BACKUP_TIME` / `BACKUP_STALE_HOURS` | Scheduled backup settings and the stale-backup startup-warning threshold. |
 | `LOGIN_MAX_ATTEMPTS` / `LOGIN_WINDOW_MINUTES` | Brute-force throttle: failed-attempt ceiling and window. |
 | `LOG_LEVEL` / `LOG_FORMAT` | Log verbosity (`debug`/`info`/`warn`/`error`) and format: `pretty` (readable, aligned lines — the docker-compose default) or `json` (one object per line, for log shippers; the default when `NODE_ENV=production` and `LOG_FORMAT` is unset). |
-| `METRICS_ENABLED` / `METRICS_TOKEN` | Opt-in Prometheus scrape at `/metrics`; when a token is set it is required (Bearer or `?token=`). See the [metrics setup guide](docs/metrics-setup.md). |
+| `METRICS_ENABLED` / `METRICS_TOKEN` | Opt-in Prometheus scrape at `/metrics`; when a token is set it is required (Bearer or `?token=`). With no token set, token-less scrapes are served only to a private/loopback source address (a public source gets 401). See the [metrics setup guide](docs/metrics-setup.md). |
 | `WEBAUTHN_RP_ID` / `WEBAUTHN_ORIGIN` | Pin the passkey relying-party id/origin. Auto-derived from the request when blank (correct for same-origin); set both behind a Host-rewriting proxy. |
 | `PUBLIC_API_ENABLED` | Toggle for the public API surface. |
 | `CORS_ORIGINS` | Allowed CORS origins (comma-separated). |

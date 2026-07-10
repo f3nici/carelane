@@ -88,7 +88,11 @@ variable is needed.
 ## Self-hosting ntfy / protected topics (optional)
 
 By default CareLane publishes to the public `ntfy.sh` server. To use your own
-ntfy server, just change the **server URL** in the settings card.
+ntfy server, just change the **server URL** in the settings card. The URL must be
+a public `http(s)` address: saving it rejects a private/loopback host, and every
+send additionally resolves the hostname and refuses to publish if it points at a
+private, loopback or link-local address (SSRF protection), so the server URL
+can't be used to probe the host's own network or a cloud metadata endpoint.
 
 If your server requires authentication (or you've made the topic
 [access-protected](https://docs.ntfy.sh/config/#access-control)), provide an
