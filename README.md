@@ -80,6 +80,13 @@ encrypted at rest.
   optional token-gated Prometheus scrape at `/metrics`.
 - **Participant data export** — one-click "download everything" (PDF + JSON zip)
   for data-access requests.
+- **Client portal** — give a participant their own read-only login to view their
+  **finalised shift notes** (rendered, not raw Markdown) and **completed
+  documents**. It is a completely separate sign-in from the staff app (its own
+  accounts, session and section at `/portal`), scoped so a participant only ever
+  sees their own records — never billing, incident detail, drafts, or anyone
+  else's data. Admins grant, reset or revoke access from a **Portal access** tab
+  on the participant's page. See the [client portal guide](docs/client-portal.md).
 
 ## Tech stack
 
@@ -234,6 +241,9 @@ the app without any real participant data.
 - **Two shared logins** are created and advertised (and pre-filled) on the sign-in
   screen: a `demo` **admin** and a `demoworker` **support worker**, both with the
   password `demo`. Just press **Sign in**.
+- **A client-portal login** (`aisha` / `demo`) is seeded for one example
+  participant and advertised on the participant portal sign-in page
+  (`/portal/login`), so you can also see the read-only participant view.
 - **Rich example data** is seeded across every record type (participants, service
   agreements, shift notes, an incident report, goals + progress, medication and
   restrictive-practice logs, consent documents, a report and a roster), so every

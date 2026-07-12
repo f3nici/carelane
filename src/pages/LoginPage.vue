@@ -128,6 +128,10 @@ async function signInWithPasskey () {
           {{ passkeyBusy ? 'Waiting for passkey…' : 'Sign in with a passkey' }}
         </button>
       </template>
+
+      <p class="text-xs text-mid mt-6 text-center">
+        Are you a participant? <a href="/portal/login" class="text-accent hover:underline">Open the participant portal</a>
+      </p>
     </div>
   </div>
 </template>

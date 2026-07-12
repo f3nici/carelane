@@ -696,6 +696,29 @@ CREATE INDEX IF NOT EXISTS idx_share_links_resource ON share_links (resource_typ
 CREATE INDEX IF NOT EXISTS idx_share_links_client ON share_links (client_id);
 `)
 
+  // Client-portal login accounts (added post-launch). A participant can be given
+  // a read-only portal login to view their OWN finalised shift notes and
+  // completed documents. Kept in a table entirely separate from the staff
+  // `users` table so a portal credential can never satisfy the staff auth
+  // middleware or reach another participant's data — the session stores only a
+  // `portalClientId`, never a `userId`. One account per participant (UNIQUE
+  // client_id); an admin deactivates (not deletes) an account to revoke access.
+  // See portalService / routes/portal.js.
+  sqlite.exec(`
+CREATE TABLE IF NOT EXISTS client_portal_accounts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  client_id INTEGER NOT NULL REFERENCES clients(id) UNIQUE,
+  username TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  active INTEGER NOT NULL DEFAULT 1,
+  last_login_at TEXT,
+  created_at TEXT,
+  updated_at TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_client_portal_accounts_username ON client_portal_accounts (username);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_client_portal_accounts_client ON client_portal_accounts (client_id);
+`)
+
   migrateChunkFts()
 
   // Blind-index keyword search over shift notes (added post-launch). The note

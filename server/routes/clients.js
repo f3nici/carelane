@@ -5,7 +5,7 @@ import crypto from 'node:crypto'
 import multer from 'multer'
 import { ZipArchive } from 'archiver'
 import { validate, validatePartial } from '../middleware/validate.js'
-import { clientSchema, clientBillingCodesSchema, clientDocumentMetaSchema, goalSchema, goalProgressSchema, restrictivePracticeSchema, medicationRecordSchema, clientWorkersSchema } from '../utils/validators.js'
+import { clientSchema, clientBillingCodesSchema, clientDocumentMetaSchema, goalSchema, goalProgressSchema, restrictivePracticeSchema, medicationRecordSchema, clientWorkersSchema, portalAccountSchema, portalPasswordSchema } from '../utils/validators.js'
 import { requireClientParam, requireAdmin, demoLock } from '../middleware/auth.js'
 import * as accessService from '../services/accessService.js'
 import * as clientService from '../services/clientService.js'
@@ -15,6 +15,7 @@ import * as clientDocumentService from '../services/clientDocumentService.js'
 import * as goalService from '../services/goalService.js'
 import * as restrictivePracticeService from '../services/restrictivePracticeService.js'
 import * as medicationService from '../services/medicationService.js'
+import * as portalService from '../services/portalService.js'
 import { CLIENT_DOC_DIR } from '../services/clientDocumentService.js'
 import { logActivity, diffChanges } from '../services/activityService.js'
 import { renderPdf, pdfPath } from '../utils/pdfRenderer.js'
@@ -237,6 +238,49 @@ router.delete('/:id/documents/:docId', (req, res) => {
   clientDocumentService.deleteClientDocument(Number(req.params.id), Number(req.params.docId))
   logActivity('client', Number(req.params.id), req.session.userId, 'updated', { document_archived: true })
   res.json(ok({ deleted: true }))
+})
+
+/**
+ * Client-portal account management (admin only). The participant-facing portal
+ * itself lives at /api/v1/portal; here the operator grants, updates, resets or
+ * revokes the single login attached to a participant. Sharing a login exposes
+ * participant data, so — like share links — it is an operator concern a worker
+ * never touches (each route carries its own requireAdmin, since GET is otherwise
+ * open to an assigned worker).
+ *
+ * @openapi
+ * /clients/{id}/portal-account:
+ *   get: { tags: [Clients], summary: Get the participant's portal account (no password) }
+ *   put: { tags: [Clients], summary: Create/update the participant's portal login (admin only) }
+ *   delete: { tags: [Clients], summary: Remove the participant's portal login (admin only) }
+ */
+router.get('/:id/portal-account', requireAdmin, (req, res) => {
+  res.json(ok(portalService.getAccountForClient(Number(req.params.id))))
+})
+
+router.put('/:id/portal-account', requireAdmin, demoLock, validate(portalAccountSchema), (req, res, next) => {
+  try {
+    const existed = !!portalService.getAccountForClient(Number(req.params.id))
+    const account = portalService.upsertAccount(Number(req.params.id), req.body)
+    logActivity('client', Number(req.params.id), req.session.userId, 'updated', { portal_account: existed ? 'updated' : 'created' })
+    res.status(existed ? 200 : 201).json(ok(account))
+  } catch (err) { next(err) }
+})
+
+router.post('/:id/portal-account/password', requireAdmin, demoLock, validate(portalPasswordSchema), (req, res, next) => {
+  try {
+    portalService.resetPassword(Number(req.params.id), req.body.new_password)
+    logActivity('client', Number(req.params.id), req.session.userId, 'updated', { portal_account: 'password_reset' })
+    res.json(ok({ reset: true }))
+  } catch (err) { next(err) }
+})
+
+router.delete('/:id/portal-account', requireAdmin, demoLock, (req, res, next) => {
+  try {
+    portalService.deleteAccount(Number(req.params.id))
+    logActivity('client', Number(req.params.id), req.session.userId, 'updated', { portal_account: 'removed' })
+    res.json(ok({ removed: true }))
+  } catch (err) { next(err) }
 })
 
 /**
