@@ -84,9 +84,10 @@ encrypted at rest.
   **finalised shift notes** (rendered, not raw Markdown) and **completed
   documents**. It is a completely separate sign-in from the staff app (its own
   accounts, session and section at `/portal`), scoped so a participant only ever
-  sees their own records — never billing, incident detail, drafts, or anyone
-  else's data. Admins grant, reset or revoke access from a **Portal access** tab
-  on the participant's page. See the [client portal guide](docs/client-portal.md).
+  sees their own records — never billing, drafts, the structured incident
+  register, or anyone else's data. Admins grant, reset or revoke access from a
+  **Portal access** tab on the participant's page. See the
+  [client portal guide](docs/client-portal.md).
 
 ## Tech stack
 

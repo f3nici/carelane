@@ -182,9 +182,11 @@ export function loadPortalContext (clientId) {
 }
 
 // Shift-note fields safe to expose in the portal: the shift metadata + the
-// participant-facing narrative. Deliberately EXCLUDES billing fields and the
-// sensitive `incident_details` free text (the incident register is a staff
-// surface). `body` is decrypted here and rendered as Markdown by the client.
+// participant-facing narrative, including the incident narrative for a
+// participant's own note (`incident_details`, decrypted here). Deliberately
+// EXCLUDES billing fields (an operator concern) and never surfaces the
+// structured NDIS incident register, which stays a staff surface. `body` and
+// `incident_details` are rendered as Markdown by the client.
 function toPortalNote (row) {
   return {
     id: row.id,
@@ -196,6 +198,7 @@ function toPortalNote (row) {
     support_provided: row.support_provided,
     participant_response: row.participant_response,
     incident_flag: !!row.incident_flag,
+    incident_details: decrypt(row.incident_details),
     body: decrypt(row.body)
   }
 }

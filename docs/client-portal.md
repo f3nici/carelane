@@ -18,6 +18,10 @@ When signed in to the portal a participant sees only **their own** records:
   (drafts, archived and deleted notes are never shown). The note narrative is
   rendered from Markdown into formatted text, alongside the date, time, location,
   the support provided, how the shift went, and any photos attached to the note.
+- **Incident details** — where a note is flagged as involving an incident, the
+  participant sees the incident narrative recorded on **their own** note. (The
+  separate structured NDIS incident register — reportable categories, Commission
+  reporting, and internal follow-up tracking — stays staff-only.)
 - **Documents** — their completed documents (consent forms, plans, signed
   paperwork, …), which they can download.
 
@@ -26,9 +30,10 @@ When signed in to the portal a participant sees only **their own** records:
 The portal deliberately exposes a narrow slice of a note. It never shows:
 
 - **billing** information (rates, whether a shift was billed/invoiced);
-- **incident detail** — a note flagged as involving an incident shows only a
-  neutral "incident noted" badge; the sensitive `incident_details` narrative and
-  the structured incident report stay staff-only;
+- the **structured incident register** — a participant sees the incident
+  narrative on their own note, but not the separate NDIS incident report
+  (reportable categories, reported-to-Commission status, contributing factors,
+  witnesses, notified parties and internal follow-up), which stays staff-only;
 - **draft** notes — only finalised records the worker has completed;
 - **any other participant's** data — every read is scoped to the signed-in
   participant.

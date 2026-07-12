@@ -43,7 +43,7 @@ beforeAll(async () => {
 
   finalisedNote = await createNote({ client_id: clientA.id, body: 'Went to the park and had a lovely time.', support_provided: 'Community access' })
   draftNote = await createNote({ client_id: clientA.id, body: 'Draft note not yet complete.', finalised: 0 })
-  incidentNote = await createNote({ client_id: clientA.id, body: 'General narrative of the shift.', incident_flag: 1, incident_details: 'SENSITIVE incident detail that must never reach the portal.' })
+  incidentNote = await createNote({ client_id: clientA.id, body: 'General narrative of the shift.', incident_flag: 1, incident_details: 'A minor slip in the kitchen; first aid applied and the participant was fine.' })
   otherNote = await createNote({ client_id: clientB.id, body: 'Belongs to a different participant.' })
 
   docA = (await admin.agent.post(`/api/v1/clients/${clientA.id}/documents`).set('x-csrf-token', admin.csrf)
@@ -100,15 +100,15 @@ describe('client portal', () => {
     expect(ids).not.toContain(otherNote.id)
   })
 
-  it('renders a note without exposing incident detail or billing', async () => {
+  it('shows the incident narrative on the participant\'s own note but never billing', async () => {
     const { agent } = await portalLogin()
     const detail = await agent.get(`/api/v1/portal/shift-notes/${incidentNote.id}`)
     expect(detail.status).toBe(200)
     expect(detail.body.data.body).toContain('General narrative')
     expect(detail.body.data.incident_flag).toBe(true)
-    // The sensitive incident_details field is never serialised.
-    expect(JSON.stringify(detail.body.data)).not.toContain('SENSITIVE incident detail')
-    expect(detail.body.data).not.toHaveProperty('incident_details')
+    // The participant sees the incident narrative on their own note …
+    expect(detail.body.data.incident_details).toContain('minor slip in the kitchen')
+    // … but billing is still never serialised.
     expect(detail.body.data).not.toHaveProperty('billed')
   })
 

@@ -11,6 +11,7 @@ const note = ref(null)
 const loading = ref(true)
 
 const bodyHtml = computed(() => renderMarkdown(note.value?.body || ''))
+const incidentHtml = computed(() => renderMarkdown(note.value?.incident_details || ''))
 
 function niceDate (iso) {
   try {
@@ -58,6 +59,11 @@ onMounted(async () => {
       <section v-if="note.body" class="card">
         <p class="label">Shift note</p>
         <div class="prose-portal" v-html="bodyHtml"></div>
+      </section>
+
+      <section v-if="note.incident_details" class="card border-warning/40 bg-warning/5">
+        <p class="label text-warning">Incident details</p>
+        <div class="prose-portal" v-html="incidentHtml"></div>
       </section>
 
       <section v-if="note.participant_response" class="card">

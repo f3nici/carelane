@@ -176,8 +176,10 @@ API docs at `/api/docs`, health at `/healthz`.
   login and brute-force throttled via a `portal:`-namespaced key). Every read is
   scoped to the account's `client_id` (`portalService`), so a portal user reaches
   only their own records; the exposed note fields are deliberately limited —
-  billing and the sensitive `incident_details` are NEVER serialised (only an
-  incident *flag*), and drafts/archived/deleted notes are excluded. The SPA
+  billing is NEVER serialised, and drafts/archived/deleted notes are excluded.
+  A participant DOES see the incident narrative (`incident_details`) on their own
+  note (plus the incident *flag*), but the structured NDIS incident register
+  stays a staff-only surface. The SPA
   serves the portal as its own section (`/portal/*`, `PortalLayout`, its own
   `portalAuth` store + `usePortalApi` axios instance + router-guard branch),
   distinct from the staff app. Admins manage the login from a "Portal access" tab
