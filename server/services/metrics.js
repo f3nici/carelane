@@ -1,4 +1,5 @@
 import crypto from 'node:crypto'
+import { isPrivateHost } from '@carelane/core'
 import { sqlite } from '../db/connection.js'
 import { logger } from './logger.js'
 
@@ -160,6 +161,13 @@ export function metricsHandler (config) {
       if (!timingSafeEqual(String(provided ?? ''), config.metricsToken)) {
         return res.status(401).type('text/plain').send('# unauthorized\n')
       }
+    } else if (!isPrivateHost(req.ip)) {
+      // No token configured: the endpoint is meant to be an internal-only scrape
+      // target (like /healthz), so serve it only to a private/loopback source
+      // address. A public client without a token is refused rather than handed the
+      // app's operational gauges — defence against accidental exposure. Set
+      // METRICS_TOKEN to allow scraping from a non-private address.
+      return res.status(401).type('text/plain').send('# unauthorized (set METRICS_TOKEN to scrape from a public address)\n')
     }
     try {
       res.set('Content-Type', 'text/plain; version=0.0.4; charset=utf-8')

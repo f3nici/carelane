@@ -59,4 +59,29 @@ describe('metrics registry', () => {
     expect(b.out.code).toBe(200)
     expect(b.out.body).toMatch(/carelane_up 1/)
   })
+
+  it('without a token, serves only private/loopback source addresses', () => {
+    const handler = metrics.metricsHandler({ metricsToken: '' })
+    function makeRes () {
+      const out = { code: 200, body: null }
+      const res = {
+        status (c) { out.code = c; return res },
+        type () { return res },
+        set () { return res },
+        send (b) { out.body = b; return res }
+      }
+      return { res, out }
+    }
+
+    // Loopback source → 200
+    const local = makeRes()
+    handler({ get: () => '', query: {}, ip: '127.0.0.1' }, local.res)
+    expect(local.out.code).toBe(200)
+    expect(local.out.body).toMatch(/carelane_up 1/)
+
+    // Public source without a token → 401
+    const remote = makeRes()
+    handler({ get: () => '', query: {}, ip: '203.0.113.10' }, remote.res)
+    expect(remote.out.code).toBe(401)
+  })
 })

@@ -189,7 +189,9 @@ export async function finishLogin ({ response, expectedChallenge, expectedOrigin
     .run(verification.authenticationInfo.newCounter, now(), row.id)
 
   const user = sqlite.prepare('SELECT * FROM users WHERE id = ?').get(row.user_id)
-  if (!user) throw new ApiError(401, 'PASSKEY_INVALID', 'Passkey is not linked to an active account')
+  // A deactivated account must not be able to log in via a still-registered
+  // passkey (mirrors the active-account check on the password login path).
+  if (!user || !user.active) throw new ApiError(401, 'PASSKEY_INVALID', 'Passkey is not linked to an active account')
   return user
 }
 

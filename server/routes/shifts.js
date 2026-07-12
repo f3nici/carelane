@@ -88,6 +88,9 @@ router.get('/:id', (req, res) => {
 })
 
 router.put('/:id', canEditNote, validatePartial(shiftSchema), (req, res) => {
+  // Billing status is an operator-only concern — a worker may write their own
+  // draft note but must not mark it billed. Strip the flag from a worker's update.
+  if (!req.isAdmin) delete req.body.billed
   const before = shiftService.getShift(Number(req.params.id))
   const shift = shiftService.updateShift(Number(req.params.id), req.body)
   let action = 'updated'

@@ -56,9 +56,14 @@ carelane_up 1
 
 ## 2. Protect it with a token (recommended if reachable)
 
-With no token the endpoint is **open** — fine for an internal-only scrape target
-that isn't reachable from outside your network (the same posture as `/healthz`).
-If the port is reachable from anywhere else, set a token:
+With no token set, token-less scrapes are served **only to a private / loopback
+source address** (`127.0.0.1`, `10/8`, `172.16/12`, `192.168/16`, link-local,
+IPv6 ULA/loopback) — the intended internal-only scrape posture, and enough for a
+same-host or same-network Prometheus (including a Docker-bridge scraper). A
+request from a public source address without a token is refused with `401`.
+
+To scrape from a **public** source address, or to require credentials even on the
+internal network, set a token:
 
 ```bash
 METRICS_TOKEN=a-long-random-string

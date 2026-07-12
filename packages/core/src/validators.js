@@ -10,8 +10,10 @@ const bool01 = z.union([z.boolean(), z.literal(0), z.literal(1)]).transform(v =>
  * non-public address. Used to keep an operator-set outbound URL (e.g. the ntfy
  * server) from targeting the host's own internal network or a cloud metadata
  * endpoint (169.254.169.254). This checks the literal only — it does not resolve
- * DNS, so a public hostname that resolves to a private IP is not caught here (a
- * documented limitation; full SSRF protection needs a resolve-time check).
+ * DNS, so a public hostname that resolves to a private IP is not caught by this
+ * function alone. The outbound caller pairs it with a resolve-time check that
+ * runs this against each resolved address before sending (see the DNS lookup in
+ * `ntfyService.publish`), which closes that gap.
  * @param {string} host hostname or IP literal (no port/brackets)
  * @returns {boolean}
  */

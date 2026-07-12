@@ -8,7 +8,7 @@ import {
   passkeyRegisterSchema, passkeyLoginSchema, passkeyRenameSchema, securityPolicySchema
 } from '../utils/validators.js'
 import { ApiError } from '../middleware/errorHandler.js'
-import { requireAuth, requireAdmin, ensureCsrfToken, demoLock } from '../middleware/auth.js'
+import { requireAuth, attachAccess, requireAdmin, ensureCsrfToken, demoLock } from '../middleware/auth.js'
 import { isDemo, DEMO_ADMIN_USERNAME, DEMO_WORKER_USERNAME, DEMO_PASSWORD } from '../services/demoService.js'
 import { rateLimit } from '../middleware/rateLimit.js'
 import { logActivity } from '../services/activityService.js'
@@ -110,6 +110,15 @@ router.post('/login', validate(loginSchema), (req, res, next) => {
     return next(new ApiError(401, 'INVALID_CREDENTIALS', 'Invalid username or password'))
   }
 
+  // A deactivated login must not be able to establish a fresh session — data
+  // routes already reject it via attachAccess, but the auth surfaces would still
+  // be reachable. The password was correct here, so a clear message (rather than
+  // a generic credential error) leaks nothing an authenticated user doesn't know.
+  if (!user.active) {
+    logActivity('auth', user.id, user.id, 'login_failed', { reason: 'inactive' })
+    return next(new ApiError(403, 'ACCOUNT_INACTIVE', 'This account has been deactivated. Contact your administrator.'))
+  }
+
   // Second factor, when the account has it enabled.
   if (user.totp_enabled) {
     if (!req.body.token) {
@@ -180,11 +189,15 @@ router.get('/config', (req, res) => {
  *   get: { tags: [Auth], summary: Get the second-factor enforcement policy (admin only) }
  *   put: { tags: [Auth], summary: Set whether a second factor is required for everyone (admin only) }
  */
-router.get('/security-policy', requireAuth, requireAdmin, (req, res) => {
+// attachAccess re-derives the role from a fresh user read (and rejects a
+// deactivated account), so a demoted/deactivated admin's still-live session
+// cannot change the second-factor policy — requireAdmin here would otherwise
+// trust the role stamped on the session at login.
+router.get('/security-policy', requireAuth, attachAccess, requireAdmin, (req, res) => {
   res.json(ok({ require_2fa: getRequire2fa() }))
 })
 
-router.put('/security-policy', requireAuth, requireAdmin, demoLock, validate(securityPolicySchema), (req, res, next) => {
+router.put('/security-policy', requireAuth, attachAccess, requireAdmin, demoLock, validate(securityPolicySchema), (req, res, next) => {
   try {
     const actingUser = sqlite.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId)
     const result = setRequire2fa(req.body.require_2fa === 1, actingUser)

@@ -61,7 +61,13 @@ API docs at `/api/docs`, health at `/healthz`.
   `routes/shifts.js`). They also clock in/out of their own roster.
   `accessService`/`userService` (server-only) manage assignments and user CRUD
   (`/api/v1/users`, admin only; last-admin guard). Users are never hard-deleted —
-  a departing worker is deactivated (`users.active=0`), revoking their sessions.
+  a departing worker is deactivated (`users.active=0`), which revokes their
+  existing sessions AND blocks a fresh login: both the password path (403
+  `ACCOUNT_INACTIVE`) and passkey `finishLogin` reject an inactive account, so a
+  deactivated login cannot re-establish a session. The admin-only
+  `/auth/security-policy` routes run `attachAccess` so a role change (e.g. an
+  admin demoted mid-session) takes effect immediately rather than trusting the
+  role stamped on the session at login.
   Operator surfaces (notifications, invoices, templates, audit log, deleted-items)
   are admin-only; billing codes and the knowledge base (RAG search + grounded
   Q&A) are usable by all (a worker picks a code on a note, searches/asks the
@@ -69,7 +75,10 @@ API docs at `/api/docs`, health at `/healthz`.
   re-indexes/deletes documents. AI drafting
   follows the note-edit rule — a worker can AI-draft their OWN draft note — and
   the whole AI surface degrades to nothing when Claude is off/unconfigured
-  (`useIntegrations`/`aiActive`). Settings *reads* (branding + AI status) are open
+  (`useIntegrations`/`aiActive`). Billing is an operator concern, so the shift-note
+  update route strips the `billed` flag from a non-admin caller — a worker edits
+  the narrative of their own draft but never marks it billed. Settings *reads*
+  (branding + AI status) are open
   to all — the app needs them — but every settings *write* keeps its own
   `requireAdmin` (secrets are stripped from the read). Access failures return 401
   `UNAUTHENTICATED` ("not authenticated") or 403 `FORBIDDEN` ("you don't have
@@ -331,8 +340,10 @@ API docs at `/api/docs`, health at `/healthz`.
   docker-compose default) or `json` (one object per line for shippers; the prod
   default when unset). Optional Prometheus scrape at `GET /metrics`
   (`METRICS_ENABLED`/`METRICS_TOKEN`) exposing HTTP counters/latency + app
-  gauges; mounted before the auth stack like `/healthz`. See
-  `docs/metrics-setup.md`.
+  gauges; mounted before the auth stack like `/healthz`. When `METRICS_TOKEN` is
+  set it is required (Bearer or `?token=`, constant-time compared); with no token
+  set, token-less scrapes are served only to a private/loopback source address
+  (a public source without a token gets 401). See `docs/metrics-setup.md`.
 - Passkeys (WebAuthn) are a passwordless login factor (`passkeyService.js`,
   `@simplewebauthn`). Each authenticator is a `webauthn_credentials` row; public
   keys are non-secret (not encrypted) and the in-flight challenge lives on the

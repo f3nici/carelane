@@ -58,8 +58,9 @@ const config = {
   logLevel: env.LOG_LEVEL || (env.NODE_ENV === 'test' ? 'silent' : 'info'),
   logFormat: env.LOG_FORMAT || (env.NODE_ENV === 'production' ? 'json' : 'pretty'),
   // Prometheus metrics at /metrics (for self-hosters running monitoring).
-  // Disabled by default; when enabled it is open unless METRICS_TOKEN is set, in
-  // which case a Bearer token (or ?token=) is required. Intended for an
+  // Disabled by default. When METRICS_TOKEN is set a Bearer token (or ?token=) is
+  // required; with no token set, token-less scrapes are served only to a
+  // private/loopback source address (a public source gets 401). Intended for an
   // internal-only scrape target, like /healthz.
   metricsEnabled: (env.METRICS_ENABLED || 'false') === 'true',
   metricsToken: env.METRICS_TOKEN || '',

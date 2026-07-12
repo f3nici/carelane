@@ -120,7 +120,7 @@ export function csrfProtect (req, res, next) {
  * @param {string} b
  * @returns {boolean}
  */
-function timingSafeStrEqual (a, b) {
+export function timingSafeStrEqual (a, b) {
   const ab = Buffer.from(String(a))
   const bb = Buffer.from(String(b))
   if (ab.length !== bb.length) return false
