@@ -104,6 +104,9 @@ export function requireClientParam (req, res, next, value) {
 export function csrfProtect (req, res, next) {
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next()
   if (req.path === '/auth/login') return next()
+  // The client-portal login also runs before any portal session/CSRF token
+  // exists, so it is exempt exactly like the staff login above.
+  if (req.path === '/portal/auth/login') return next()
   // Passkey login happens before any session/CSRF token exists; the WebAuthn
   // challenge bound to the session is itself the anti-forgery guard here.
   if (req.path.startsWith('/auth/passkeys/login/')) return next()

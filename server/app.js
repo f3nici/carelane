@@ -33,6 +33,7 @@ import userRoutes from './routes/users.js'
 import calendarFeedRoutes from './routes/calendarFeed.js'
 import shareLinkRoutes from './routes/shareLinks.js'
 import sharePublicRoutes from './routes/sharePublic.js'
+import portalRoutes from './routes/portal.js'
 
 /**
  * Build the configured Express app (middleware + routes) without binding a
@@ -173,6 +174,12 @@ export function createApp () {
   const api = express.Router()
   api.use(csrfProtect)
   api.use('/auth', authRoutes)
+  // Client portal (participant-facing, read-only). Mounted INSIDE the session +
+  // CSRF stack but BEFORE the staff `requireAuth`/`attachAccess` gate — a portal
+  // session carries only `portalClientId`, and every route inside enforces
+  // `requirePortalAuth`, so it can never reach staff data. (`/portal/auth/login`
+  // is CSRF-exempt in csrfProtect, like the staff login.)
+  api.use('/portal', portalRoutes)
   // Everything past here needs a session; `attachAccess` then resolves the
   // caller's role + assigned participants (and rejects a deactivated login).
   const authed = [requireAuth, attachAccess]

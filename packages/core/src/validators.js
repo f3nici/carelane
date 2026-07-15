@@ -464,6 +464,26 @@ export const clientWorkersSchema = z.object({
   user_ids: z.array(z.number().int().positive()).max(2000)
 })
 
+// Client-portal login (participant-facing). Mirrors the staff login shape but is
+// a wholly separate surface (see routes/portal.js).
+export const portalLoginSchema = z.object({
+  username: z.string().trim().min(1),
+  password: z.string().min(1)
+})
+
+// Admin-managed client-portal account. `username` reuses the same character
+// rules as a staff login; `password` is optional on update (present only when
+// (re)setting it). `active` toggles access without removing the account.
+export const portalAccountSchema = z.object({
+  username,
+  password: userPassword.optional(),
+  active: bool01.optional()
+})
+
+export const portalPasswordSchema = z.object({
+  new_password: userPassword
+})
+
 export const askSchema = z.object({
   question: z.string().trim().min(3).max(2000)
 })

@@ -163,6 +163,31 @@ API docs at `/api/docs`, health at `/healthz`.
   audit history stays. `demoLock` blocks link creation and the public download in
   demo mode. UI: a "Client share links" panel on the report detail page and a
   per-document "share" action in the participant documents tab.
+- Client portal (participant-facing, read-only): a participant can be granted a
+  login to view their OWN **finalised** shift notes (narrative rendered from
+  Markdown, never raw) and **completed documents**. It is a wholly separate auth
+  surface from staff: `client_portal_accounts` (one per participant, username +
+  bcrypt hash, `active` toggle) is unrelated to the `users` table, and a portal
+  session stores only `req.session.portalClientId` — never a `userId` — so a
+  portal credential can never satisfy staff `requireAuth`/`attachAccess`, and a
+  staff cookie can never satisfy `requirePortalAuth` (mutually exclusive). Portal
+  routes live at `/api/v1/portal` (mounted inside the session+CSRF stack but
+  BEFORE the staff auth gate; `/portal/auth/login` is CSRF-exempt like the staff
+  login and brute-force throttled via a `portal:`-namespaced key). Every read is
+  scoped to the account's `client_id` (`portalService`), so a portal user reaches
+  only their own records; the exposed note fields are deliberately limited —
+  billing is NEVER serialised, and drafts/archived/deleted notes are excluded.
+  A participant DOES see the incident narrative (`incident_details`) on their own
+  note (plus the incident *flag*), but the structured NDIS incident register
+  stays a staff-only surface. The SPA
+  serves the portal as its own section (`/portal/*`, `PortalLayout`, its own
+  `portalAuth` store + `usePortalApi` axios instance + router-guard branch),
+  distinct from the staff app. Admins manage the login from a "Portal access" tab
+  on the participant detail page (`/clients/:id/portal-account`, admin-only,
+  demo-locked writes); accounts are deactivated to revoke access (a reset/deactivate
+  destroys live portal sessions). The demo seeds a portal login for one
+  participant (`aisha`/`demo`), advertised on the portal sign-in page. See
+  `docs/client-portal.md`.
 - Square Invoicing (optional): `squareService` turns a completed shift note into a
   **draft** invoice in the operator's Square account (never sent — sending it is a
   manual step in Square). The access token is a secret read from env
