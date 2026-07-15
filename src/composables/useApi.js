@@ -22,7 +22,12 @@ client.interceptors.response.use(
     const status = err.response?.status
     const error = err.response?.data?.error
     const offline = typeof navigator !== 'undefined' && !navigator.onLine
-    if (status === 401 && router.currentRoute.value.name !== 'login') {
+    // Never hijack navigation into the staff login while the user is in the
+    // participant portal — the portal is a separate auth surface with its own
+    // 401 handling (see usePortalApi). Keyed off the URL so it is reliable even
+    // before the router has resolved its first navigation.
+    const inPortal = typeof window !== 'undefined' && window.location.pathname.startsWith('/portal')
+    if (status === 401 && !inPortal && router.currentRoute.value.name !== 'login') {
       useAuthStore().clear()
       router.push({ name: 'login', query: { redirect: router.currentRoute.value.fullPath } })
     } else if (error?.message) {

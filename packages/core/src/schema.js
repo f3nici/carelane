@@ -29,6 +29,24 @@ export const webauthnCredentials = sqliteTable('webauthn_credentials', {
   lastUsedAt: text('last_used_at')
 })
 
+// Client-portal login accounts (added post-launch). A participant (or their
+// representative) can be granted a read-only portal login to view their own
+// finalised shift notes and completed documents. One account per participant;
+// the credential is a username + bcrypt password hash, entirely separate from
+// the staff `users` table so a portal login can never reach staff surfaces or
+// another participant's records. Managed by an admin; deactivated (not deleted)
+// to revoke access.
+export const clientPortalAccounts = sqliteTable('client_portal_accounts', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  clientId: integer('client_id').notNull().references(() => clients.id).unique(),
+  username: text('username').notNull().unique(),
+  passwordHash: text('password_hash').notNull(),
+  active: integer('active').notNull().default(1),
+  lastLoginAt: text('last_login_at'),
+  createdAt: text('created_at'),
+  updatedAt: text('updated_at')
+})
+
 export const clients = sqliteTable('clients', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   firstName: text('first_name').notNull(), // 🔒

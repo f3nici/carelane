@@ -8,6 +8,7 @@ import { seed } from '../db/seed.js'
 import { services } from './_core.js'
 import { setWorkerClients } from './accessService.js'
 import { CLIENT_DOC_DIR } from './clientDocumentService.js'
+import * as portalService from './portalService.js'
 import { logger } from './logger.js'
 
 /**
@@ -27,6 +28,9 @@ import { logger } from './logger.js'
 export const DEMO_ADMIN_USERNAME = 'demo'
 export const DEMO_WORKER_USERNAME = 'demoworker'
 export const DEMO_PASSWORD = 'demo'
+// A client-portal login for one demo participant (Aisha), advertised on the
+// portal sign-in page so a visitor can see the participant-facing view.
+export const DEMO_PORTAL_USERNAME = 'aisha'
 
 const BCRYPT_COST = 12
 const nowIso = () => new Date().toISOString()
@@ -45,7 +49,7 @@ function isoDate (days = 0) {
 // foreign-key constraints (enabled on the connection) are satisfied. Reference
 // data (billing_codes, templates, settings, users) is intentionally preserved.
 const WIPE_ORDER = [
-  'share_links', 'goal_progress_notes', 'client_goals', 'shift_photos', 'square_invoices',
+  'client_portal_accounts', 'share_links', 'goal_progress_notes', 'client_goals', 'shift_photos', 'square_invoices',
   'medication_records', 'restrictive_practice_records', 'incident_reports',
   'reports', 'client_documents', 'agreement_line_items', 'service_agreements',
   'client_billing_codes', 'scheduled_shifts', 'shift_recurrences', 'shift_notes',
@@ -193,6 +197,10 @@ function seedExampleData (adminId, workerId) {
   // Assign two participants to the demo support worker (Grace stays admin-only,
   // to show the difference between the two logins).
   setWorkerClients(workerId, [aisha.id, tom.id], adminId)
+
+  // Give Aisha a client-portal login so the participant-facing portal can be
+  // explored in the demo (shows her finalised notes + documents, read-only).
+  portalService.upsertAccount(aisha.id, { username: DEMO_PORTAL_USERNAME, password: DEMO_PASSWORD })
 
   // ── Service agreements ──────────────────────────────────────────────────
   agreement.createAgreement({
