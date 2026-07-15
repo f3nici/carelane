@@ -26,7 +26,7 @@ function photoUrl (photoId) {
 
 onMounted(async () => {
   try {
-    note.value = await api.get(`/shift-notes/${route.params.id}`)
+    note.value = (await api.get(`/shift-notes/${route.params.id}`)).data
   } finally {
     loading.value = false
   }

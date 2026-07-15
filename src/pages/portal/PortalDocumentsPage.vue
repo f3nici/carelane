@@ -35,7 +35,7 @@ function fileUrl (id) {
 
 onMounted(async () => {
   try {
-    documents.value = await api.get('/documents')
+    documents.value = (await api.get('/documents')).data
   } finally {
     loading.value = false
   }
