@@ -1,9 +1,25 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
+import { usePortalAuthStore } from '../stores/portalAuth.js'
 import DefaultLayout from '../layouts/DefaultLayout.vue'
+import PortalLayout from '../layouts/PortalLayout.vue'
 
 const routes = [
   { path: '/login', name: 'login', component: () => import('../pages/LoginPage.vue'), meta: { public: true } },
+  // Client portal (participant-facing). A wholly separate section with its own
+  // layout, auth store and guard branch — never mixes with the staff app.
+  { path: '/portal/login', name: 'portal-login', component: () => import('../pages/portal/PortalLoginPage.vue'), meta: { portal: true, public: true } },
+  {
+    path: '/portal',
+    component: PortalLayout,
+    meta: { portal: true },
+    children: [
+      { path: '', redirect: { name: 'portal-notes' } },
+      { path: 'shift-notes', name: 'portal-notes', component: () => import('../pages/portal/PortalNotesPage.vue'), meta: { portal: true } },
+      { path: 'shift-notes/:id', name: 'portal-note', component: () => import('../pages/portal/PortalNoteDetailPage.vue'), meta: { portal: true } },
+      { path: 'documents', name: 'portal-documents', component: () => import('../pages/portal/PortalDocumentsPage.vue'), meta: { portal: true } }
+    ]
+  },
   {
     path: '/',
     component: DefaultLayout,
@@ -47,6 +63,16 @@ const router = createRouter({
 })
 
 router.beforeEach(async to => {
+  // Client-portal routes run on a wholly separate auth store/session — resolve
+  // them here and never touch the staff auth flow below.
+  if (to.meta.portal) {
+    const portal = usePortalAuthStore()
+    if (!portal.checked) await portal.fetchMe()
+    if (to.meta.public) return true
+    if (!portal.isAuthenticated) return { name: 'portal-login', query: { redirect: to.fullPath } }
+    return true
+  }
+
   if (to.meta.public) return true
   const auth = useAuthStore()
   if (!auth.checked) await auth.fetchMe()

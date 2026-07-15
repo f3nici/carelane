@@ -39,6 +39,11 @@ export const useOfflineStore = defineStore('offline', {
     /** Begin listening for connectivity changes (idempotent). */
     async init () {
       if (this.started || !offlineSupported()) return
+      // Offline note capture is a staff-only feature; it must stay completely
+      // inert in the participant portal (a separate /portal URL space). Its
+      // staff API calls (`/clients`) would 401 for a portal visitor and the
+      // staff axios interceptor would hijack navigation to the staff login.
+      if (typeof window !== 'undefined' && window.location.pathname.startsWith('/portal')) return
       this.started = true
       window.addEventListener('online', () => { this.online = true; this.flush(); this.cacheClients() })
       window.addEventListener('offline', () => {

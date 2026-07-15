@@ -10,6 +10,7 @@ import ClientGoals from '../components/ClientGoals.vue'
 import ClientDocuments from '../components/ClientDocuments.vue'
 import ClientRestrictivePractices from '../components/ClientRestrictivePractices.vue'
 import ClientMedications from '../components/ClientMedications.vue'
+import ClientPortalAccess from '../components/ClientPortalAccess.vue'
 
 const api = useApi()
 const route = useRoute()
@@ -97,13 +98,15 @@ function exportData () {
   window.open(`/api/v1/clients/${id.value}/export.zip`, '_blank')
 }
 
-const tabs = [
+// Portal-access management is an operator surface — only shown to an admin.
+const tabs = computed(() => [
   { key: 'overview', label: 'Overview' },
   { key: 'goals', label: 'Goals', count: goalCount },
   { key: 'documents', label: 'Documents & consents', count: documentCount },
   { key: 'medications', label: 'Medications', count: medicationCount },
-  { key: 'restrictive', label: 'Restrictive practices', count: restrictiveCount }
-]
+  { key: 'restrictive', label: 'Restrictive practices', count: restrictiveCount },
+  ...(auth.isAdmin ? [{ key: 'portal', label: 'Portal access' }] : [])
+])
 </script>
 
 <template>
@@ -240,6 +243,10 @@ const tabs = [
 
     <div v-show="tab === 'restrictive'">
       <ClientRestrictivePractices :key="id" :client-id="id" :readonly="!auth.isAdmin" @count="restrictiveCount = $event" />
+    </div>
+
+    <div v-if="auth.isAdmin" v-show="tab === 'portal'">
+      <ClientPortalAccess :key="id" :client-id="id" />
     </div>
 
     <ConfirmDialog
