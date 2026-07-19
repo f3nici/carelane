@@ -36,7 +36,7 @@
     "packages/*"
   ],
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.111.0",
+    "@anthropic-ai/sdk": "^0.112.3",
     "@carelane/core": "*",
     "@simplewebauthn/browser": "^13.3.0",
     "@huggingface/transformers": "^3.8.1",
@@ -63,9 +63,9 @@
     "sqlite-vec": "^0.1.9",
     "swagger-jsdoc": "^6.3.0",
     "swagger-ui-express": "^5.0.1",
-    "vue": "^3.5.39",
+    "vue": "^3.5.40",
     "vue-cal": "^4.10.2",
-    "vue-router": "^5.1.0",
+    "vue-router": "^5.2.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
