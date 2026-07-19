@@ -5,6 +5,7 @@ import { useApi } from '../composables/useApi.js'
 import { useIntegrations } from '../composables/useIntegrations.js'
 import { useToastStore } from '../stores/toast.js'
 import { useAuthStore } from '../stores/auth.js'
+import { openServerFile } from '../composables/nativeFiles.js'
 import ReportBuilder from '../components/ReportBuilder.vue'
 import AgreementEditor from '../components/AgreementEditor.vue'
 import AiDraftPanel from '../components/AiDraftPanel.vue'
@@ -88,7 +89,7 @@ async function draft () {
 }
 
 function downloadPdf () {
-  window.open(`/api/v1/reports/${id.value}/pdf?refresh=true`, '_blank')
+  openServerFile(`/api/v1/reports/${id.value}/pdf?refresh=true`, `report-${id.value}.pdf`)
 }
 
 async function toggleArchive () {

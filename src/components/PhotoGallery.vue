@@ -1,5 +1,6 @@
 <script setup>
 import { useApi } from '../composables/useApi.js'
+import { apiUrl } from '../composables/serverBase.js'
 
 const props = defineProps({
   shiftId: { type: [Number, String], required: true },
@@ -10,7 +11,7 @@ const emit = defineEmits(['deleted'])
 const api = useApi()
 
 // media files are served only via this auth-gated endpoint, never a static path
-const mediaUrl = id => `/api/v1/shifts/${props.shiftId}/photos/${id}/file`
+const mediaUrl = id => apiUrl(`/api/v1/shifts/${props.shiftId}/photos/${id}/file`)
 const isVideo = mime => typeof mime === 'string' && mime.startsWith('video/')
 
 async function remove (id) {

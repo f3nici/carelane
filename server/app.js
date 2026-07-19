@@ -109,7 +109,7 @@ export function createApp () {
 
   app.use(express.json({ limit: '2mb' }))
 
-  // CORS for the dev frontend only (prod is same-origin)
+  // CORS for the dev frontend and the Android app (the web app is same-origin)
   app.use((req, res, next) => {
     const origin = req.get('origin')
     if (origin && config.corsOrigins.includes(origin)) {
@@ -117,6 +117,8 @@ export function createApp () {
       res.set('Access-Control-Allow-Credentials', 'true')
       res.set('Access-Control-Allow-Headers', 'Content-Type, x-csrf-token')
       res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+      // Lets the native app name downloaded files (PDF exports etc).
+      res.set('Access-Control-Expose-Headers', 'Content-Disposition')
     }
     if (req.method === 'OPTIONS') return res.sendStatus(204)
     next()
@@ -131,11 +133,12 @@ export function createApp () {
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      sameSite: 'lax',
+      sameSite: config.sessionSameSite,
       // HTTPS-only in production (the app is expected to run behind a
       // TLS-terminating proxy — see `trust proxy`). A hard `true` prevents the
-      // session cookie being sent or injected over plain HTTP.
-      secure: config.isProduction,
+      // session cookie being sent or injected over plain HTTP. SameSite=None
+      // additionally requires Secure, browsers drop the cookie otherwise.
+      secure: config.isProduction || config.sessionSameSite === 'none',
       maxAge: 12 * 60 * 60 * 1000
     }
   }))

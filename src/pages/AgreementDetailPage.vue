@@ -5,6 +5,7 @@ import { useApi } from '../composables/useApi.js'
 import { useIntegrations } from '../composables/useIntegrations.js'
 import { useToastStore } from '../stores/toast.js'
 import { useAuthStore } from '../stores/auth.js'
+import { openServerFile } from '../composables/nativeFiles.js'
 import AgreementQuestionnaire from '../components/AgreementQuestionnaire.vue'
 import AgreementEditor from '../components/AgreementEditor.vue'
 import AiDraftPanel from '../components/AiDraftPanel.vue'
@@ -124,7 +125,7 @@ async function sign () {
 }
 
 function downloadPdf () {
-  window.open(`/api/v1/agreements/${id.value}/pdf?refresh=true`, '_blank')
+  openServerFile(`/api/v1/agreements/${id.value}/pdf?refresh=true`, `agreement-${id.value}.pdf`)
 }
 
 async function toggleArchive () {

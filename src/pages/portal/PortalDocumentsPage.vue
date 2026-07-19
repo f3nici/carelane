@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { usePortalApi } from '../../composables/usePortalApi.js'
+import { openServerFile } from '../../composables/nativeFiles.js'
 
 /** The participant's completed documents, with authenticated downloads. */
 const api = usePortalApi()
@@ -28,9 +29,9 @@ function niceDate (iso) {
   } catch { return iso }
 }
 
-/** Same-origin, cookie-authenticated download URL. */
-function fileUrl (id) {
-  return `/api/v1/portal/documents/${id}/file`
+/** Cookie-authenticated download (share sheet in the native app). */
+function download (id) {
+  openServerFile(`/api/v1/portal/documents/${id}/file`)
 }
 
 onMounted(async () => {
@@ -60,7 +61,7 @@ onMounted(async () => {
             <span v-if="doc.issue_date"> · Issued {{ niceDate(doc.issue_date) }}</span>
           </p>
         </div>
-        <a :href="fileUrl(doc.id)" class="btn-ghost text-xs shrink-0" target="_blank" rel="noopener">Download</a>
+        <button class="btn-ghost text-xs shrink-0" @click="download(doc.id)">Download</button>
       </li>
     </ul>
   </div>

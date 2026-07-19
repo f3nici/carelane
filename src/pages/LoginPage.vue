@@ -4,6 +4,7 @@ import axios from 'axios'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
 import BrandLogo from '../components/BrandLogo.vue'
+import { isNativeApp, serverBase, serverSetupOpen } from '../composables/serverBase.js'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -131,6 +132,10 @@ async function signInWithPasskey () {
 
       <p class="text-xs text-mid mt-6 text-center">
         Are you a participant? <a href="/portal/login" class="text-accent hover:underline">Open the participant portal</a>
+      </p>
+      <p v-if="isNativeApp()" class="text-xs text-mid mt-2 text-center">
+        Server: <span class="text-white/80">{{ serverBase() }}</span>
+        <button type="button" class="text-accent hover:underline ml-1" @click="serverSetupOpen = true">Change</button>
       </p>
     </div>
   </div>

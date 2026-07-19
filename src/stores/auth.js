@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import axios from 'axios'
 import { startAuthentication, browserSupportsWebAuthn } from '@simplewebauthn/browser'
+import { isNativeApp } from '../composables/serverBase.js'
 
 // Remembers that a session was established so the PWA can keep working offline
 // (where /auth/me is unreachable). Only the worker's own display name/role is
@@ -104,7 +105,9 @@ export const useAuthStore = defineStore('auth', {
     },
     /** Whether this browser can do WebAuthn (gates the passkey UI). */
     supportsPasskeys () {
-      return browserSupportsWebAuthn()
+      // The native app runs on its own local origin, which can never match the
+      // server's WebAuthn relying party, so passkeys are hidden there.
+      return !isNativeApp() && browserSupportsWebAuthn()
     },
     async logout () {
       try {

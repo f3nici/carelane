@@ -72,7 +72,18 @@ const config = {
   webauthnRpId: env.WEBAUTHN_RP_ID || '',
   webauthnOrigin: env.WEBAUTHN_ORIGIN || '',
   publicApiEnabled: (env.PUBLIC_API_ENABLED || 'false') === 'true',
-  corsOrigins: (env.CORS_ORIGINS || 'http://localhost:5173').split(',').map(s => s.trim()),
+  // 'https://localhost' is the Android app's WebView origin (see the
+  // carelane-android repo) and is always allowed. CORS alone does not let the
+  // app authenticate: the session cookie still needs SESSION_SAMESITE=none.
+  corsOrigins: [...new Set([
+    ...(env.CORS_ORIGINS || 'http://localhost:5173').split(',').map(s => s.trim()),
+    'https://localhost'
+  ])],
+  // Session cookie SameSite. The default 'lax' is right for the web app
+  // (same-origin). Set SESSION_SAMESITE=none to let the Android app sign in
+  // (cross-origin cookie); 'none' forces the Secure flag, so the server must be
+  // reached over HTTPS. Writes stay CSRF-protected either way.
+  sessionSameSite: ['lax', 'strict', 'none'].includes(env.SESSION_SAMESITE) ? env.SESSION_SAMESITE : 'lax',
   // Google Calendar one-way push (optional). App credentials live in env; the
   // per-user refresh token is stored encrypted in settings (see
   // googleCalendarService). Sync is a no-op until both are present.

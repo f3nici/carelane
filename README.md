@@ -224,7 +224,8 @@ All configuration is via environment variables (see [`.env.example`](.env.exampl
 | `METRICS_ENABLED` / `METRICS_TOKEN` | Opt-in Prometheus scrape at `/metrics`; when a token is set it is required (Bearer or `?token=`). With no token set, token-less scrapes are served only to a private/loopback source address (a public source gets 401). See the [metrics setup guide](docs/metrics-setup.md). |
 | `WEBAUTHN_RP_ID` / `WEBAUTHN_ORIGIN` | Pin the passkey relying-party id/origin. Auto-derived from the request when blank (correct for same-origin); set both behind a Host-rewriting proxy. |
 | `PUBLIC_API_ENABLED` | Toggle for the public API surface. |
-| `CORS_ORIGINS` | Allowed CORS origins (comma-separated). |
+| `CORS_ORIGINS` | Allowed CORS origins (comma-separated). `https://localhost` (the Android app's WebView origin) is always allowed. |
+| `SESSION_SAMESITE` | Session cookie SameSite: `lax` (default), `strict` or `none`. Set `none` to let the [CareLane Android app](https://github.com/f3nici/carelane-android) sign in — its WebView calls the server cross-origin, so the cookie must be sent cross-site. `none` forces the `Secure` flag, so the server must be served over HTTPS. Writes stay CSRF-protected either way. |
 | `DEMO_MODE` / `DEMO_RESET_HOURS` | Public demo mode (default off). See [Public demo mode](#public-demo-mode) below. |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_REDIRECT_URI` | Optional one-way Google Calendar sync. See the [Google Calendar setup guide](docs/google-calendar-setup.md). |
 | `SQUARE_ACCESS_TOKEN` / `SQUARE_ENVIRONMENT` | Optional Square draft-invoicing. The location is auto-detected on the first "Test connection" in Settings. See the [Square invoicing setup guide](docs/square-invoicing-setup.md). |
