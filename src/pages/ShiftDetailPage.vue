@@ -5,6 +5,7 @@ import { useApi } from '../composables/useApi.js'
 import { useIntegrations } from '../composables/useIntegrations.js'
 import { useToastStore } from '../stores/toast.js'
 import { useOfflineStore } from '../stores/offline.js'
+import { isOnline } from '../composables/connectivity.js'
 import { useAuthStore } from '../stores/auth.js'
 import ShiftNoteEditor from '../components/ShiftNoteEditor.vue'
 import AiDraftPanel from '../components/AiDraftPanel.vue'
@@ -45,7 +46,7 @@ const fromSchedule = computed(() => route.query.from_schedule ? Number(route.que
 onMounted(async () => {
   // Offline note capture: the participant list comes from the offline cache when
   // there's no signal (the server fetch would just fail).
-  if (offline.supported && !navigator.onLine) {
+  if (offline.supported && !offline.online) {
     clients.value = offline.clients
     return
   }
@@ -82,7 +83,7 @@ async function save (payload) {
       // New note. Editing the schedule-linked endpoint keeps the two in step.
       const endpoint = fromSchedule.value ? `/schedule/${fromSchedule.value}/note` : '/shifts'
       // Offline field capture: park new notes in IndexedDB and sync on reconnect.
-      if (offline.supported && !navigator.onLine) return queueOffline(endpoint, payload)
+      if (offline.supported && !offline.online) return queueOffline(endpoint, payload)
       try {
         const created = await api.post(endpoint, payload)
         res = { data: fromSchedule.value ? created.data.note : created.data }
@@ -110,7 +111,7 @@ async function queueOffline (endpoint, payload) {
   await offline.enqueue({ endpoint, payload: draft, shiftDate: payload.shift_date })
   busy.value = false
   toast.push('Saved offline — it will sync automatically when you reconnect', 'success')
-  router.push(navigator.onLine ? '/shifts' : { name: 'offline' })
+  router.push(isOnline() ? '/shifts' : { name: 'offline' })
 }
 
 async function reopen () {

@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
 import { usePortalAuthStore } from '../stores/portalAuth.js'
+import { isOnline } from '../composables/connectivity.js'
 import DefaultLayout from '../layouts/DefaultLayout.vue'
 import PortalLayout from '../layouts/PortalLayout.vue'
 
@@ -85,7 +86,7 @@ router.beforeEach(async to => {
   if (to.meta.adminOnly && !auth.isAdmin) return { name: 'dashboard' }
   // Offline, the only pages that work are note capture and the offline home —
   // everything else fans out to the API and just renders connection errors.
-  const offline = typeof navigator !== 'undefined' && !navigator.onLine
+  const offline = !isOnline()
   if (offline && !to.meta.offlineReady) return { name: 'offline' }
   return true
 })

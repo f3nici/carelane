@@ -3,6 +3,7 @@ import { useAuthStore } from '../stores/auth.js'
 import { useToastStore } from '../stores/toast.js'
 import router from '../router/index.js'
 import { serverBase } from './serverBase.js'
+import { isOnline } from './connectivity.js'
 
 const client = axios.create({
   // serverBase() is '' on the web; in the native app it is the configured
@@ -24,7 +25,7 @@ client.interceptors.response.use(
   err => {
     const status = err.response?.status
     const error = err.response?.data?.error
-    const offline = typeof navigator !== 'undefined' && !navigator.onLine
+    const offline = !isOnline()
     // Never hijack navigation into the staff login while the user is in the
     // participant portal — the portal is a separate auth surface with its own
     // 401 handling (see usePortalApi). Keyed off the URL so it is reliable even

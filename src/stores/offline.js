@@ -1,8 +1,10 @@
 import { defineStore } from 'pinia'
 import router from '../router/index.js'
 import { useApi } from '../composables/useApi.js'
+import { useAuthStore } from './auth.js'
 import { useToastStore } from './toast.js'
 import { countDrafts, queueDraft, syncDrafts, offlineSupported } from '../composables/offlineDrafts.js'
+import { isOnline, onConnectivityChange, initConnectivity } from '../composables/connectivity.js'
 
 // A minimal participant roster cached so the new-note form can still pick a
 // participant with no signal. Only id + names are kept (no PII beyond what the
@@ -26,7 +28,7 @@ function writeClients (clients) {
  */
 export const useOfflineStore = defineStore('offline', {
   state: () => ({
-    online: typeof navigator === 'undefined' ? true : navigator.onLine,
+    online: isOnline(),
     pending: 0,
     syncing: false,
     started: false,
@@ -45,15 +47,17 @@ export const useOfflineStore = defineStore('offline', {
       // staff axios interceptor would hijack navigation to the staff login.
       if (typeof window !== 'undefined' && window.location.pathname.startsWith('/portal')) return
       this.started = true
-      window.addEventListener('online', () => { this.online = true; this.flush(); this.cacheClients() })
-      window.addEventListener('offline', () => {
-        this.online = false
+      onConnectivityChange((online) => {
+        this.online = online
+        if (online) { this.flush(); this.cacheClients(); return }
         // Drop the worker onto the offline-safe screen so they don't sit on a
         // page that can only render connection errors.
         if (!router.currentRoute.value.meta.offlineReady && !router.currentRoute.value.meta.public) {
           router.replace({ name: 'offline' })
         }
       })
+      await initConnectivity()
+      this.online = isOnline()
       await this.refresh()
       if (this.online) { this.flush(); this.cacheClients() }
     },
@@ -86,6 +90,11 @@ export const useOfflineStore = defineStore('offline', {
     /** Flush queued drafts to the server (best-effort). */
     async flush ({ silent = true } = {}) {
       if (this.syncing || !this.pending) { await this.refresh(); if (!this.pending) return }
+      // After an offline boot the session was restored from the local marker
+      // and carries no CSRF token; the queued POSTs would all be rejected.
+      // Re-fetch /auth/me first (a no-op when the token is already there).
+      const auth = useAuthStore()
+      if (!auth.csrfToken) await auth.fetchMe()
       this.syncing = true
       try {
         const { synced } = await syncDrafts(useApi())

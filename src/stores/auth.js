@@ -54,11 +54,13 @@ export const useAuthStore = defineStore('auth', {
         this.offlineSession = false
         rememberSession(this.user)
       } catch (err) {
-        // Offline (no response) with a known prior session: keep the worker
-        // signed in so they can still capture notes. A real 401 means logged
-        // out — drop the marker and clear.
+        // No response (offline, or the server is unreachable) with a known
+        // prior session: keep the worker signed in so they can still capture
+        // notes. Deliberately NOT gated on navigator.onLine, which lies in the
+        // Android WebView. A real 401 means logged out — drop the marker and
+        // clear.
         const session = readSession()
-        if (!err.response && typeof navigator !== 'undefined' && !navigator.onLine && session) {
+        if (!err.response && session) {
           this.user = session
           this.offlineSession = true
         } else {
