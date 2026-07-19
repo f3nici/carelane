@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia'
 import axios from 'axios'
 import { startAuthentication, browserSupportsWebAuthn } from '@simplewebauthn/browser'
-import { isNativeApp } from '../composables/serverBase.js'
 
 // Remembers that a session was established so the PWA can keep working offline
 // (where /auth/me is unreachable). Only the worker's own display name/role is
@@ -56,9 +55,9 @@ export const useAuthStore = defineStore('auth', {
       } catch (err) {
         // No response (offline, or the server is unreachable) with a known
         // prior session: keep the worker signed in so they can still capture
-        // notes. Deliberately NOT gated on navigator.onLine, which lies in the
-        // Android WebView. A real 401 means logged out — drop the marker and
-        // clear.
+        // notes. Deliberately NOT gated on navigator.onLine, which can lag or
+        // lie about real connectivity. A real 401 means logged out — drop the
+        // marker and clear.
         const session = readSession()
         if (!err.response && session) {
           this.user = session
@@ -107,9 +106,7 @@ export const useAuthStore = defineStore('auth', {
     },
     /** Whether this browser can do WebAuthn (gates the passkey UI). */
     supportsPasskeys () {
-      // The native app runs on its own local origin, which can never match the
-      // server's WebAuthn relying party, so passkeys are hidden there.
-      return !isNativeApp() && browserSupportsWebAuthn()
+      return browserSupportsWebAuthn()
     },
     async logout () {
       try {

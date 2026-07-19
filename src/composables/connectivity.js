@@ -1,10 +1,8 @@
-import { isNativeApp } from './serverBase.js'
-
 /*
- * Connectivity tracking that works in the native app. Android WebView's
- * navigator.onLine is unreliable (it can stay true in airplane mode), so the
- * native app asks the Capacitor Network plugin instead. The web app keeps
- * using the browser online/offline events.
+ * Shared connectivity tracking, backed by the browser's online/offline
+ * events. Centralised here so the offline store, router guard and API
+ * interceptor all read the same value instead of checking navigator.onLine
+ * separately in three places.
  */
 
 let online = typeof navigator === 'undefined' ? true : navigator.onLine
@@ -31,12 +29,7 @@ function set (value) {
 
 /** Start watching connectivity (idempotent via the offline store's init). */
 export async function initConnectivity () {
-  const Network = isNativeApp() && window.Capacitor?.Plugins?.Network
-  if (Network) {
-    Network.addListener('networkStatusChange', s => set(!!s.connected))
-    try { set((await Network.getStatus()).connected) } catch { /* keep default */ }
-  } else if (typeof window !== 'undefined') {
-    window.addEventListener('online', () => set(true))
-    window.addEventListener('offline', () => set(false))
-  }
+  if (typeof window === 'undefined') return
+  window.addEventListener('online', () => set(true))
+  window.addEventListener('offline', () => set(false))
 }

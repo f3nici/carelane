@@ -3,7 +3,6 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
 import { usePortalApi } from '../../composables/usePortalApi.js'
 import { renderMarkdown } from '../../composables/useMarkdown.js'
-import { apiUrl } from '../../composables/serverBase.js'
 
 /** A single finalised shift note, with the narrative rendered from Markdown. */
 const api = usePortalApi()
@@ -20,9 +19,9 @@ function niceDate (iso) {
   } catch { return iso }
 }
 
-/** Cookie-authenticated URL for a note photo (server-prefixed in the app). */
+/** Same-origin, cookie-authenticated URL for a note photo. */
 function photoUrl (photoId) {
-  return apiUrl(`/api/v1/portal/shift-notes/${route.params.id}/photos/${photoId}/file`)
+  return `/api/v1/portal/shift-notes/${route.params.id}/photos/${photoId}/file`
 }
 
 onMounted(async () => {

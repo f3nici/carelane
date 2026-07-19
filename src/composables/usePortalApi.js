@@ -2,7 +2,6 @@ import axios from 'axios'
 import { usePortalAuthStore } from '../stores/portalAuth.js'
 import { useToastStore } from '../stores/toast.js'
 import router from '../router/index.js'
-import { serverBase } from './serverBase.js'
 
 /**
  * API access for the client portal. A dedicated axios instance (separate from
@@ -10,7 +9,7 @@ import { serverBase } from './serverBase.js'
  * funnels to the portal login rather than the staff one.
  */
 const client = axios.create({
-  baseURL: serverBase() + '/api/v1/portal',
+  baseURL: '/api/v1/portal',
   withCredentials: true
 })
 

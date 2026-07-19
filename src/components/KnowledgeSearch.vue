@@ -3,9 +3,6 @@ import { ref, onMounted } from 'vue'
 import { useApi } from '../composables/useApi.js'
 import { useIntegrations } from '../composables/useIntegrations.js'
 import { renderMarkdown } from '../composables/useMarkdown.js'
-import { openServerFile } from '../composables/nativeFiles.js'
-
-const download = id => openServerFile(`/api/v1/documents/${id}/file`)
 
 const api = useApi()
 const { aiActive, ensureLoaded } = useIntegrations()
@@ -58,7 +55,7 @@ async function run () {
         <ul class="space-y-1 text-xs text-mid">
           <li v-for="(s, i) in sources" :key="i">
             <span class="text-accent">{{ s.title }}</span>, p.{{ s.page }} — {{ s.snippet }}…
-            <button v-if="s.document_id" class="text-accent hover:underline ml-1" @click="download(s.document_id)">(download)</button>
+            <a v-if="s.document_id" class="text-accent hover:underline ml-1" :href="`/api/v1/documents/${s.document_id}/file`" target="_blank" rel="noopener">(download)</a>
           </li>
         </ul>
       </div>
@@ -68,7 +65,7 @@ async function run () {
       <li v-for="(r, i) in results" :key="i" class="text-sm border-b border-white/5 pb-2">
         <p class="text-xs mb-1">
           <span class="text-accent">{{ r.title }} · page {{ r.page }}</span><span v-if="r.score" class="text-mid"> · {{ (r.score * 100).toFixed(0) }}% match</span>
-          <button class="text-accent hover:underline ml-1" @click="download(r.document_id)">(download)</button>
+          <a class="text-accent hover:underline ml-1" :href="`/api/v1/documents/${r.document_id}/file`" target="_blank" rel="noopener">(download)</a>
         </p>
         <p class="text-mid">{{ r.content.slice(0, 350) }}…</p>
       </li>

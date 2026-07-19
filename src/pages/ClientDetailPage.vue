@@ -4,7 +4,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { useApi } from '../composables/useApi.js'
 import { useToastStore } from '../stores/toast.js'
 import { useAuthStore } from '../stores/auth.js'
-import { openServerFile } from '../composables/nativeFiles.js'
 import StatusBadge from '../components/StatusBadge.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import ClientGoals from '../components/ClientGoals.vue'
@@ -96,7 +95,7 @@ async function remove () {
 
 /** Download everything held for this participant as a zip (PDF summary + JSON). */
 function exportData () {
-  openServerFile(`/api/v1/clients/${id.value}/export.zip`, 'export.zip')
+  window.open(`/api/v1/clients/${id.value}/export.zip`, '_blank')
 }
 
 // Portal-access management is an operator surface — only shown to an admin.

@@ -4,7 +4,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { useApi } from '../composables/useApi.js'
 import { useToastStore } from '../stores/toast.js'
 import { useAuthStore } from '../stores/auth.js'
-import { openServerFile } from '../composables/nativeFiles.js'
 import StatusBadge from '../components/StatusBadge.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 
@@ -97,7 +96,7 @@ async function save () {
 }
 
 function exportPdf () {
-  openServerFile(`/api/v1/incidents/${id.value}/export.pdf`, `incident-${id.value}.pdf`)
+  window.open(`/api/v1/incidents/${id.value}/export.pdf`, '_blank')
 }
 
 async function remove () {

@@ -2,13 +2,10 @@ import axios from 'axios'
 import { useAuthStore } from '../stores/auth.js'
 import { useToastStore } from '../stores/toast.js'
 import router from '../router/index.js'
-import { serverBase } from './serverBase.js'
 import { isOnline } from './connectivity.js'
 
 const client = axios.create({
-  // serverBase() is '' on the web; in the native app it is the configured
-  // server origin.
-  baseURL: serverBase() + '/api/v1',
+  baseURL: '/api/v1',
   withCredentials: true
 })
 

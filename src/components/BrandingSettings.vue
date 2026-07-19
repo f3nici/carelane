@@ -3,7 +3,6 @@ import { ref } from 'vue'
 import { useApi } from '../composables/useApi.js'
 import { useToastStore } from '../stores/toast.js'
 import { useAuthStore } from '../stores/auth.js'
-import { apiUrl } from '../composables/serverBase.js'
 
 defineProps({
   settings: { type: Object, required: true }
@@ -46,7 +45,7 @@ async function uploadLogo (event) {
       <div><label class="label">Accent colour</label><input v-model="settings.brand_accent_color" type="color" class="input h-10" /></div>
     </div>
     <div class="flex items-center gap-4">
-      <img v-if="settings.logo_filename" :src="apiUrl(`/api/v1/settings/logo?v=${logoVersion}`)" alt="Business logo" class="h-12 rounded bg-white/5 p-1" />
+      <img v-if="settings.logo_filename" :src="`/api/v1/settings/logo?v=${logoVersion}`" alt="Business logo" class="h-12 rounded bg-white/5 p-1" />
       <label v-if="!auth.isDemo" class="btn-ghost cursor-pointer">
         <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" class="hidden" @change="uploadLogo" />
         {{ logoBusy ? 'Uploading…' : (settings.logo_filename ? 'Replace logo' : 'Upload logo') }}

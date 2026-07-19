@@ -3,7 +3,6 @@ import { ref, reactive, onMounted } from 'vue'
 import { useApi } from '../composables/useApi.js'
 import { useToastStore } from '../stores/toast.js'
 import { useAuthStore } from '../stores/auth.js'
-import { openServerFile } from '../composables/nativeFiles.js'
 import StatusBadge from './StatusBadge.vue'
 import ShareLinkManager from './ShareLinkManager.vue'
 
@@ -99,7 +98,7 @@ async function toggleAcknowledged (doc) {
 }
 
 function downloadDocument (doc) {
-  openServerFile(`/api/v1/clients/${props.clientId}/documents/${doc.id}/file`, doc.original_name)
+  window.open(`/api/v1/clients/${props.clientId}/documents/${doc.id}/file`, '_blank')
 }
 
 async function removeDocument (doc) {
