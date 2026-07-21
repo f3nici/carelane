@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest'
 import { freshDb } from './helpers/db.js'
 
 let ntfy, settingsService, sqlite, clientId, workerId
@@ -29,6 +29,8 @@ beforeEach(() => {
     ntfy_notify_incidents: 1,
     ntfy_notify_unbilled: 1,
     ntfy_notify_shift_reminders: 1,
+    ntfy_notify_birthdays: 1,
+    ntfy_birthday_lead_days: '30,1',
     ntfy_shift_reminder_minutes: 60,
     google_calendar_timezone: 'UTC',
     ntfy_last_error: null,
@@ -156,5 +158,47 @@ describe('ntfyService timezone math', () => {
     // Australia/Perth is UTC+8 year-round (no DST).
     const ms = ntfy._internal.zonedToUtcMs('2026-07-01', '09:00', 'Australia/Perth')
     expect(ms).toBe(Date.parse('2026-07-01T01:00:00Z'))
+  })
+})
+
+describe('ntfyService birthdays', () => {
+  let bdayIds = []
+
+  // A birth date (year is irrelevant) whose month/day is `daysAhead` from today.
+  const dobAhead = daysAhead => {
+    const d = new Date(Date.now() + daysAhead * 86400000)
+    return `1990-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
+  }
+  const addClient = dob => sqlite.prepare("INSERT INTO clients (first_name, last_name, date_of_birth, active, created_at) VALUES ('Bday', 'Person', ?, 1, ?)")
+    .run(dob, now()).lastInsertRowid
+
+  afterEach(() => {
+    for (const id of bdayIds) sqlite.prepare('DELETE FROM clients WHERE id = ?').run(id)
+    bdayIds = []
+  })
+
+  it('fires only on the configured lead marks (30 and 1 days ahead)', () => {
+    bdayIds.push(addClient(dobAhead(30)))  // 30 days out — a mark
+    bdayIds.push(addClient(dobAhead(1)))   // tomorrow — a mark
+    bdayIds.push(addClient(dobAhead(10)))  // 10 days out — not a mark
+    const rows = ntfy._internal.upcomingBirthdays()
+    expect(rows.map(r => r.days).sort((a, b) => a - b)).toEqual([1, 30])
+  })
+
+  it('adds a birthdays category to the digest with a friendly "when"', () => {
+    bdayIds.push(addClient(dobAhead(1)))
+    const bday = ntfy.buildDigest().find(i => i.key === 'birthdays')
+    expect(bday).toBeTruthy()
+    expect(bday.title).toMatch(/1 upcoming birthday/)
+    expect(bday.message).toMatch(/tomorrow/)
+    expect(ntfy.digestCounts().birthdays).toBe(1)
+  })
+
+  it('honours the lead-days setting and the category toggle', () => {
+    bdayIds.push(addClient(dobAhead(30)))
+    settingsService.updateSettings({ ntfy_birthday_lead_days: '1' })
+    expect(ntfy._internal.upcomingBirthdays()).toHaveLength(0) // 30 is no longer a mark
+    settingsService.updateSettings({ ntfy_notify_birthdays: 0, ntfy_birthday_lead_days: '30,1' })
+    expect(ntfy.buildDigest().find(i => i.key === 'birthdays')).toBeFalsy()
   })
 })

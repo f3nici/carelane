@@ -7,6 +7,7 @@ export const {
   clientDisplayName,
   getClient,
   listClients,
+  listBirthdays,
   createClient,
   updateClient,
   deleteClient,

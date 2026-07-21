@@ -240,10 +240,14 @@ export const ntfySettingsSchema = z.object({
   notify_incidents: bool01.optional(),
   notify_unbilled: bool01.optional(),
   notify_shift_reminders: bool01.optional(),
+  notify_birthdays: bool01.optional(),
   digest_time: time.optional(),
   plan_review_days: z.coerce.number().int().min(0).max(365).optional(),
   unbilled_days: z.coerce.number().int().min(0).max(365).optional(),
   shift_reminder_minutes: z.coerce.number().int().min(0).max(1440).optional(),
+  // Comma-separated lead marks (days before) for birthday nudges, e.g. "30,1".
+  // An empty string disables the marks without touching the category toggle.
+  birthday_lead_days: z.string().trim().regex(/^\s*(\d{1,3}(\s*,\s*\d{1,3})*)?\s*$/, 'use comma-separated day counts, e.g. 30,1').max(120).optional(),
   timeout_ms: z.coerce.number().int().min(1000).max(120000).optional()
 })
 

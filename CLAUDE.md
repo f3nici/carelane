@@ -136,7 +136,11 @@ API docs at `/api/docs`, health at `/healthz`.
   exactly like the roster list (admin → all shifts, worker → own via `worker_id`),
   windowed to a bounded past/future range, excludes cancelled/deleted shifts, and
   — like the Google push — carries only a short participant label + location +
-  times, never plan/health notes. The secret path is redacted from the access log
+  times, never plan/health notes. It also mirrors each participant's **birthday**
+  as an all-day, yearly-recurring event (scoped by participant access — admin
+  sees all, a worker only their assigned participants); only a short label is
+  exposed and the recurrence is anchored to a neutral base year so the birth year
+  (age) never leaks. The secret path is redacted from the access log
   (and never appears in metrics, which are path-free). UI: a "Calendar
   subscription" panel on the Roster page.
 - Client-facing share links (`shareLinkService`, `share_links` table): a
@@ -206,7 +210,9 @@ API docs at `/api/docs`, health at `/healthz`.
   [ntfy](https://ntfy.sh) topic — **plan reviews due** (active agreements nearing
   `end_date`), **incidents needing follow-up** (open/in-progress reports, overdue
   ones flagged) and **unbilled shifts aging** (finalised, `billed=0`, older than a
-  threshold) — pushed as a once-daily digest at the operator's configured time,
+  threshold) and **participant birthdays** (a nudge on the configured lead marks
+  — 30 days and 1 day before by default, `ntfy_birthday_lead_days`) — pushed as a
+  once-daily digest at the operator's configured time,
   plus per-shift **reminders** a configurable lead time before a scheduled shift
   starts (deduped via `scheduled_shifts.reminder_sent_at`). All sync is
   best-effort and a no-op until a topic is set + enabled. Server URL, topic,

@@ -3,6 +3,8 @@ import { sqlite } from '../db/connection.js'
 import config from '../config.js'
 import { getSetting } from './settingsService.js'
 import { listScheduled } from './scheduleService.js'
+import { listBirthdays } from './clientService.js'
+import { listAssignedClientIds } from './accessService.js'
 
 /**
  * Read-only iCalendar (.ics) subscription feed. Any calendar app (Google
@@ -19,6 +21,11 @@ import { listScheduled } from './scheduleService.js'
  * Privacy: events carry only a short participant label (preferred name /
  * display name) plus location and times — never plan or health notes, mirroring
  * how the Google push and AI calls minimise what leaves the record.
+ *
+ * The feed also carries each participant's **birthday** as an all-day, yearly
+ * recurring event (scoped like the roster — admins see all, a worker sees only
+ * their assigned participants). Only a short label is exposed; the birth year is
+ * never included (the recurrence is anchored to a neutral base year).
  */
 
 // How far back / forward the feed reaches. Bounded so a subscription stays small
@@ -186,6 +193,39 @@ function eventLines (shift, tz, host, stamp) {
   return lines
 }
 
+// Neutral anchor year for the recurring birthday events. A leap year is used so a
+// 29 February birthday keeps a valid DTSTART; the year itself is never meaningful
+// (the RRULE recurs it every year) and deliberately hides the participant's age.
+const BIRTHDAY_ANCHOR_YEAR = 2000
+
+/** Two-digit zero-padded string. */
+const pad2 = n => String(n).padStart(2, '0')
+
+/**
+ * Build the VEVENT lines for one participant's birthday — an all-day event that
+ * recurs yearly. Carries only a short label, never the birth year.
+ * @param {{client_id:number, label:string, month:number, day:number}} b
+ * @param {string} host request host, for a globally unique UID
+ * @param {Date} stamp DTSTAMP for this generation
+ */
+function birthdayEventLines (b, host, stamp) {
+  const start = `${BIRTHDAY_ANCHOR_YEAR}${pad2(b.month)}${pad2(b.day)}`
+  const next = new Date(`${BIRTHDAY_ANCHOR_YEAR}-${pad2(b.month)}-${pad2(b.day)}T00:00:00Z`)
+  next.setUTCDate(next.getUTCDate() + 1)
+  return [
+    'BEGIN:VEVENT',
+    `UID:carelane-birthday-${b.client_id}@${host}`,
+    `DTSTAMP:${toIcalUtcStamp(stamp)}`,
+    `DTSTART;VALUE=DATE:${start}`,
+    `DTEND;VALUE=DATE:${toIcalDate(next.toISOString().slice(0, 10))}`,
+    'RRULE:FREQ=YEARLY',
+    `SUMMARY:${escapeText(`🎂 ${b.label} — birthday`)}`,
+    `DESCRIPTION:${escapeText('Participant birthday (managed by CareLane).')}`,
+    'TRANSP:TRANSPARENT',
+    'END:VEVENT'
+  ]
+}
+
 /**
  * Render the full VCALENDAR document for a user's roster. Scoped to the user
  * (admins see all shifts; a worker sees only their own) over a bounded date
@@ -204,6 +244,10 @@ export function buildFeed (user, host) {
   if (user.role !== 'admin') filters.worker_id = user.id
   const shifts = listScheduled(filters).filter(s => s.status !== 'cancelled')
 
+  // Birthdays are scoped by participant access (assigned clients for a worker,
+  // everyone for an admin) rather than by rostered shift.
+  const birthdays = listBirthdays(user.role === 'admin' ? {} : { client_ids: listAssignedClientIds(user.id) })
+
   const stamp = new Date()
   const lines = [
     'BEGIN:VCALENDAR',
@@ -215,6 +259,7 @@ export function buildFeed (user, host) {
     `X-WR-TIMEZONE:${tz}`
   ]
   for (const shift of shifts) lines.push(...eventLines(shift, tz, host, stamp))
+  for (const b of birthdays) lines.push(...birthdayEventLines(b, host, stamp))
   lines.push('END:VCALENDAR')
   return lines.map(foldLine).join('\r\n') + '\r\n'
 }

@@ -106,6 +106,20 @@ describe('iCal calendar feed', () => {
     expect(feed.text).toMatch(/\r\n /)
   })
 
+  it('includes participant birthdays as yearly, all-day events (age hidden)', async () => {
+    await admin.agent.post('/api/v1/clients').set('x-csrf-token', admin.csrf)
+      .send({ first_name: 'Cake', last_name: 'Day', preferred_name: 'Cake', ndis_number: '431000004', date_of_birth: '1990-03-14' })
+    const gen = await admin.agent.post('/api/v1/schedule/calendar-feed/rotate').set('x-csrf-token', admin.csrf)
+    const feed = await request(app).get(`/calendar/${tokenOf(gen.body.data.url)}.ics`)
+    expect(feed.status).toBe(200)
+    expect(feed.text).toContain('UID:carelane-birthday-')
+    expect(feed.text).toContain('RRULE:FREQ=YEARLY')
+    // Anchored to a neutral base year (2000), not the birth year (1990).
+    expect(feed.text).toContain('DTSTART;VALUE=DATE:20000314')
+    expect(feed.text).not.toContain('1990')
+    expect(feed.text).toMatch(/SUMMARY:.*Cake.*birthday/)
+  })
+
   it('404s an unknown token', async () => {
     const res = await request(app).get('/calendar/not-a-real-token.ics')
     expect(res.status).toBe(404)

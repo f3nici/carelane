@@ -22,10 +22,12 @@ const SETTING_KEYS = {
   notify_incidents: 'ntfy_notify_incidents',
   notify_unbilled: 'ntfy_notify_unbilled',
   notify_shift_reminders: 'ntfy_notify_shift_reminders',
+  notify_birthdays: 'ntfy_notify_birthdays',
   digest_time: 'ntfy_digest_time',
   plan_review_days: 'ntfy_plan_review_days',
   unbilled_days: 'ntfy_unbilled_days',
   shift_reminder_minutes: 'ntfy_shift_reminder_minutes',
+  birthday_lead_days: 'ntfy_birthday_lead_days',
   timeout_ms: 'ntfy_timeout_ms'
 }
 

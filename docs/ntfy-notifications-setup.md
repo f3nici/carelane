@@ -13,6 +13,8 @@ CareLane notifies you about:
   ones are called out).
 - **Unbilled shifts aging** — finalised shifts that still haven't been billed.
 - **Upcoming shifts** — a reminder a configurable time before each scheduled shift.
+- **Participant birthdays** — a nudge a configurable number of days ahead
+  (30 days and 1 day before, by default).
 
 > You need: the **ntfy app** ([iOS](https://apps.apple.com/app/ntfy/id1625396347)
 > / [Android](https://play.google.com/store/apps/details?id=io.heckel.ntfy) / or
@@ -59,10 +61,10 @@ needs attention — handy for confirming the content.
 
 In the same settings card:
 
-- **What to notify about** — toggle each of the four categories independently.
-- **Daily digest time** — when the plan-review, incident and unbilled nudges go
-  out each day (in your operator timezone). One notification per non-empty
-  category.
+- **What to notify about** — toggle each of the five categories independently.
+- **Daily digest time** — when the plan-review, incident, unbilled and birthday
+  nudges go out each day (in your operator timezone). One notification per
+  non-empty category.
 - **Remind me before a shift** — how many minutes ahead of a scheduled shift to
   push its reminder (e.g. `60`). Reminders only fire for shifts that have a start
   time, and each shift is reminded once.
@@ -70,6 +72,16 @@ In the same settings card:
   start nudging.
 - **Unbilled shift age** — how old a finalised-but-unbilled shift must be before
   it's nudged, so brand-new shifts aren't flagged immediately.
+- **Birthday reminders** — a comma-separated list of lead marks in days before a
+  participant's birthday (e.g. `30,1`). A birthday only fires on the days exactly
+  that far ahead, so you get a heads-up 30 days out and a final reminder the day
+  before — never a nudge every day in between. Clear the field to disable the
+  marks without turning the category off.
+
+Participant birthdays also appear on the **iCal calendar subscription** (the
+"Calendar subscription" panel on the Roster page) as all-day, yearly-recurring
+events (scoped like the roster), so any calendar app you subscribe shows them
+alongside your shifts.
 
 ---
 

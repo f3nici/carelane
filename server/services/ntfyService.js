@@ -5,7 +5,7 @@ import { sqlite } from '../db/connection.js'
 import config from '../config.js'
 import { getSetting, updateSettings } from './settingsService.js'
 import { logActivity } from './activityService.js'
-import { clientDisplayName } from './clientService.js'
+import { clientDisplayName, listBirthdays } from './clientService.js'
 import { agreementDueDate } from './agreementService.js'
 import { countOpenIncidents } from './incidentService.js'
 
@@ -40,8 +40,13 @@ export const NTFY_DEFAULTS = {
   ntfy_notify_incidents: 1,
   ntfy_notify_unbilled: 1,
   ntfy_notify_shift_reminders: 1,
+  ntfy_notify_birthdays: 1,
   // Time of day (operator timezone) to push the daily "attention needed" digest.
   ntfy_digest_time: '08:00',
+  // Participant birthdays: comma-separated lead marks (days before) at which to
+  // nudge — a birthday fires only on the days exactly this far ahead, so no
+  // repeat nudges in between. Defaults to 30 days and 1 day before.
+  ntfy_birthday_lead_days: '30,1',
   // Plan reviews due: lead window (days) before a service agreement's end date.
   ntfy_plan_review_days: 30,
   // Unbilled shifts aging: only nudge once a finalised-but-unbilled shift is at
@@ -121,6 +126,65 @@ function zonedToUtcMs (dateStr, timeStr, timeZone) {
   return guess - tzOffsetMinutes(new Date(guess), timeZone) * 60000
 }
 
+/* ------------------------------- birthdays --------------------------------- */
+
+/** Whether a year is a leap year (Gregorian). */
+const isLeapYear = y => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0
+
+/**
+ * The configured birthday lead marks (days before) as a sorted, de-duplicated
+ * list of non-negative integers. Blank/invalid entries are dropped.
+ * @returns {number[]}
+ */
+function birthdayLeadDays () {
+  const raw = String(setting('ntfy_birthday_lead_days') ?? NTFY_DEFAULTS.ntfy_birthday_lead_days)
+  const set = new Set()
+  for (const part of raw.split(',')) {
+    const n = Number(part.trim())
+    if (Number.isInteger(n) && n >= 0 && n <= 365) set.add(n)
+  }
+  return [...set].sort((a, b) => a - b)
+}
+
+/**
+ * Whole days from `todayStr` (YYYY-MM-DD, operator-local) until the participant's
+ * next birthday on `month`/`day`. A 29 February birthday falls back to 28
+ * February in a non-leap year so it still fires.
+ * @param {string} todayStr
+ * @param {number} month 1–12
+ * @param {number} day 1–31
+ * @returns {number}
+ */
+function daysUntilBirthday (todayStr, month, day) {
+  const [ty, tm, td] = todayStr.split('-').map(Number)
+  const todayUtc = Date.UTC(ty, tm - 1, td)
+  const occurrence = year => {
+    const d = (month === 2 && day === 29 && !isLeapYear(year)) ? 28 : day
+    return Date.UTC(year, month - 1, d)
+  }
+  let target = occurrence(ty)
+  if (target < todayUtc) target = occurrence(ty + 1)
+  return Math.round((target - todayUtc) / 86400000)
+}
+
+/**
+ * Participants whose next birthday is exactly one of the configured lead marks
+ * away (e.g. 30 days and 1 day out), each tagged with the days remaining. This
+ * is an operator/admin surface, so it is unscoped (all participants).
+ * @returns {Array<{client_id:number, label:string, days:number}>}
+ */
+function upcomingBirthdays () {
+  const leads = birthdayLeadDays()
+  if (!leads.length) return []
+  const today = localDate(new Date(), tz())
+  const out = []
+  for (const b of listBirthdays()) {
+    const days = daysUntilBirthday(today, b.month, b.day)
+    if (leads.includes(days)) out.push({ client_id: b.client_id, label: b.label, days })
+  }
+  return out.sort((a, b) => a.days - b.days || (a.label < b.label ? -1 : 1))
+}
+
 /* ------------------------------ live status -------------------------------- */
 
 /** Record the live error banner (the audit log keeps the permanent record). */
@@ -145,7 +209,8 @@ export function digestCounts () {
     plan_reviews: planReviewsDue().length,
     incidents: countOpenIncidents(),
     incidents_overdue: overdueIncidentCount(),
-    unbilled: unbilledAging().count
+    unbilled: unbilledAging().count,
+    birthdays: upcomingBirthdays().length
   }
 }
 
@@ -161,10 +226,12 @@ export function status () {
     notify_incidents: bool(setting('ntfy_notify_incidents')),
     notify_unbilled: bool(setting('ntfy_notify_unbilled')),
     notify_shift_reminders: bool(setting('ntfy_notify_shift_reminders')),
+    notify_birthdays: bool(setting('ntfy_notify_birthdays')),
     digest_time: setting('ntfy_digest_time'),
     plan_review_days: num('ntfy_plan_review_days'),
     unbilled_days: num('ntfy_unbilled_days'),
     shift_reminder_minutes: num('ntfy_shift_reminder_minutes'),
+    birthday_lead_days: birthdayLeadDays().join(','),
     timeout_ms: timeoutMs(),
     timezone: tz(),
     token_configured: !!config.ntfyToken,
@@ -358,6 +425,22 @@ export function buildDigest () {
     }
   }
 
+  if (bool(setting('ntfy_notify_birthdays'))) {
+    const rows = upcomingBirthdays()
+    if (rows.length) {
+      const when = d => (d === 0 ? 'today' : d === 1 ? 'tomorrow' : `in ${d} days`)
+      const names = rows.slice(0, 5).map(r => `• ${r.label} — ${when(r.days)}`)
+      if (rows.length > 5) names.push(`…and ${rows.length - 5} more`)
+      out.push({
+        key: 'birthdays',
+        title: `${rows.length} upcoming birthday${rows.length === 1 ? '' : 's'}`,
+        message: names.join('\n'),
+        tags: ['birthday'],
+        click: linkTo('/clients')
+      })
+    }
+  }
+
   return out
 }
 
@@ -475,4 +558,4 @@ export function scheduleNotifications () {
 }
 
 // Exposed for tests.
-export const _internal = { localTime, localDate, zonedToUtcMs, tzOffsetMinutes, dueShiftReminders, buildDigest, maybeSendDigest }
+export const _internal = { localTime, localDate, zonedToUtcMs, tzOffsetMinutes, dueShiftReminders, buildDigest, maybeSendDigest, daysUntilBirthday, upcomingBirthdays, birthdayLeadDays }

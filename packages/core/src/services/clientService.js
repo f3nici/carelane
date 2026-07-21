@@ -79,6 +79,35 @@ export function createClientService (ctx, services) {
   }
 
   /**
+   * Active participants that have a recorded date of birth, for birthday
+   * reminders and the calendar feed. DOB is encrypted at rest, so it is decrypted
+   * here and reduced to a short display label plus the month/day only — the birth
+   * year is never surfaced (it would leak age and is not needed to place a
+   * birthday on a calendar). Scoped like the list: pass `client_ids` (a worker's
+   * assignments) to restrict; omit for an admin (all participants).
+   * @param {{client_ids?: number[]|null}} [filters]
+   * @returns {Array<{client_id:number, label:string, month:number, day:number}>}
+   */
+  function listBirthdays (filters = {}) {
+    const where = ['deleted_at IS NULL', 'active = 1']
+    const params = []
+    applyClientScope(where, params, 'id', filters.client_ids)
+    const rows = sqlite.prepare(`SELECT id, preferred_name, first_name, last_name, date_of_birth
+      FROM clients WHERE ${where.join(' AND ')}`).all(...params)
+    const out = []
+    for (const row of rows) {
+      const dob = decrypt(row.date_of_birth)
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dob ?? '').trim())
+      if (!m) continue
+      const month = Number(m[2])
+      const day = Number(m[3])
+      if (month < 1 || month > 12 || day < 1 || day > 31) continue
+      out.push({ client_id: row.id, label: clientDisplayName(row), month, day })
+    }
+    return out
+  }
+
+  /**
    * Fetch one client (decrypted) or throw 404.
    * @param {number} id
    */
@@ -277,6 +306,7 @@ export function createClientService (ctx, services) {
     clientDisplayName,
     getClient,
     listClients,
+    listBirthdays,
     createClient,
     updateClient,
     deleteClient,

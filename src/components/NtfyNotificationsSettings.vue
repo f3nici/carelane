@@ -29,10 +29,12 @@ async function save () {
       notify_incidents: s.value.notify_incidents ? 1 : 0,
       notify_unbilled: s.value.notify_unbilled ? 1 : 0,
       notify_shift_reminders: s.value.notify_shift_reminders ? 1 : 0,
+      notify_birthdays: s.value.notify_birthdays ? 1 : 0,
       digest_time: s.value.digest_time,
       plan_review_days: s.value.plan_review_days,
       unbilled_days: s.value.unbilled_days,
       shift_reminder_minutes: s.value.shift_reminder_minutes,
+      birthday_lead_days: s.value.birthday_lead_days,
       timeout_ms: s.value.timeout_ms
     })
     s.value = res.data
@@ -78,7 +80,7 @@ async function clearError () {
 
     <p class="text-xs text-mid">
       Get proactive nudges on your phone via <a href="https://ntfy.sh" target="_blank" rel="noopener" class="underline">ntfy</a> for plan reviews
-      due, incidents needing follow-up, unbilled shifts aging, and upcoming shifts. Pick a hard-to-guess topic name, subscribe to it in the
+      due, incidents needing follow-up, unbilled shifts aging, upcoming shifts, and participant birthdays. Pick a hard-to-guess topic name, subscribe to it in the
       ntfy app on your phone, then enter the same topic here. Messages carry only short labels and counts — never plan or health notes.
     </p>
 
@@ -88,13 +90,14 @@ async function clearError () {
     </div>
 
     <!-- Live preview of what a digest would push right now (the dashboard counts). -->
-    <div class="rounded-lg bg-white/5 p-3 text-sm grid grid-cols-2 sm:grid-cols-4 gap-2">
+    <div class="rounded-lg bg-white/5 p-3 text-sm grid grid-cols-2 sm:grid-cols-5 gap-2">
       <div><div class="text-lg font-semibold">{{ s.pending.plan_reviews }}</div><div class="text-xs text-mid">Plan reviews due</div></div>
       <div>
         <div class="text-lg font-semibold">{{ s.pending.incidents }}</div>
         <div class="text-xs text-mid">Incidents to follow up<span v-if="s.pending.incidents_overdue" class="text-warning"> ({{ s.pending.incidents_overdue }} overdue)</span></div>
       </div>
       <div><div class="text-lg font-semibold">{{ s.pending.unbilled }}</div><div class="text-xs text-mid">Unbilled shifts aging</div></div>
+      <div><div class="text-lg font-semibold">{{ s.pending.birthdays }}</div><div class="text-xs text-mid">Birthdays approaching</div></div>
       <div><div class="text-xs text-mid">Last sent</div><div class="text-xs">{{ s.last_sent_at ? new Date(s.last_sent_at).toLocaleString() : 'never' }}</div></div>
     </div>
 
@@ -137,6 +140,7 @@ async function clearError () {
       <label class="flex items-center gap-2 text-sm"><input v-model="s.notify_incidents" type="checkbox" class="accent-accent" /> Incidents needing follow-up</label>
       <label class="flex items-center gap-2 text-sm"><input v-model="s.notify_unbilled" type="checkbox" class="accent-accent" /> Unbilled shifts aging</label>
       <label class="flex items-center gap-2 text-sm"><input v-model="s.notify_shift_reminders" type="checkbox" class="accent-accent" /> Upcoming shift reminders</label>
+      <label class="flex items-center gap-2 text-sm"><input v-model="s.notify_birthdays" type="checkbox" class="accent-accent" /> Participant birthdays</label>
     </div>
 
     <div class="border-t border-white/10 pt-4 space-y-3">
@@ -167,6 +171,14 @@ async function clearError () {
             <input v-model.number="s.unbilled_days" type="number" min="0" max="365" class="input w-28" />
             <span class="text-sm text-mid">days old before nudging</span>
           </div>
+        </div>
+        <div>
+          <label class="label">Birthday reminders</label>
+          <div class="flex items-center gap-2">
+            <input v-model="s.birthday_lead_days" class="input w-28 font-mono" placeholder="30,1" />
+            <span class="text-sm text-mid">days before</span>
+          </div>
+          <p class="text-xs text-mid mt-1">Comma-separated. A birthday nudge fires only on the days exactly this far ahead — e.g. <span class="font-mono">30,1</span> means 30 days and 1 day before.</p>
         </div>
       </div>
     </div>
