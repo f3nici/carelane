@@ -12,10 +12,11 @@ import { ApiError } from '../middleware/errorHandler.js'
  *     + bcrypt password hash (cost 12, matching the staff `users` table); the
  *     hash is never returned to any API caller.
  *  2. Data reads (participant-facing) — the read-only slice a logged-in
- *     participant may see: their OWN finalised shift notes (rendered narrative,
- *     never billing or the sensitive `incident_details` field) and their own
- *     completed documents. Every read is scoped to the account's `client_id`, so
- *     a portal session can never reach another participant's records.
+ *     participant may see: their OWN finalised shift notes (the progress-note
+ *     narrative + attached photos only — never billing, and never the structured
+ *     support/response/incident fields) and their own completed documents. Every
+ *     read is scoped to the account's `client_id`, so a portal session can never
+ *     reach another participant's records.
  *
  * A portal session stores only `req.session.portalClientId` — never a staff
  * `userId` — so a portal credential can never satisfy the staff auth middleware.
@@ -181,12 +182,13 @@ export function loadPortalContext (clientId) {
   }
 }
 
-// Shift-note fields safe to expose in the portal: the shift metadata + the
-// participant-facing narrative, including the incident narrative for a
-// participant's own note (`incident_details`, decrypted here). Deliberately
-// EXCLUDES billing fields (an operator concern) and never surfaces the
-// structured NDIS incident register, which stays a staff surface. `body` and
-// `incident_details` are rendered as Markdown by the client.
+// Shift-note fields safe to expose in the portal: the shift metadata that labels
+// a note (date/time/location) plus the participant-facing **progress note**
+// narrative (`body`, decrypted here and rendered as Markdown by the client) and
+// its photos. Deliberately narrow — it EXCLUDES billing fields (an operator
+// concern), the structured NDIS incident register (a staff surface), and the
+// other structured note fields (support provided, participant response and the
+// incident narrative/flag): the portal shows only the progress note and photos.
 function toPortalNote (row) {
   return {
     id: row.id,
@@ -195,10 +197,6 @@ function toPortalNote (row) {
     end_time: row.end_time,
     duration_hours: row.duration_hours,
     location: row.location,
-    support_provided: row.support_provided,
-    participant_response: row.participant_response,
-    incident_flag: !!row.incident_flag,
-    incident_details: decrypt(row.incident_details),
     body: decrypt(row.body)
   }
 }

@@ -55,10 +55,7 @@ onMounted(load)
     <ul v-else class="space-y-3">
       <li v-for="note in notes" :key="note.id">
         <RouterLink :to="{ name: 'portal-note', params: { id: note.id } }" class="card block hover:border-primary transition-colors">
-          <div class="flex items-center justify-between gap-3">
-            <p class="font-medium">{{ niceDate(note.shift_date) }}</p>
-            <span v-if="note.incident_flag" class="pill bg-warning/15 text-warning">Incident noted</span>
-          </div>
+          <p class="font-medium">{{ niceDate(note.shift_date) }}</p>
           <p v-if="note.start_time" class="text-xs text-mid mt-0.5">
             {{ note.start_time }}<span v-if="note.end_time"> – {{ note.end_time }}</span>
             <span v-if="note.location"> · {{ note.location }}</span>

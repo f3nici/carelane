@@ -100,16 +100,19 @@ describe('client portal', () => {
     expect(ids).not.toContain(otherNote.id)
   })
 
-  it('shows the incident narrative on the participant\'s own note but never billing', async () => {
+  it('exposes only the progress note + photos — never billing, support, response or incident fields', async () => {
     const { agent } = await portalLogin()
     const detail = await agent.get(`/api/v1/portal/shift-notes/${incidentNote.id}`)
     expect(detail.status).toBe(200)
+    // The progress-note narrative and its photos are the only content exposed …
     expect(detail.body.data.body).toContain('General narrative')
-    expect(detail.body.data.incident_flag).toBe(true)
-    // The participant sees the incident narrative on their own note …
-    expect(detail.body.data.incident_details).toContain('minor slip in the kitchen')
-    // … but billing is still never serialised.
+    expect(detail.body.data).toHaveProperty('photos')
+    // … billing, the structured note fields and the incident register stay hidden.
     expect(detail.body.data).not.toHaveProperty('billed')
+    expect(detail.body.data).not.toHaveProperty('support_provided')
+    expect(detail.body.data).not.toHaveProperty('participant_response')
+    expect(detail.body.data).not.toHaveProperty('incident_flag')
+    expect(detail.body.data).not.toHaveProperty('incident_details')
   })
 
   it('404s a draft or another participant\'s note by id', async () => {
