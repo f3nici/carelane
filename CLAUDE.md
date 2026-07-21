@@ -164,8 +164,9 @@ API docs at `/api/docs`, health at `/healthz`.
   demo mode. UI: a "Client share links" panel on the report detail page and a
   per-document "share" action in the participant documents tab.
 - Client portal (participant-facing, read-only): a participant can be granted a
-  login to view their OWN **finalised** shift notes (narrative rendered from
-  Markdown, never raw) and **completed documents**. It is a wholly separate auth
+  login to view their OWN **finalised** shift notes (only the **progress note**
+  narrative rendered from Markdown, never raw — plus attached photos) and
+  **completed documents**. It is a wholly separate auth
   surface from staff: `client_portal_accounts` (one per participant, username +
   bcrypt hash, `active` toggle) is unrelated to the `users` table, and a portal
   session stores only `req.session.portalClientId` — never a `userId` — so a
@@ -175,11 +176,12 @@ API docs at `/api/docs`, health at `/healthz`.
   BEFORE the staff auth gate; `/portal/auth/login` is CSRF-exempt like the staff
   login and brute-force throttled via a `portal:`-namespaced key). Every read is
   scoped to the account's `client_id` (`portalService`), so a portal user reaches
-  only their own records; the exposed note fields are deliberately limited —
-  billing is NEVER serialised, and drafts/archived/deleted notes are excluded.
-  A participant DOES see the incident narrative (`incident_details`) on their own
-  note (plus the incident *flag*), but the structured NDIS incident register
-  stays a staff-only surface. The SPA
+  only their own records; the exposed note fields are deliberately limited to the
+  **progress note** (`body`) + photos — billing is NEVER serialised, drafts/
+  archived/deleted notes are excluded, and the other structured note fields
+  (support provided, participant response, and the incident narrative/flag) are
+  not surfaced either. Both the incident narrative and the structured NDIS
+  incident register stay a staff-only surface. The SPA
   serves the portal as its own section (`/portal/*`, `PortalLayout`, its own
   `portalAuth` store + `usePortalApi` axios instance + router-guard branch),
   distinct from the staff app. Admins manage the login from a "Portal access" tab
