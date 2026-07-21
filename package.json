@@ -57,7 +57,7 @@
     "node-cron": "^4.6.0",
     "pdf-parse": "^2.4.5",
     "pdfkit": "^0.19.1",
-    "pinia": "^3.0.4",
+    "pinia": "^4.0.2",
     "qrcode": "^1.5.4",
     "sharp": "^0.35.3",
     "sqlite-vec": "^0.1.9",
