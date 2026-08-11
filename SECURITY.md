@@ -59,6 +59,23 @@ Out of scope:
   exposing the database file, or running without TLS) — see the hardening notes
   in [`README.md`](README.md)
 
+## Automated scanning
+
+The repository carries an on-demand [Strix](https://github.com/usestrix/strix)
+penetration-test workflow (`.github/workflows/strix.yml`). It is **not** part of
+the every-push CI — each run drives an LLM agent against the source and costs
+tokens, so it is triggered manually from **Actions → Strix Security Scan → Run
+workflow** (or `gh workflow run strix.yml`). Inputs let you pick a `quick` or
+`standard` scan and limit the scope to the diff against a base branch.
+
+It requires an `LLM_API_KEY` repository secret; the model is chosen with an
+optional `STRIX_LLM` repository variable. Results are uploaded as a run
+artifact with short retention, since findings can quote application source.
+
+Strix findings are a starting point, not a verdict — confirm anything it
+reports before acting on it, and follow the private disclosure process above
+rather than filing a public issue.
+
 ## Operator responsibilities
 
 Because CareLane is self-hosted, the operator owns the runtime security posture:
