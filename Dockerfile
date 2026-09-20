@@ -1,5 +1,5 @@
 # ---- builder: install deps (incl. native builds) and build frontend ----
-FROM node:22-bookworm-slim AS builder
+FROM node:25-bookworm-slim AS builder
 RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 # The workspace package manifest must be present before `npm ci` so npm can set
@@ -11,7 +11,7 @@ COPY . .
 RUN npm run build
 
 # ---- runtime ----
-FROM node:22-bookworm-slim
+FROM node:25-bookworm-slim
 ENV NODE_ENV=production
 WORKDIR /app
 # gosu lets the entrypoint fix ownership of bind-mounted volumes while running as
