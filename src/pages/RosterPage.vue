@@ -6,6 +6,8 @@ import 'vue-cal/dist/vuecal.css'
 import { useApi } from '../composables/useApi.js'
 import { useAuthStore } from '../stores/auth.js'
 import ScheduledShiftModal from '../components/ScheduledShiftModal.vue'
+import RecurringSeriesModal from '../components/RecurringSeriesModal.vue'
+import RecurringSeriesPanel from '../components/RecurringSeriesPanel.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import CalendarFeedSettings from '../components/CalendarFeedSettings.vue'
 
@@ -23,6 +25,9 @@ const range = ref({ from: '', to: '' })
 const modalOpen = ref(false)
 const selectedShift = ref(null)
 const selectedDate = ref('')
+// Set when the admin steps up from a single occurrence to the series behind it.
+const editingSeries = ref(null)
+const seriesRefreshKey = ref(0)
 
 const STATUS_BADGE = { scheduled: 'draft', in_progress: 'active', completed: 'finalised', cancelled: 'unbilled' }
 
@@ -66,7 +71,9 @@ function toEvent (s) {
   return {
     start,
     end,
-    title: s.client_display_name + (s.title ? ` · ${s.title}` : ''),
+    // A leading 🔁 marks an occurrence of a repeating appointment, so it is
+    // obvious from the calendar that editing it changes one day of many.
+    title: (s.recurrence_id ? '🔁 ' : '') + s.client_display_name + (s.title ? ` · ${s.title}` : ''),
     class: `ev-${s.status}`,
     raw: s
   }
@@ -87,6 +94,23 @@ function openExisting (shift) {
 
 async function refresh () {
   await Promise.all([loadEvents(), loadUpcoming()])
+}
+
+/**
+ * Step up from one occurrence to its whole series. Closes the per-shift modal
+ * so the two never stack, and carries the occurrence's date across to prefill
+ * "stop repeating from this one onward".
+ * @param {{id:number, from:string}} e
+ */
+function openSeries (e) {
+  modalOpen.value = false
+  editingSeries.value = e
+}
+
+/** A series edit rewrites upcoming occurrences — reload the calendar and list. */
+async function onSeriesChanged () {
+  seriesRefreshKey.value++
+  await refresh()
 }
 
 function goWriteNote (scheduledId) {
@@ -136,7 +160,7 @@ function goWriteNote (scheduledId) {
           <li v-for="s in upcoming" :key="s.id">
             <button class="w-full text-left text-sm flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-white/5" @click="openExisting(s)">
               <span class="min-w-0">
-                <span class="block truncate">{{ s.client_display_name }}</span>
+                <span class="block truncate"><span v-if="s.recurrence_id" title="Repeating appointment">🔁 </span>{{ s.client_display_name }}</span>
                 <span class="text-xs text-mid">{{ s.scheduled_date }}<template v-if="s.start_time"> · {{ s.start_time }}–{{ s.end_time || '?' }}</template></span>
               </span>
               <StatusBadge :status="STATUS_BADGE[s.status] || 'draft'" />
@@ -145,6 +169,14 @@ function goWriteNote (scheduledId) {
         </ul>
       </div>
     </div>
+
+    <RecurringSeriesPanel
+      v-if="auth.isAdmin"
+      :key="seriesRefreshKey"
+      :clients="clients"
+      :workers="workers"
+      @changed="refresh"
+    />
 
     <CalendarFeedSettings />
 
@@ -158,6 +190,17 @@ function goWriteNote (scheduledId) {
       @close="modalOpen = false"
       @changed="refresh"
       @create-note="goWriteNote"
+      @edit-series="openSeries"
+    />
+
+    <RecurringSeriesModal
+      v-if="editingSeries"
+      :series-id="editingSeries.id"
+      :clients="clients"
+      :workers="workers"
+      :default-end-from="editingSeries.from"
+      @close="editingSeries = null"
+      @changed="onSeriesChanged"
     />
   </div>
 </template>

@@ -202,6 +202,12 @@ export const recurrenceSchema = z.object({
   active: bool01.default(1)
 })
 
+// Stopping an open-ended series: the first date it should no longer run on.
+// Defaults to today (stop it now) when omitted.
+export const recurrenceEndSchema = z.object({
+  from: isoDate.nullish()
+})
+
 // Note fields supplied at clock-out. client_id is taken from the scheduled
 // shift; the date/times default to the clocked values but may be overridden
 // when the operator corrects them before saving.

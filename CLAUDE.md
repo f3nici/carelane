@@ -117,7 +117,18 @@ API docs at `/api/docs`, health at `/healthz`.
   materialised into `scheduled_shifts` on a rolling 60-day horizon by a nightly
   cron (`recurrenceService.scheduleMaterialisation`); cancellations/edits are not
   re-created. Scheduled shifts are soft-deleted + restorable like other records.
-  UI: the "Roster" page (`vue-cal` calendar + upcoming list + clock in/out).
+  A series is managed **as a whole** (admin-only, `/schedule/recurrences`): `PUT`
+  is "edit them all" — it regenerates every upcoming occurrence from the new rule
+  (`worker_id` included, so a series re-rosters in one edit), `DELETE` is "delete
+  them all", and `POST …/:id/end` caps an open-ended series at a chosen date and
+  drops the occurrences from there on. All three touch only occurrences that are
+  still `scheduled` with no `clock_in_at` — worked, in-progress and individually
+  cancelled shifts stay as history, so the roster's past is never rewritten.
+  Series reads carry `upcoming_count`/`kept_count`/`next_date` so the UI can say
+  how many shifts an action will change. UI: the "Roster" page (`vue-cal`
+  calendar + upcoming list + clock in/out), a "Repeating appointments" panel
+  listing every series, and a 🔁 marker + "edit the whole series" step-up on any
+  occurrence that came from one.
 - Google Calendar (optional, one-way push): `googleCalendarService` mirrors
   scheduled shifts to the operator's calendar via OAuth2 (native `fetch`, no SDK).
   App creds come from env (`GOOGLE_CLIENT_ID`/`SECRET`/`REDIRECT_URI`); the
