@@ -7,11 +7,13 @@ import { logger } from './logger.js'
 
 export const {
   occurrenceDates,
+  occurrenceSummary,
   materialiseDueOccurrences,
   listRecurrences,
   getRecurrence,
   createRecurrence,
   updateRecurrence,
+  endRecurrence,
   deleteRecurrence
 } = services.recurrence
 

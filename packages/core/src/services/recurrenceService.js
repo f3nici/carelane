@@ -28,6 +28,10 @@ export function createRecurrenceService (ctx, services) {
   const HORIZON_DAYS = 60
   const COLUMNS = ['client_id', 'title', 'frequency', 'interval', 'weekdays', 'start_date',
     'until_date', 'start_time', 'end_time', 'billing_code_id', 'location', 'plan_notes', 'active']
+  // Fields an existing series accepts on edit. `worker_id` is settable here but
+  // not part of COLUMNS because create derives it from the acting user; on an
+  // edit an admin may re-roster the whole series to a different support worker.
+  const UPDATABLE = [...COLUMNS, 'worker_id']
 
   const now = () => new Date(ctx.now()).toISOString()
   const today = () => new Date(ctx.now()).toISOString().slice(0, 10)
@@ -40,6 +44,37 @@ export function createRecurrenceService (ctx, services) {
     const r = decryptFields(row, ENCRYPTED)
     r.weekdays = r.weekdays ? JSON.parse(r.weekdays) : null
     return r
+  }
+
+  /**
+   * SQL predicate for the occurrences a series-wide edit or delete may touch:
+   * still merely planned (never clocked into), not already deleted, and dated on
+   * or after the cut-off. Everything else is history and is left alone.
+   */
+  const EDITABLE_OCCURRENCE = `recurrence_id = ? AND status = 'scheduled'
+    AND clock_in_at IS NULL AND deleted_at IS NULL AND scheduled_date >= ?`
+
+  /**
+   * Count a series' occurrences either side of the cut-off, so the caller (and
+   * the confirmation prompt in the UI) can say exactly how many upcoming shifts
+   * an "edit them all" / "delete them all" will rewrite, and how many worked or
+   * cancelled ones stay untouched.
+   * @param {number} recurrenceId
+   * @param {string} [from] ISO date the upcoming window starts at
+   * @returns {{upcoming_count:number, kept_count:number, next_date:string|null}}
+   */
+  function occurrenceSummary (recurrenceId, from = today()) {
+    const up = sqlite.prepare(`SELECT COUNT(*) AS c, MIN(scheduled_date) AS next
+      FROM scheduled_shifts WHERE ${EDITABLE_OCCURRENCE}`).get(recurrenceId, from)
+    const kept = sqlite.prepare(`SELECT COUNT(*) AS c FROM scheduled_shifts
+      WHERE recurrence_id = ? AND deleted_at IS NULL AND NOT (status = 'scheduled'
+        AND clock_in_at IS NULL AND scheduled_date >= ?)`).get(recurrenceId, from)
+    return { upcoming_count: up.c, kept_count: kept.c, next_date: up.next || null }
+  }
+
+  /** Attach the occurrence counts a series-management UI needs to a series. */
+  function withCounts (rec) {
+    return rec ? { ...rec, ...occurrenceSummary(rec.id) } : rec
   }
 
   /**
@@ -127,27 +162,41 @@ export function createRecurrenceService (ctx, services) {
     return total
   }
 
-  /** List recurrence series (decrypted) with participant display names. */
-  function listRecurrences () {
-    const rows = sqlite.prepare(`SELECT r.*, c.preferred_name AS client_preferred_name,
-        c.first_name AS client_first_name, c.last_name AS client_last_name, bc.code AS billing_code
-      FROM shift_recurrences r JOIN clients c ON c.id = r.client_id
-      LEFT JOIN billing_codes bc ON bc.id = r.billing_code_id
-      WHERE r.deleted_at IS NULL ORDER BY r.created_at DESC`).all()
-    return rows.map(row => {
-      const r = toRecurrence(row)
-      r.client_display_name = clientDisplayName(row)
-      delete r.client_first_name
-      delete r.client_last_name
-      return r
-    })
+  // Series rows carry the participant and assigned-worker labels a management UI
+  // needs, so a series can be identified without a second round-trip.
+  const SERIES_SELECT = `SELECT r.*, c.preferred_name AS client_preferred_name,
+      c.first_name AS client_first_name, c.last_name AS client_last_name, bc.code AS billing_code,
+      u.display_name AS worker_display_name, u.username AS worker_username
+    FROM shift_recurrences r JOIN clients c ON c.id = r.client_id
+    LEFT JOIN billing_codes bc ON bc.id = r.billing_code_id
+    LEFT JOIN users u ON u.id = r.worker_id`
+
+  /** Decrypt a joined series row and resolve its display labels + counts. */
+  function toSeries (row) {
+    const r = withCounts(toRecurrence(row))
+    r.client_display_name = clientDisplayName(row)
+    r.worker_display_name = row.worker_display_name || row.worker_username || null
+    delete r.client_first_name
+    delete r.client_last_name
+    delete r.worker_username
+    return r
   }
 
-  /** Fetch one series (decrypted) or throw 404. */
+  /**
+   * List recurrence series. This is what backs the "repeating appointments"
+   * list, where a series is edited or ended as a whole rather than one
+   * materialised occurrence at a time. Active series sort first.
+   */
+  function listRecurrences () {
+    return sqlite.prepare(`${SERIES_SELECT} WHERE r.deleted_at IS NULL
+      ORDER BY r.active DESC, r.created_at DESC`).all().map(toSeries)
+  }
+
+  /** Fetch one series (decrypted, with labels + occurrence counts) or throw 404. */
   function getRecurrence (id) {
-    const row = sqlite.prepare('SELECT * FROM shift_recurrences WHERE id = ? AND deleted_at IS NULL').get(id)
+    const row = sqlite.prepare(`${SERIES_SELECT} WHERE r.id = ? AND r.deleted_at IS NULL`).get(id)
     if (!row) throw new ApiError(404, 'NOT_FOUND', 'Recurring appointment not found')
-    return toRecurrence(row)
+    return toSeries(row)
   }
 
   /**
@@ -176,19 +225,27 @@ export function createRecurrenceService (ctx, services) {
   }
 
   /**
-   * Update a series. Future un-started occurrences are regenerated to reflect the
-   * change; past, in-progress and completed occurrences are left untouched.
+   * Update a series — the "edit them all" path. Every future un-started
+   * occurrence is regenerated from the new rule (so a changed time, location,
+   * support item, participant-facing title or assigned worker lands on all of
+   * them at once); past, in-progress, completed and individually cancelled
+   * occurrences are history and are left untouched.
    * @param {number} id
-   * @param {object} data
+   * @param {object} data validated partial payload
+   * @param {number} [actingUserId] fallback owner when `worker_id` is cleared
+   * @returns {object} the updated series, with `occurrences_replaced`/`occurrences_created`
    */
-  function updateRecurrence (id, data) {
-    getRecurrence(id)
+  function updateRecurrence (id, data, actingUserId) {
+    const before = getRecurrence(id)
     const sets = []
     const params = []
-    for (const col of COLUMNS) {
+    for (const col of UPDATABLE) {
       if (!(col in data)) continue
       if (col === 'weekdays') { sets.push('weekdays = ?'); params.push(data.weekdays ? JSON.stringify(data.weekdays) : null); continue }
       if (col === 'plan_notes') { sets.push('plan_notes = ?'); params.push(encrypt(data.plan_notes ?? null)); continue }
+      // worker_id is NOT NULL: clearing it re-rosters the series to the acting
+      // admin (the single-operator default), never to NULL.
+      if (col === 'worker_id') { sets.push('worker_id = ?'); params.push(data.worker_id || actingUserId || before.worker_id); continue }
       sets.push(`${col} = ?`)
       params.push(data[col] ?? null)
     }
@@ -197,42 +254,78 @@ export function createRecurrenceService (ctx, services) {
       params.push(now(), id)
       sqlite.prepare(`UPDATE shift_recurrences SET ${sets.join(', ')} WHERE id = ?`).run(...params)
     }
-    removeFutureOccurrences(id)
+    const replaced = removeFutureOccurrences(id)
     const horizonEnd = fmt(addDays(parse(today()), HORIZON_DAYS))
     const rec = getRecurrence(id)
-    if (rec.active) materialiseSeries(rec, horizonEnd)
-    return rec
-  }
-
-  /** Delete future, not-yet-started occurrences of a series (and their events). */
-  function removeFutureOccurrences (recurrenceId) {
-    const rows = sqlite.prepare(`SELECT * FROM scheduled_shifts
-      WHERE recurrence_id = ? AND status = 'scheduled' AND clock_in_at IS NULL AND deleted_at IS NULL AND scheduled_date >= ?`)
-      .all(recurrenceId, today())
-    for (const row of rows) googleCalendar.removeScheduledShift(row)
-    sqlite.prepare(`DELETE FROM scheduled_shifts
-      WHERE recurrence_id = ? AND status = 'scheduled' AND clock_in_at IS NULL AND deleted_at IS NULL AND scheduled_date >= ?`)
-      .run(recurrenceId, today())
+    const created = rec.active ? materialiseSeries(rec, horizonEnd) : 0
+    // Only the occurrence counts moved under `rec`, so refresh those rather than
+    // re-reading the whole series.
+    return { ...rec, ...occurrenceSummary(id), occurrences_replaced: replaced, occurrences_created: created }
   }
 
   /**
-   * Soft-delete a series and remove its future un-started occurrences. History
-   * (started/completed occurrences) is retained.
+   * Delete a series' not-yet-started occurrences from `from` onward (and their
+   * mirrored calendar events). Worked, in-progress and cancelled occurrences are
+   * never touched, so the roster history survives.
+   * @param {number} recurrenceId
+   * @param {string} [from] ISO date to cut from (defaults to today)
+   * @returns {number} occurrences removed
+   */
+  function removeFutureOccurrences (recurrenceId, from = today()) {
+    const rows = sqlite.prepare(`SELECT * FROM scheduled_shifts WHERE ${EDITABLE_OCCURRENCE}`)
+      .all(recurrenceId, from)
+    for (const row of rows) googleCalendar.removeScheduledShift(row)
+    sqlite.prepare(`DELETE FROM scheduled_shifts WHERE ${EDITABLE_OCCURRENCE}`).run(recurrenceId, from)
+    return rows.length
+  }
+
+  /**
+   * Stop an open-ended series without erasing what it already produced — the
+   * "delete the rest of them" path for an indefinite appointment. Caps the rule
+   * at the day before `from`, drops every un-started occurrence from `from`
+   * onward, and deactivates the series once nothing further can be generated.
    * @param {number} id
+   * @param {string} [from] ISO date the series should stop repeating on (defaults to today)
+   * @returns {object} the updated series, with `occurrences_removed`
+   */
+  function endRecurrence (id, from) {
+    const rec = getRecurrence(id)
+    const cut = from || today()
+    const lastDay = fmt(addDays(parse(cut), -1))
+    const removed = removeFutureOccurrences(id, cut)
+    // Capping the rule is enough to stop it: an until_date before start_date
+    // simply expands to no dates. Only deactivate once the cap is in the past —
+    // a future cut-off must stay active so the nightly run keeps filling the
+    // horizon up to it.
+    const active = lastDay >= today() ? rec.active : 0
+    sqlite.prepare('UPDATE shift_recurrences SET until_date = ?, active = ?, updated_at = ? WHERE id = ?')
+      .run(lastDay, active, now(), id)
+    return { ...getRecurrence(id), occurrences_removed: removed }
+  }
+
+  /**
+   * Soft-delete a series and remove its future un-started occurrences — the
+   * "delete them all" path. History (started/completed/cancelled occurrences) is
+   * retained, and the series stops materialising new ones.
+   * @param {number} id
+   * @returns {{deleted:boolean, occurrences_removed:number}}
    */
   function deleteRecurrence (id) {
     getRecurrence(id)
-    removeFutureOccurrences(id)
+    const removed = removeFutureOccurrences(id)
     sqlite.prepare('UPDATE shift_recurrences SET deleted_at = ?, active = 0, updated_at = ? WHERE id = ?').run(now(), now(), id)
+    return { deleted: true, occurrences_removed: removed }
   }
 
   return {
     occurrenceDates,
+    occurrenceSummary,
     materialiseDueOccurrences,
     listRecurrences,
     getRecurrence,
     createRecurrence,
     updateRecurrence,
+    endRecurrence,
     deleteRecurrence
   }
 }

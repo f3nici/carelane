@@ -52,8 +52,12 @@ export function createScheduleService (ctx, services) {
   function toScheduledListRow (row) {
     const s = toScheduled(row)
     s.client_display_name = clientDisplayName(row)
+    // Who the shift is rostered to, so the roster can name the assignee without
+    // a second lookup. Null when the join wasn't made.
+    s.worker_display_name = row.worker_display_name || row.worker_username || null
     delete s.client_first_name
     delete s.client_last_name
+    delete s.worker_username
     return s
   }
 
@@ -73,10 +77,12 @@ export function createScheduleService (ctx, services) {
     if (filters.worker_id) { where.push('s.worker_id = ?'); params.push(Number(filters.worker_id)) }
     if (filters.status && STATUSES.includes(filters.status)) { where.push('s.status = ?'); params.push(filters.status) }
     const rows = sqlite.prepare(`SELECT s.*, c.preferred_name AS client_preferred_name,
-        c.first_name AS client_first_name, c.last_name AS client_last_name, bc.code AS billing_code
+        c.first_name AS client_first_name, c.last_name AS client_last_name, bc.code AS billing_code,
+        u.display_name AS worker_display_name, u.username AS worker_username
       FROM scheduled_shifts s
       JOIN clients c ON c.id = s.client_id AND c.deleted_at IS NULL
       LEFT JOIN billing_codes bc ON bc.id = s.billing_code_id
+      LEFT JOIN users u ON u.id = s.worker_id
       WHERE ${where.join(' AND ')} ORDER BY s.scheduled_date, s.start_time, s.id`).all(...params)
     return rows.map(toScheduledListRow)
   }
@@ -308,8 +314,11 @@ export function createScheduleService (ctx, services) {
       : sqlite.prepare("SELECT * FROM scheduled_shifts WHERE status = 'in_progress' AND deleted_at IS NULL ORDER BY clock_in_at DESC LIMIT 1").get()
     if (!row) return null
     return toScheduledListRow(sqlite.prepare(`SELECT s.*, c.preferred_name AS client_preferred_name,
-        c.first_name AS client_first_name, c.last_name AS client_last_name FROM scheduled_shifts s
-      JOIN clients c ON c.id = s.client_id WHERE s.id = ?`).get(row.id))
+        c.first_name AS client_first_name, c.last_name AS client_last_name,
+        u.display_name AS worker_display_name, u.username AS worker_username
+      FROM scheduled_shifts s
+      JOIN clients c ON c.id = s.client_id
+      LEFT JOIN users u ON u.id = s.worker_id WHERE s.id = ?`).get(row.id))
   }
 
   return {

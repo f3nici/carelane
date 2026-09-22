@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import crypto from 'node:crypto'
 import { validate, validatePartial } from '../middleware/validate.js'
-import { scheduledShiftSchema, recurrenceSchema, scheduleNoteSchema, googleSettingsSchema } from '../utils/validators.js'
+import { scheduledShiftSchema, recurrenceSchema, recurrenceEndSchema, scheduleNoteSchema, googleSettingsSchema } from '../utils/validators.js'
 import * as scheduleService from '../services/scheduleService.js'
 import * as recurrenceService from '../services/recurrenceService.js'
 import * as googleCalendar from '../services/googleCalendarService.js'
@@ -106,16 +106,50 @@ router.get('/recurrences/:id', (req, res) => {
   res.json(ok(recurrenceService.getRecurrence(id(req))))
 })
 
+/**
+ * @openapi
+ * /schedule/recurrences/{id}:
+ *   put: { tags: [Schedule], summary: Edit a whole series (regenerates its upcoming occurrences) }
+ *   delete: { tags: [Schedule], summary: Delete a series and its upcoming occurrences }
+ */
+
+// Editing the series is the "change them all" action: every upcoming occurrence
+// is regenerated from the new rule, while worked/cancelled ones stay as history.
 router.put('/recurrences/:id', validatePartial(recurrenceSchema), (req, res) => {
-  const rec = recurrenceService.updateRecurrence(id(req), req.body)
-  logActivity('shift_recurrence', rec.id, req.session.userId, 'updated', { changes: Object.keys(req.body) })
+  const before = recurrenceService.getRecurrence(id(req))
+  const rec = recurrenceService.updateRecurrence(id(req), req.body, req.session.userId)
+  ensureRosterAccess(rec.worker_id, rec.client_id, req.session.userId)
+  logActivity('shift_recurrence', rec.id, req.session.userId, 'updated', {
+    changes: diffChanges(before, rec, Object.keys(req.body)),
+    occurrences_replaced: rec.occurrences_replaced,
+    occurrences_created: rec.occurrences_created
+  })
+  res.json(ok(rec))
+})
+
+/**
+ * @openapi
+ * /schedule/recurrences/{id}/end:
+ *   post: { tags: [Schedule], summary: Stop a series from a date onward, keeping earlier occurrences }
+ */
+
+// Stop an open-ended series without erasing the occurrences it already put on
+// the roster — the gentler counterpart to DELETE for an indefinite appointment.
+router.post('/recurrences/:id/end', validate(recurrenceEndSchema), (req, res) => {
+  const rec = recurrenceService.endRecurrence(id(req), req.body.from || undefined)
+  logActivity('shift_recurrence', rec.id, req.session.userId, 'ended', {
+    until_date: rec.until_date,
+    occurrences_removed: rec.occurrences_removed
+  })
   res.json(ok(rec))
 })
 
 router.delete('/recurrences/:id', (req, res) => {
-  recurrenceService.deleteRecurrence(id(req))
-  logActivity('shift_recurrence', id(req), req.session.userId, 'deleted')
-  res.json(ok({ deleted: true }))
+  const result = recurrenceService.deleteRecurrence(id(req))
+  logActivity('shift_recurrence', id(req), req.session.userId, 'deleted', {
+    occurrences_removed: result.occurrences_removed
+  })
+  res.json(ok(result))
 })
 
 /* ---- Google Calendar connection (defined before /:id) ---- */

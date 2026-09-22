@@ -144,6 +144,17 @@ describe('multi-user access control', () => {
     expect(del.status).toBe(403)
   })
 
+  it('forbids the worker managing recurring series (the whole-series actions)', async () => {
+    expect((await worker.agent.get('/api/v1/schedule/recurrences')).status).toBe(403)
+    const edit = await worker.agent.put('/api/v1/schedule/recurrences/1').set('x-csrf-token', worker.csrf)
+      .send({ start_time: '10:00' })
+    expect(edit.status).toBe(403)
+    const end = await worker.agent.post('/api/v1/schedule/recurrences/1/end').set('x-csrf-token', worker.csrf).send({})
+    expect(end.status).toBe(403)
+    const del = await worker.agent.delete('/api/v1/schedule/recurrences/1').set('x-csrf-token', worker.csrf)
+    expect(del.status).toBe(403)
+  })
+
   it('blocks the worker from operator-only surfaces and user management', async () => {
     for (const path of ['/api/v1/users', '/api/v1/audit/verify', '/api/v1/deleted', '/api/v1/invoices', '/api/v1/settings/backups']) {
       expect((await worker.agent.get(path)).status).toBe(403)
