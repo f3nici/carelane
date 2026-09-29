@@ -117,7 +117,18 @@ API docs at `/api/docs`, health at `/healthz`.
   materialised into `scheduled_shifts` on a rolling 60-day horizon by a nightly
   cron (`recurrenceService.scheduleMaterialisation`); cancellations/edits are not
   re-created. Scheduled shifts are soft-deleted + restorable like other records.
-  UI: the "Roster" page (`vue-cal` calendar + upcoming list + clock in/out).
+  A series is managed **as a whole** (admin-only, `/schedule/recurrences`): `PUT`
+  is "edit them all" — it regenerates every upcoming occurrence from the new rule
+  (`worker_id` included, so a series re-rosters in one edit), `DELETE` is "delete
+  them all", and `POST …/:id/end` caps an open-ended series at a chosen date and
+  drops the occurrences from there on. All three touch only occurrences that are
+  still `scheduled` with no `clock_in_at` — worked, in-progress and individually
+  cancelled shifts stay as history, so the roster's past is never rewritten.
+  Series reads carry `upcoming_count`/`kept_count`/`next_date` so the UI can say
+  how many shifts an action will change. UI: the "Roster" page (`vue-cal`
+  calendar + upcoming list + clock in/out), a "Repeating appointments" panel
+  listing every series, and a 🔁 marker + "edit the whole series" step-up on any
+  occurrence that came from one.
 - Google Calendar (optional, one-way push): `googleCalendarService` mirrors
   scheduled shifts to the operator's calendar via OAuth2 (native `fetch`, no SDK).
   App creds come from env (`GOOGLE_CLIENT_ID`/`SECRET`/`REDIRECT_URI`); the
@@ -323,7 +334,14 @@ API docs at `/api/docs`, health at `/healthz`.
   re-index button). Original PDFs download via auth-gated `GET /documents/:id/file`.
 - AI: Haiku for cheap tasks (note cleanup, condensing), Sonnet for agreements/
   reports/Q&A. Stable system block uses prompt caching. Inputs are minimised
-  (preferred name/initials, bullets, top-k chunks). Usage logged per call.
+  (bullets, top-k chunks) and **pseudonymised** (`pseudonymService`): before a
+  shift-note/report/agreement prompt is sent, the participant's names (preferred,
+  first, last), plan-manager + emergency-contact names, NDIS number, phone and
+  email are swapped for a stable per-participant code (`PT-XXXXX`, derived from
+  an HMAC of the client id with the blind-index key — no storage), and the codes
+  in Claude's reply are swapped back to the real values before the draft is
+  saved, so the worker never sees them. Condensed report summaries stay masked
+  until the final draft is unmasked. Usage logged per call.
   Drafting is operator-toggleable (`claude_enabled` setting, default on): when
   off, the draft/ask services refuse (`AI_DISABLED`) and the SPA hides every AI
   tip/panel (estimated-token hints, "used for the AI draft" notes, the

@@ -1,0 +1,125 @@
+# Strix autonomous penetration test — https://github.com/usestrix/strix
+#
+# Deliberately manual: this is an on-demand job, not part of the every-push CI.
+# Run it from Actions → "Strix Security Scan" → "Run workflow", or from the CLI
+# with `gh workflow run strix.yml -f scan_mode=standard`.
+#
+# Strix drives a real LLM against the source, so every run costs tokens and can
+# take a while — hence the explicit trigger and the scope/mode inputs.
+name: Strix Security Scan
+
+on:
+  workflow_dispatch:
+    inputs:
+      scan_mode:
+        description: 'Depth of the scan'
+        type: choice
+        default: quick
+        options: [quick, standard]
+      scope:
+        description: 'Whole repo, or only what changed against the base branch'
+        type: choice
+        default: full
+        options: [full, diff]
+      diff_base:
+        description: 'Base branch for scope=diff'
+        type: string
+        default: main
+      instruction:
+        description: 'Optional extra testing directive passed to the agent'
+        type: string
+        default: ''
+      fail_on_findings:
+        description: 'Fail the job when vulnerabilities are found'
+        type: boolean
+        default: true
+
+# The scan only reads the checked-out tree; it never needs write access.
+permissions:
+  contents: read
+
+concurrency:
+  group: strix-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    # Generous: a standard scan on a repo this size can run well past an hour.
+    timeout-minutes: 120
+
+    steps:
+      - name: Check required secret
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+        run: |
+          if [ -z "$LLM_API_KEY" ]; then
+            echo "::error::LLM_API_KEY is not set. Add it under Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+
+      # fetch-depth: 0 so scope=diff can compare against the base branch.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install Strix
+        run: |
+          curl -sSL https://strix.ai/install | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Run Strix
+        env:
+          # Model id, e.g. "anthropic/claude-sonnet-4-6" or "openai/gpt-5.4".
+          # Not a secret — set it as an Actions *variable*; the default below
+          # applies if you leave it unset.
+          STRIX_LLM: ${{ vars.STRIX_LLM || 'anthropic/claude-sonnet-4-6' }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          # Optional: only needed for a self-hosted / proxied model endpoint.
+          LLM_API_BASE: ${{ vars.LLM_API_BASE }}
+          # Optional: lets the agent research CVEs while it works.
+          PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
+          STRIX_REASONING_EFFORT: ${{ vars.STRIX_REASONING_EFFORT || 'high' }}
+          # Inputs go through the environment rather than `${{ }}` interpolation
+          # so a crafted value can never be spliced into this shell script.
+          SCAN_MODE: ${{ inputs.scan_mode }}
+          SCOPE: ${{ inputs.scope }}
+          DIFF_BASE: ${{ inputs.diff_base }}
+          INSTRUCTION: ${{ inputs.instruction }}
+          FAIL_ON_FINDINGS: ${{ inputs.fail_on_findings }}
+        # `-n` is headless and exits non-zero when it finds something, so the
+        # fail_on_findings toggle just swallows that exit code when off.
+        run: |
+          args=(-n -t ./ --scan-mode "$SCAN_MODE")
+
+          if [ "$SCOPE" = "diff" ]; then
+            args+=(--scope-mode diff --diff-base "$DIFF_BASE")
+          fi
+
+          if [ -n "$INSTRUCTION" ]; then
+            args+=(--instruction "$INSTRUCTION")
+          fi
+
+          set +e
+          strix "${args[@]}"
+          status=$?
+          set -e
+
+          echo "strix exited with $status"
+          if [ "$FAIL_ON_FINDINGS" != "true" ]; then
+            exit 0
+          fi
+          exit $status
+
+      # Findings can quote application source, so keep the retention short.
+      - name: Upload scan results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: strix-results-${{ github.run_id }}
+          path: |
+            agent_runs/
+            .strix/
+            strix_runs/
+          if-no-files-found: ignore
+          retention-days: 7
