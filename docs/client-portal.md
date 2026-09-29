@@ -1,10 +1,11 @@
 # Client portal
 
 The client portal gives a participant (or their nominee) their own **read-only**
-login to view their information in CareLane — specifically their **finalised
-shift notes** and **completed documents**. It is designed for transparency: the
-participant sees what was recorded about the support they received, rendered in
-plain language, without needing to contact you for a copy.
+login to view their information in CareLane — specifically the **progress note**
+(and any photos) from their **finalised shift notes**, plus their **completed
+documents**. It is designed for transparency: the participant sees the narrative
+that was recorded about the support they received, rendered in plain language,
+without needing to contact you for a copy.
 
 It is a completely separate surface from the staff app. It has its own accounts,
 its own sign-in page, its own session, and its own section of the interface —
@@ -15,13 +16,11 @@ nothing about it can reach the staff app, and a staff login cannot reach it.
 When signed in to the portal a participant sees only **their own** records:
 
 - **Shift notes** — every note about them that a worker has **finalised**
-  (drafts, archived and deleted notes are never shown). The note narrative is
-  rendered from Markdown into formatted text, alongside the date, time, location,
-  the support provided, how the shift went, and any photos attached to the note.
-- **Incident details** — where a note is flagged as involving an incident, the
-  participant sees the incident narrative recorded on **their own** note. (The
-  separate structured NDIS incident register — reportable categories, Commission
-  reporting, and internal follow-up tracking — stays staff-only.)
+  (drafts, archived and deleted notes are never shown). For each note the portal
+  shows only the **progress note** — the narrative, rendered from Markdown into
+  formatted text — alongside the date, time and location, plus any **photos**
+  attached to the note. The other structured fields (support provided, how the
+  shift went) are not surfaced.
 - **Documents** — their completed documents (consent forms, plans, signed
   paperwork, …), which they can download.
 
@@ -30,10 +29,11 @@ When signed in to the portal a participant sees only **their own** records:
 The portal deliberately exposes a narrow slice of a note. It never shows:
 
 - **billing** information (rates, whether a shift was billed/invoiced);
-- the **structured incident register** — a participant sees the incident
-  narrative on their own note, but not the separate NDIS incident report
+- the structured note fields beyond the progress note — **support provided**,
+  **how the shift went**, and the **incident narrative/flag** are not surfaced;
+- the **structured incident register** — the separate NDIS incident report
   (reportable categories, reported-to-Commission status, contributing factors,
-  witnesses, notified parties and internal follow-up), which stays staff-only;
+  witnesses, notified parties and internal follow-up) stays staff-only;
 - **draft** notes — only finalised records the worker has completed;
 - **any other participant's** data — every read is scoped to the signed-in
   participant.

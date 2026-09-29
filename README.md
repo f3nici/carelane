@@ -43,7 +43,11 @@ encrypted at rest.
 - **Scheduling / roster** — forward-looking shift plan (one-off or recurring
   series materialised on a rolling horizon), clock in/out lifecycle, an optional
   one-way push of shifts to Google Calendar, and a read-only iCal (`.ics`) feed
-  each user can subscribe to from any calendar app.
+  each user can subscribe to from any calendar app. A repeating appointment is
+  editable as a whole — change the time, location, support item or assigned
+  worker once and every upcoming shift follows; stop an open-ended series from a
+  chosen date, or delete it and its upcoming shifts outright. Shifts already
+  worked, in progress or cancelled are history and are never rewritten.
 - **Square invoicing (optional)** — turn a completed shift note into a *draft*
   invoice in your Square account (sending stays a manual step in Square). Unlike
   the other integrations, enabling this sends the participant's **name, email and

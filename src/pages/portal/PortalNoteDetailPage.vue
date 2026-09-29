@@ -11,7 +11,6 @@ const note = ref(null)
 const loading = ref(true)
 
 const bodyHtml = computed(() => renderMarkdown(note.value?.body || ''))
-const incidentHtml = computed(() => renderMarkdown(note.value?.incident_details || ''))
 
 function niceDate (iso) {
   try {
@@ -48,27 +47,11 @@ onMounted(async () => {
           <span v-if="note.duration_hours"> · {{ note.duration_hours }} h</span>
           <span v-if="note.location"> · {{ note.location }}</span>
         </p>
-        <span v-if="note.incident_flag" class="pill bg-warning/15 text-warning mt-2">Incident noted during this shift</span>
       </header>
 
-      <section v-if="note.support_provided" class="card">
-        <p class="label">Support provided</p>
-        <p class="text-sm">{{ note.support_provided }}</p>
-      </section>
-
       <section v-if="note.body" class="card">
-        <p class="label">Shift note</p>
+        <p class="label">Progress note</p>
         <div class="prose-portal" v-html="bodyHtml"></div>
-      </section>
-
-      <section v-if="note.incident_details" class="card border-warning/40 bg-warning/5">
-        <p class="label text-warning">Incident details</p>
-        <div class="prose-portal" v-html="incidentHtml"></div>
-      </section>
-
-      <section v-if="note.participant_response" class="card">
-        <p class="label">How the shift went</p>
-        <p class="text-sm">{{ note.participant_response }}</p>
       </section>
 
       <section v-if="note.photos?.length" class="card">
