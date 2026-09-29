@@ -334,7 +334,14 @@ API docs at `/api/docs`, health at `/healthz`.
   re-index button). Original PDFs download via auth-gated `GET /documents/:id/file`.
 - AI: Haiku for cheap tasks (note cleanup, condensing), Sonnet for agreements/
   reports/Q&A. Stable system block uses prompt caching. Inputs are minimised
-  (preferred name/initials, bullets, top-k chunks). Usage logged per call.
+  (bullets, top-k chunks) and **pseudonymised** (`pseudonymService`): before a
+  shift-note/report/agreement prompt is sent, the participant's names (preferred,
+  first, last), plan-manager + emergency-contact names, NDIS number, phone and
+  email are swapped for a stable per-participant code (`PT-XXXXX`, derived from
+  an HMAC of the client id with the blind-index key — no storage), and the codes
+  in Claude's reply are swapped back to the real values before the draft is
+  saved, so the worker never sees them. Condensed report summaries stay masked
+  until the final draft is unmasked. Usage logged per call.
   Drafting is operator-toggleable (`claude_enabled` setting, default on): when
   off, the draft/ask services refuse (`AI_DISABLED`) and the SPA hides every AI
   tip/panel (estimated-token hints, "used for the AI draft" notes, the

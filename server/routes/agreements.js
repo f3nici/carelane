@@ -7,6 +7,7 @@ import * as clientService from '../services/clientService.js'
 import { assertClientAccess, demoLock } from '../middleware/auth.js'
 import { resolveTemplateForDraft } from '../services/templateService.js'
 import { draftAgreement, estimateAgreementTokens } from '../services/aiService.js'
+import { pseudonymiserFor } from '../services/pseudonymService.js'
 import { rateLimit } from '../middleware/rateLimit.js'
 import { renderPdf, pdfPath, safeFilename } from '../utils/pdfRenderer.js'
 import { logActivity, diffChanges } from '../services/activityService.js'
@@ -98,9 +99,11 @@ router.post('/:id/draft', demoLock, aiLimiter, validate(agreementDraftSchema), a
     const agreement = agreementService.getAgreement(Number(req.params.id))
     if (!agreement.questionnaire_json) throw new ApiError(409, 'NO_QUESTIONNAIRE', 'Complete the questionnaire before drafting')
     const client = clientService.getClient(agreement.client_id)
-    const label = client.preferred_name || `${client.first_name?.[0] || ''}${client.last_name?.[0] || ''}`.toUpperCase()
+    // minimise PII in prompts: Claude only sees the participant's code
+    const pseudonym = pseudonymiserFor(client)
+    const label = pseudonym.label
     const template = resolveTemplateForDraft('agreement', { templateId: req.body.template_id })
-    const body = await draftAgreement({ clientLabel: label, questionnaire: JSON.parse(agreement.questionnaire_json), template }, req.session.userId)
+    const body = await draftAgreement({ clientLabel: label, pseudonym, questionnaire: JSON.parse(agreement.questionnaire_json), template }, req.session.userId)
     const updated = agreementService.updateAgreement(agreement.id, { body_markdown: body, status: 'draft' })
     logActivity('agreement', agreement.id, req.session.userId, 'ai_drafted', { template_id: template?.id ?? null })
     res.json(ok(updated))
@@ -116,12 +119,14 @@ router.post('/:id/draft/estimate', async (req, res, next) => {
   try {
     const agreement = agreementService.getAgreement(Number(req.params.id))
     const client = clientService.getClient(agreement.client_id)
-    const label = client.preferred_name || `${client.first_name?.[0] || ''}${client.last_name?.[0] || ''}`.toUpperCase()
+    // minimise PII in prompts: Claude only sees the participant's code
+    const pseudonym = pseudonymiserFor(client)
+    const label = pseudonym.label
     // Prefer the live (possibly unsaved) questionnaire from the editor; fall
     // back to the stored one.
     const questionnaire = req.body.questionnaire ?? (agreement.questionnaire_json ? JSON.parse(agreement.questionnaire_json) : {})
     const template = resolveTemplateForDraft('agreement', { templateId: req.body.template_id })
-    const estimated_tokens = await estimateAgreementTokens({ clientLabel: label, questionnaire, template })
+    const estimated_tokens = await estimateAgreementTokens({ clientLabel: label, pseudonym, questionnaire, template })
     res.json(ok({ estimated_tokens }))
   } catch (err) { next(err) }
 })
