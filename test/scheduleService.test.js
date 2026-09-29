@@ -12,6 +12,9 @@ beforeAll(async () => {
   clientId = clientService.createClient({ first_name: 'Ada', last_name: 'Lovelace', ndis_number: '430000020', active: 1 }).id
 })
 
+/** ISO date `n` days from today — keeps the expectations from going stale. */
+const day = n => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10)
+
 const base = (over = {}) => ({
   client_id: clientId,
   scheduled_date: '2026-07-01',
@@ -124,9 +127,8 @@ describe('recurrenceService occurrence expansion', () => {
   })
 
   it('materialises occurrences for a new series and does not duplicate them', () => {
-    const future = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
     const rec = recurrenceService.createRecurrence({
-      client_id: clientId, frequency: 'daily', interval: 1, start_date: future
+      client_id: clientId, frequency: 'daily', interval: 1, start_date: day(7)
     }, workerId)
     const count1 = sqlite.prepare('SELECT COUNT(*) AS c FROM scheduled_shifts WHERE recurrence_id = ?').get(rec.id).c
     expect(count1).toBeGreaterThan(0)
@@ -134,5 +136,100 @@ describe('recurrenceService occurrence expansion', () => {
     recurrenceService.materialiseDueOccurrences()
     const count2 = sqlite.prepare('SELECT COUNT(*) AS c FROM scheduled_shifts WHERE recurrence_id = ?').get(rec.id).c
     expect(count2).toBe(count1)
+  })
+})
+
+describe('recurrenceService whole-series management', () => {
+  /** An open-ended daily series starting today, as the roster would hold it. */
+  const openEndedSeries = (over = {}) => recurrenceService.createRecurrence({
+    client_id: clientId, frequency: 'daily', interval: 1, start_date: day(0),
+    start_time: '09:00', end_time: '11:00', location: 'Home', ...over
+  }, workerId)
+
+  const occurrences = recId => sqlite.prepare(
+    'SELECT * FROM scheduled_shifts WHERE recurrence_id = ? AND deleted_at IS NULL ORDER BY scheduled_date'
+  ).all(recId)
+
+  it('counts the upcoming occurrences an edit or delete would rewrite', () => {
+    const rec = openEndedSeries()
+    expect(rec.upcoming_count).toBe(occurrences(rec.id).length)
+    expect(rec.kept_count).toBe(0)
+    expect(rec.next_date).toBe(day(0))
+  })
+
+  it('applies an edit to every upcoming occurrence at once', () => {
+    const rec = openEndedSeries()
+    const before = occurrences(rec.id).length
+    const updated = recurrenceService.updateRecurrence(rec.id, { start_time: '13:00', location: 'Library' }, workerId)
+    expect(updated.occurrences_replaced).toBe(before)
+    expect(updated.occurrences_created).toBe(before)
+    const after = occurrences(rec.id)
+    expect(after.length).toBe(before)
+    expect(after.every(o => o.start_time === '13:00' && o.location === 'Library')).toBe(true)
+  })
+
+  it('re-rosters a whole series to another support worker', () => {
+    const other = sqlite.prepare("INSERT INTO users (username, password_hash, role) VALUES ('w2', 'x', 'worker')").run().lastInsertRowid
+    const rec = openEndedSeries()
+    const updated = recurrenceService.updateRecurrence(rec.id, { worker_id: other }, workerId)
+    expect(updated.worker_id).toBe(other)
+    expect(occurrences(rec.id).every(o => o.worker_id === other)).toBe(true)
+  })
+
+  it('leaves a started occurrence alone when the series is edited', () => {
+    const rec = openEndedSeries()
+    const first = occurrences(rec.id)[0]
+    scheduleService.clockIn(first.id)
+    recurrenceService.updateRecurrence(rec.id, { start_time: '15:00' }, workerId)
+    const kept = sqlite.prepare('SELECT * FROM scheduled_shifts WHERE id = ?').get(first.id)
+    expect(kept.status).toBe('in_progress')
+    expect(kept.start_time).toBe('09:00')
+  })
+
+  it('stops an open-ended series from a date, keeping the earlier occurrences', () => {
+    const rec = openEndedSeries()
+    const cut = day(3)
+    const ended = recurrenceService.endRecurrence(rec.id, cut)
+    expect(ended.until_date).toBe(day(2))
+    expect(ended.occurrences_removed).toBeGreaterThan(0)
+    const left = occurrences(rec.id)
+    expect(left.length).toBe(3)
+    expect(left.every(o => o.scheduled_date < cut)).toBe(true)
+    // Still active while the cap is in the future, so the nightly run may fill
+    // up to it — but it can never produce a shift past the cap.
+    expect(ended.active).toBe(1)
+    recurrenceService.materialiseDueOccurrences()
+    expect(occurrences(rec.id).length).toBe(3)
+  })
+
+  it('deactivates a series ended as of today', () => {
+    const rec = openEndedSeries()
+    const ended = recurrenceService.endRecurrence(rec.id)
+    expect(ended.active).toBe(0)
+    expect(occurrences(rec.id).length).toBe(0)
+  })
+
+  it('deletes a whole series but keeps the shifts already worked', () => {
+    const rec = openEndedSeries()
+    const first = occurrences(rec.id)[0]
+    scheduleService.clockIn(first.id)
+    const upcoming = rec.upcoming_count
+    const result = recurrenceService.deleteRecurrence(rec.id)
+    expect(result.occurrences_removed).toBe(upcoming - 1)
+    expect(() => recurrenceService.getRecurrence(rec.id)).toThrow(/not found/i)
+    const left = occurrences(rec.id)
+    expect(left.map(o => o.id)).toEqual([first.id])
+    // A deleted series never materialises again.
+    recurrenceService.materialiseDueOccurrences()
+    expect(occurrences(rec.id).length).toBe(1)
+  })
+
+  it('lists series with the labels and counts the management UI shows', () => {
+    const rec = openEndedSeries({ title: 'Community access' })
+    const listed = recurrenceService.listRecurrences().find(r => r.id === rec.id)
+    expect(listed.client_display_name).toBe('Ada Lovelace')
+    expect(listed.title).toBe('Community access')
+    expect(listed.upcoming_count).toBeGreaterThan(0)
+    expect(listed.next_date).toBe(day(0))
   })
 })

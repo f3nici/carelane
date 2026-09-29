@@ -15,7 +15,7 @@ const props = defineProps({
   // and write the note, but not create, edit, cancel or delete it.
   canManage: { type: Boolean, default: true }
 })
-const emit = defineEmits(['close', 'changed', 'create-note'])
+const emit = defineEmits(['close', 'changed', 'create-note', 'edit-series'])
 
 const api = useApi()
 const toast = useToastStore()
@@ -29,6 +29,22 @@ const WEEKDAYS = [
 
 const isExisting = computed(() => !!props.shift?.id)
 const status = computed(() => props.shift?.status || 'scheduled')
+// Set when this shift was materialised from a recurring series. Editing here
+// only ever changes this one day; the whole-series actions live behind
+// "Edit the whole series" (admin only — a worker never manages the roster plan).
+const seriesId = computed(() => (props.canManage && props.shift?.recurrence_id) || null)
+// The picker offers active support workers, plus whoever the shift is currently
+// rostered to when the list doesn't carry them (the admin themselves, or a
+// since-deactivated worker) — otherwise the select renders blank and reads as
+// unassigned.
+const workerOptions = computed(() => {
+  const opts = props.workers.map(w => ({ id: w.id, label: w.display_name }))
+  const current = form.worker_id
+  if (current && !opts.some(o => o.id === current)) {
+    opts.unshift({ id: current, label: props.shift?.worker_display_name || `User #${current}` })
+  }
+  return opts
+})
 // Fields are read-only when the shift is completed/cancelled, or when the viewer
 // is a support worker (they may clock in/out but not edit the plan).
 const locked = computed(() => !props.canManage || (isExisting.value && (status.value === 'completed' || status.value === 'cancelled')))
@@ -153,6 +169,14 @@ async function remove () {
         </template>
       </div>
 
+      <!-- One occurrence of a repeating appointment: offer the whole-series actions -->
+      <div v-if="seriesId" class="rounded-xl border border-primary/30 bg-primary/10 p-3 flex flex-wrap items-center justify-between gap-2">
+        <p class="text-sm">🔁 One of a repeating appointment. Edits below change <strong>this shift only</strong>.</p>
+        <button class="btn-ghost !py-1 text-xs" :disabled="busy" @click="emit('edit-series', { id: seriesId, from: shift.scheduled_date })">
+          Edit or delete the whole series…
+        </button>
+      </div>
+
       <div class="grid sm:grid-cols-2 gap-4">
         <div class="sm:col-span-2">
           <label class="label">Participant *</label>
@@ -161,11 +185,11 @@ async function remove () {
             <option v-for="c in clients" :key="c.id" :value="c.id">{{ c.preferred_name || `${c.first_name} ${c.last_name}` }}</option>
           </select>
         </div>
-        <div v-if="canManage && workers.length" class="sm:col-span-2">
+        <div v-if="canManage && workerOptions.length" class="sm:col-span-2">
           <label class="label">Support worker</label>
           <select v-model="form.worker_id" class="input" :disabled="locked">
             <option :value="null">— Me (unassigned)</option>
-            <option v-for="w in workers" :key="w.id" :value="w.id">{{ w.display_name }}</option>
+            <option v-for="w in workerOptions" :key="w.id" :value="w.id">{{ w.label }}</option>
           </select>
           <p class="text-xs text-mid mt-1">Only the assigned worker (and admins) will see this shift on their roster.</p>
         </div>

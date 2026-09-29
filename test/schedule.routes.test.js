@@ -18,6 +18,22 @@ beforeAll(async () => {
   clientId = client.body.data.id
 })
 
+/** ISO date `n` days from today — keeps the expectations from going stale. */
+const day = n => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10)
+
+/** Create an open-ended daily series starting today, as the roster would. */
+async function newSeries (over = {}) {
+  const res = await agent.post('/api/v1/schedule/recurrences').set('x-csrf-token', csrf)
+    .send({ client_id: clientId, frequency: 'daily', interval: 1, start_date: day(0), ...over })
+  return res.body.data
+}
+
+/** The series' live (undeleted) occurrences, oldest first. */
+async function occurrencesOf (recurrenceId) {
+  const res = await agent.get('/api/v1/schedule').query({ from: day(0), to: day(90) })
+  return res.body.data.filter(s => s.recurrence_id === recurrenceId)
+}
+
 describe('schedule routes', () => {
   it('requires authentication', async () => {
     const res = await request(app).get('/api/v1/schedule')
@@ -50,10 +66,51 @@ describe('schedule routes', () => {
 
   it('creates a recurring series that materialises occurrences', async () => {
     const res = await agent.post('/api/v1/schedule/recurrences').set('x-csrf-token', csrf)
-      .send({ client_id: clientId, frequency: 'weekly', interval: 1, weekdays: [1, 4], start_date: '2026-08-03' })
+      .send({ client_id: clientId, frequency: 'daily', interval: 1, start_date: day(0) })
     expect(res.status).toBe(201)
-    const list = await agent.get('/api/v1/schedule').query({ from: '2026-08-01', to: '2026-08-31' })
+    const list = await agent.get('/api/v1/schedule').query({ from: day(0), to: day(30) })
     expect(list.body.data.filter(s => s.recurrence_id === res.body.data.id).length).toBeGreaterThan(0)
+  })
+
+  it('edits a whole series and rewrites every upcoming occurrence', async () => {
+    const rec = await newSeries({ start_time: '09:00', location: 'Home' })
+    const res = await agent.put(`/api/v1/schedule/recurrences/${rec.id}`).set('x-csrf-token', csrf)
+      .send({ start_time: '14:00', location: 'Community centre' })
+    expect(res.status).toBe(200)
+    expect(res.body.data.occurrences_created).toBe(rec.upcoming_count)
+    const shifts = await occurrencesOf(rec.id)
+    expect(shifts.length).toBe(rec.upcoming_count)
+    expect(shifts.every(s => s.start_time === '14:00' && s.location === 'Community centre')).toBe(true)
+  })
+
+  it('stops an open-ended series from a date and keeps the earlier shifts', async () => {
+    const rec = await newSeries()
+    const res = await agent.post(`/api/v1/schedule/recurrences/${rec.id}/end`).set('x-csrf-token', csrf)
+      .send({ from: day(2) })
+    expect(res.status).toBe(200)
+    expect(res.body.data.until_date).toBe(day(1))
+    const shifts = await occurrencesOf(rec.id)
+    expect(shifts.map(s => s.scheduled_date)).toEqual([day(0), day(1)])
+  })
+
+  it('deletes a whole series and all of its upcoming shifts', async () => {
+    const rec = await newSeries()
+    const res = await agent.delete(`/api/v1/schedule/recurrences/${rec.id}`).set('x-csrf-token', csrf)
+    expect(res.status).toBe(200)
+    expect(res.body.data.occurrences_removed).toBe(rec.upcoming_count)
+    expect((await occurrencesOf(rec.id)).length).toBe(0)
+    const gone = await agent.get(`/api/v1/schedule/recurrences/${rec.id}`)
+    expect(gone.status).toBe(404)
+  })
+
+  it('lists series with the occurrence counts the roster shows', async () => {
+    const rec = await newSeries({ title: 'Swimming' })
+    const res = await agent.get('/api/v1/schedule/recurrences')
+    const listed = res.body.data.find(r => r.id === rec.id)
+    expect(listed.title).toBe('Swimming')
+    expect(listed.client_display_name).toBe('Roo Kanga')
+    expect(listed.upcoming_count).toBeGreaterThan(0)
+    expect(listed.next_date).toBe(day(0))
   })
 
   it('reports Google Calendar as not configured by default', async () => {
@@ -87,7 +144,7 @@ describe('schedule routes', () => {
 
   it('rejects an invalid recurrence frequency', async () => {
     const res = await agent.post('/api/v1/schedule/recurrences').set('x-csrf-token', csrf)
-      .send({ client_id: clientId, frequency: 'hourly', start_date: '2026-08-03' })
+      .send({ client_id: clientId, frequency: 'hourly', start_date: day(0) })
     expect(res.status).toBe(400)
     expect(res.body.error.code).toBe('VALIDATION_ERROR')
   })
