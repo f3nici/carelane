@@ -46,7 +46,8 @@ function personaText () {
 You produce DRAFTS only — the worker reviews, edits and finalises everything.
 Style: ${tone()}. Write respectfully and person-centredly, in line with the NDIS Code of Conduct:
 factual, strengths-based, no diagnoses or judgements beyond what the worker reported, no invented details.
-Use the participant's preferred name or initials exactly as given. Australian English.`
+Participants and their contacts are referred to by codes such as PT-AB2CD or PT-AB2CD-S. Treat each code as the person's name:
+reproduce it exactly as written wherever the name belongs, and never guess, expand or invent a real name. Australian English.`
 }
 
 /** Persona-only system block (cached) — used by the short Haiku tasks. */
@@ -77,6 +78,17 @@ function userMessage (text, cache = false) {
   if (cache) block.cache_control = { type: 'ephemeral' }
   return { role: 'user', content: [block] }
 }
+
+/** No-op masker for inputs that carry no participant pseudonymiser. */
+const PASSTHROUGH = { mask: t => t, unmask: t => t }
+
+/**
+ * The participant pseudonymiser attached to a draft input (see
+ * pseudonymService). Every free-text field is masked before it is sent and the
+ * reply is unmasked, so Claude only ever sees codes, never real names.
+ * @param {{pseudonym?:{mask:Function, unmask:Function}}} input
+ */
+const masker = input => input?.pseudonym || PASSTHROUGH
 
 /**
  * Rough ~4 chars/token estimate over a whole assembled prompt (every system
@@ -129,16 +141,17 @@ async function complete (params, ctx) {
 /**
  * Shift-note assist (Haiku): turn the worker's structured bullets into a
  * clean, professional progress note draft.
- * @param {{clientLabel:string, shiftDate:string, durationHours?:number, supportProvided:string, participantResponse?:string, incident?:string}} input
+ * @param {{clientLabel:string, pseudonym?:object, shiftDate:string, durationHours?:number, supportProvided:string, participantResponse?:string, incident?:string}} input
  * @param {number} userId
  */
 /** Assemble the shift-note prompt. Shared by the draft and the estimate. */
 function shiftNoteUserPrompt (input) {
+  const { mask } = masker(input)
   return `Draft a progress note for a support shift. Participant: ${input.clientLabel}. Date: ${input.shiftDate}.` +
     (input.durationHours ? ` Duration: ${input.durationHours}h.` : '') +
-    `\nSupport provided (worker's bullets):\n${input.supportProvided}` +
-    (input.participantResponse ? `\nParticipant response:\n${input.participantResponse}` : '') +
-    (input.incident ? `\nIncident to document factually:\n${input.incident}` : '') +
+    `\nSupport provided (worker's bullets):\n${mask(input.supportProvided)}` +
+    (input.participantResponse ? `\nParticipant response:\n${mask(input.participantResponse)}` : '') +
+    (input.incident ? `\nIncident to document factually:\n${mask(input.incident)}` : '') +
     '\nWrite 1-3 short paragraphs. First person ("I supported..."). Only include what is stated above.'
 }
 
@@ -150,7 +163,7 @@ export async function draftShiftNote (input, userId) {
     system: baseSystem(),
     messages: [{ role: 'user', content: shiftNoteUserPrompt(input) }]
   }, { userId, feature: 'shift_note' })
-  return { body: text, usage }
+  return { body: masker(input).unmask(text), usage }
 }
 
 /** Pre-send token estimate for a shift-note draft (whole assembled prompt). */
@@ -160,8 +173,10 @@ export function estimateShiftNoteTokens (input) {
 
 /**
  * Cheaply condense one shift note to 1–2 lines (Haiku) — used before report
- * drafting so full notes are never dumped into one large call.
- * @param {{date:string, note:string}} shift
+ * drafting so full notes are never dumped into one large call. The summary is
+ * returned still pseudonymised: it only feeds the report prompt, which is
+ * unmasked once the final draft comes back.
+ * @param {{date:string, note:string, pseudonym?:object}} shift
  * @param {number} userId
  */
 export async function condenseShift (shift, userId) {
@@ -171,7 +186,7 @@ export async function condenseShift (shift, userId) {
     system: baseSystem(),
     messages: [{
       role: 'user',
-      content: `Condense this shift note to 1-2 factual lines (keep date ${shift.date}):\n${shift.note.slice(0, 4000)}`
+      content: `Condense this shift note to 1-2 factual lines (keep date ${shift.date}):\n${masker(shift).mask(shift.note.slice(0, 4000))}`
     }]
   }, { userId, feature: 'condense_shift' })
   return text
@@ -188,23 +203,24 @@ const DEFAULT_REPORT_TEMPLATE = `## Summary
  * Report assist (Sonnet): draft a progress / plan-review report from
  * pre-condensed shift summaries, aligned to the participant's goals. When an
  * operator template is supplied, Claude follows its structure and wording.
- * @param {{clientLabel:string, reportType:string, periodStart:string, periodEnd:string, goals?:string, shiftSummaries:string[], template?:{name:string, body_markdown:string}}} input
+ * @param {{clientLabel:string, pseudonym?:object, reportType:string, periodStart:string, periodEnd:string, goals?:string, shiftSummaries:string[], template?:{name:string, body_markdown:string}}} input
  * @param {number} userId
  */
 /**
  * Assemble the report prompt as a cacheable stable system prefix (instructions
  * + template) plus a volatile user turn (the participant's period, goals and
  * shift summaries). Shared by the draft and the pre-send estimate.
- * @param {{clientLabel:string, reportType:string, periodStart:string, periodEnd:string, goals?:string, shiftSummaries:string[], template?:{name:string, body_markdown:string}}} input
+ * @param {{clientLabel:string, pseudonym?:object, reportType:string, periodStart:string, periodEnd:string, goals?:string, shiftSummaries:string[], template?:{name:string, body_markdown:string}}} input
  */
 function reportPrompt (input) {
+  const { mask } = masker(input)
   const structure = input.template?.body_markdown || DEFAULT_REPORT_TEMPLATE
   const stable = `Task: draft a ${input.reportType.replace('_', ' ')} report from the worker's condensed shift summaries, aligned to the participant's goals.\n` +
     `Follow this template${input.template ? ` ("${input.template.name}")` : ''} exactly — keep its headings and house wording, and fill each section only from the material provided. Base everything strictly on the summaries and goals; do not invent details.\n` +
     `Template:\n${structure}`
   const user = `Participant: ${input.clientLabel}. Reporting period: ${input.periodStart} to ${input.periodEnd}.` +
-    (input.goals ? `\nParticipant goals:\n${input.goals}` : '') +
-    `\nCondensed shift summaries:\n- ${(input.shiftSummaries || []).join('\n- ')}`
+    (input.goals ? `\nParticipant goals:\n${mask(input.goals)}` : '') +
+    `\nCondensed shift summaries:\n- ${(input.shiftSummaries || []).map(mask).join('\n- ')}`
   return { system: cachedSystem(stable), user }
 }
 
@@ -217,7 +233,7 @@ export async function draftReport (input, userId) {
     system,
     messages: [userMessage(user, true)]
   }, { userId, feature: 'report', maxContinuations: 2 })
-  return text
+  return masker(input).unmask(text)
 }
 
 /**
@@ -248,7 +264,7 @@ const DEFAULT_AGREEMENT_TEMPLATE = `# Service Agreement
  * Service agreement assist (Sonnet): fill the operator's template (or the
  * built-in default) from the intake questionnaire plus top-k retrieved
  * guideline chunks.
- * @param {{clientLabel:string, questionnaire:object, template?:{name:string, body_markdown:string}}} input
+ * @param {{clientLabel:string, pseudonym?:object, questionnaire:object, template?:{name:string, body_markdown:string}}} input
  * @param {number} userId
  */
 /** Retrieve the fixed top-k guideline excerpts used to ground agreement drafts. */
@@ -265,7 +281,7 @@ async function agreementGuidance () {
  * template-adherence instructions + template + guideline excerpts — identical
  * across every agreement off the same template) plus a volatile user turn (the
  * participant label + questionnaire). Shared by the draft and the estimate.
- * @param {{clientLabel:string, questionnaire:object, template?:{name:string, body_markdown:string}}} input
+ * @param {{clientLabel:string, pseudonym?:object, questionnaire:object, template?:{name:string, body_markdown:string}}} input
  * @param {string} guidance retrieved guideline excerpts (from agreementGuidance)
  */
 function agreementPrompt (input, guidance) {
@@ -277,7 +293,7 @@ function agreementPrompt (input, guidance) {
     '- Where the template has a placeholder or blank, complete it from the questionnaire; if the answer is not provided, write "[to be confirmed]" rather than inventing it.\n' +
     'Write clauses in plain English. Leave signature lines blank. Do not invent prices or terms not given.\n' +
     `Template:\n${template}${guidance}`
-  const user = `Produce the agreement above for participant ${input.clientLabel}.\nQuestionnaire answers (JSON):\n${JSON.stringify(input.questionnaire)}`
+  const user = `Produce the agreement above for participant ${input.clientLabel}.\nQuestionnaire answers (JSON):\n${masker(input).mask(JSON.stringify(input.questionnaire))}`
   return { system: cachedSystem(stable), user }
 }
 
@@ -291,13 +307,13 @@ export async function draftAgreement (input, userId) {
     system,
     messages: [userMessage(user, true)]
   }, { userId, feature: 'agreement', maxContinuations: 2 })
-  return text
+  return masker(input).unmask(text)
 }
 
 /**
  * Pre-send token estimate for an agreement draft (whole assembled prompt,
  * including the retrieved guideline excerpts).
- * @param {{clientLabel:string, questionnaire:object, template?:{name:string, body_markdown:string}}} input
+ * @param {{clientLabel:string, pseudonym?:object, questionnaire:object, template?:{name:string, body_markdown:string}}} input
  */
 export async function estimateAgreementTokens (input) {
   const guidance = await agreementGuidance()

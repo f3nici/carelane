@@ -9,6 +9,7 @@ import { assertClientAccess, demoLock } from '../middleware/auth.js'
 import { buildGoalsSummary } from '../services/goalService.js'
 import { resolveTemplateForDraft } from '../services/templateService.js'
 import { condenseShift, draftReport, estimateReportTokens } from '../services/aiService.js'
+import { pseudonymiserFor } from '../services/pseudonymService.js'
 import { rateLimit } from '../middleware/rateLimit.js'
 import { mapLimit } from '../utils/async.js'
 import { renderPdf, pdfPath, safeFilename } from '../utils/pdfRenderer.js'
@@ -104,7 +105,9 @@ router.post('/:id/draft', demoLock, aiLimiter, validate(reportDraftSchema), asyn
     const report = reportService.getReport(Number(req.params.id))
     if (report.status === 'final') throw new ApiError(409, 'FINALISED', 'Final reports cannot be redrafted')
     const client = clientService.getClient(report.client_id)
-    const label = client.preferred_name || `${client.first_name?.[0] || ''}${client.last_name?.[0] || ''}`.toUpperCase()
+    // minimise PII in prompts: Claude only sees the participant's code
+    const pseudonym = pseudonymiserFor(client)
+    const label = pseudonym.label
 
     let shiftIds = req.body.shift_ids
     if (!shiftIds?.length) {
@@ -124,11 +127,12 @@ router.post('/:id/draft', demoLock, aiLimiter, validate(reportDraftSchema), asyn
       if (note) notes.push({ date: shift.shift_date, note })
     }
     if (!notes.length) throw new ApiError(409, 'NO_CONTENT', 'Selected shifts have no notes to summarise')
-    const summaries = await mapLimit(notes, 5, n => condenseShift(n, req.session.userId))
+    const summaries = await mapLimit(notes, 5, n => condenseShift({ ...n, pseudonym }, req.session.userId))
 
     const template = resolveTemplateForDraft('report', { templateId: req.body.template_id, reportType: report.report_type })
     const body = await draftReport({
       clientLabel: label,
+      pseudonym,
       reportType: report.report_type,
       periodStart: report.period_start || '',
       periodEnd: report.period_end || '',
@@ -153,7 +157,9 @@ router.post('/:id/draft/estimate', (req, res, next) => {
   try {
     const report = reportService.getReport(Number(req.params.id))
     const client = clientService.getClient(report.client_id)
-    const label = client.preferred_name || `${client.first_name?.[0] || ''}${client.last_name?.[0] || ''}`.toUpperCase()
+    // minimise PII in prompts: Claude only sees the participant's code
+    const pseudonym = pseudonymiserFor(client)
+    const label = pseudonym.label
     const periodStart = req.body.period_start ?? report.period_start ?? ''
     const periodEnd = req.body.period_end ?? report.period_end ?? ''
     let shiftIds = req.body.shift_ids
@@ -172,6 +178,7 @@ router.post('/:id/draft/estimate', (req, res, next) => {
     const template = resolveTemplateForDraft('report', { templateId: req.body.template_id, reportType: report.report_type })
     const estimated_tokens = estimateReportTokens({
       clientLabel: label,
+      pseudonym,
       reportType: report.report_type,
       periodStart,
       periodEnd,
