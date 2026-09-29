@@ -9,6 +9,7 @@ import * as shiftService from '../services/shiftService.js'
 import * as clientService from '../services/clientService.js'
 import { assertClientAccess, requireAdmin, demoLock } from '../middleware/auth.js'
 import { draftShiftNote, estimateShiftNoteTokens } from '../services/aiService.js'
+import { pseudonymiserFor } from '../services/pseudonymService.js'
 import { rateLimit } from '../middleware/rateLimit.js'
 import { sniffFileType } from '../utils/fileType.js'
 import { logActivity, diffChanges } from '../services/activityService.js'
@@ -147,10 +148,12 @@ router.post('/:id/draft', demoLock, canEditNote, aiLimiter, validate(shiftDraftS
     const bullets = req.body.bullets || shift.support_provided
     if (!bullets) throw new ApiError(409, 'NO_INPUT', 'Add support-provided bullets first')
     const client = clientService.getClient(shift.client_id)
-    // minimise PII in prompts: preferred name or initials only
-    const label = client.preferred_name || `${client.first_name?.[0] || ''}${client.last_name?.[0] || ''}`.toUpperCase()
+    // minimise PII in prompts: Claude only sees the participant's code
+    const pseudonym = pseudonymiserFor(client)
+    const label = pseudonym.label
     const { body, usage } = await draftShiftNote({
       clientLabel: label,
+      pseudonym,
       shiftDate: shift.shift_date,
       durationHours: shift.duration_hours,
       supportProvided: bullets,
@@ -171,9 +174,12 @@ router.post('/:id/draft/estimate', (req, res, next) => {
   try {
     const shift = shiftService.getShift(Number(req.params.id))
     const client = clientService.getClient(shift.client_id)
-    const label = client.preferred_name || `${client.first_name?.[0] || ''}${client.last_name?.[0] || ''}`.toUpperCase()
+    // minimise PII in prompts: Claude only sees the participant's code
+    const pseudonym = pseudonymiserFor(client)
+    const label = pseudonym.label
     const estimated_tokens = estimateShiftNoteTokens({
       clientLabel: label,
+      pseudonym,
       shiftDate: shift.shift_date,
       durationHours: shift.duration_hours,
       supportProvided: req.body.bullets ?? shift.support_provided ?? '',
