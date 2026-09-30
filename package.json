@@ -40,7 +40,7 @@
     "@carelane/core": "*",
     "@simplewebauthn/browser": "^13.3.0",
     "@huggingface/transformers": "^3.8.1",
-    "@simplewebauthn/server": "^13.3.2",
+    "@simplewebauthn/server": "^14.0.3",
     "archiver": "^8.0.0",
     "axios": "^1.20.0",
     "bcryptjs": "^3.0.3",
