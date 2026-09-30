@@ -3,8 +3,9 @@ FROM node:22-bookworm-slim AS builder
 RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 # The workspace package manifest must be present before `npm ci` so npm can set
-# up the `@carelane/core` workspace symlink.
-COPY package.json package-lock.json ./
+# up the `@carelane/core` workspace symlink; .npmrc skips onnxruntime-node's
+# unused CUDA download.
+COPY package.json package-lock.json .npmrc ./
 COPY packages/core/package.json ./packages/core/package.json
 RUN npm ci
 COPY . .
