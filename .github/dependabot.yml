@@ -17,6 +17,12 @@ updates:
     commit-message:
       prefix: 'deps'
       prefix-development: 'deps-dev'
+    ignore:
+      # Tailwind 4 is a rewrite (new PostCSS plugin, CSS-first config, renamed
+      # utilities), not a drop-in bump. Do that migration as a dedicated PR.
+      - dependency-name: tailwindcss
+        update-types:
+          - version-update:semver-major
     groups:
       # Batch low-risk patch/minor bumps into a single PR per group.
       production-dependencies:
@@ -57,3 +63,13 @@ updates:
       - docker
     commit-message:
       prefix: 'docker'
+    ignore:
+      # Only run Node LTS lines in the image. Odd-numbered majors never become
+      # LTS and reach end-of-life after ~6 months. Docker ranges use Ruby
+      # requirement syntax (`~> 25.0` = >= 25.0, < 26).
+      - dependency-name: node
+        versions:
+          - '~> 23.0'
+          - '~> 25.0'
+          - '~> 27.0'
+          - '~> 29.0'
