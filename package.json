@@ -36,7 +36,7 @@
     "packages/*"
   ],
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.128.0",
+    "@anthropic-ai/sdk": "^0.131.0",
     "@carelane/core": "*",
     "@simplewebauthn/browser": "^14.0.0",
     "@huggingface/transformers": "^4.3.0",
@@ -59,7 +59,7 @@
     "pdfkit": "^0.20.2",
     "pinia": "^4.0.2",
     "qrcode": "^1.5.4",
-    "sharp": "^0.35.4",
+    "sharp": "^0.35.5",
     "sqlite-vec": "^0.1.9",
     "swagger-jsdoc": "^6.3.0",
     "swagger-ui-express": "^5.0.1",
