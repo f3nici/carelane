@@ -23,7 +23,7 @@
   "license": "SEE LICENSE IN ../../LICENSE",
   "dependencies": {
     "bcryptjs": "^3.0.3",
-    "drizzle-orm": "^0.45.3",
+    "drizzle-orm": "^0.45.4",
     "zod": "^4.6.5"
   },
   "devDependencies": {
