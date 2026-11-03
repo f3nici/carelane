@@ -15,15 +15,26 @@ import { ApiError } from '../middleware/errorHandler.js'
  * present and the operator has enabled invoicing.
  *
  * Square's Invoices API supports only a single `primary_recipient`, so the
- * participant is set as that recipient (their email) and the plan-manager email
- * is surfaced on the draft as a custom field + description note for the operator
- * to CC manually before sending.
+ * participant is set as that recipient (their email) and the plan manager can be
+ * surfaced in the invoice message (description) for the operator to CC manually
+ * before sending. Whatever CareLane writes to the description replaces the
+ * default message from the operator's Square invoice settings, so the operator
+ * can keep that default by saving it as CareLane's invoice message.
  */
 
 // Pin the Square API version so responses stay stable as Square evolves.
 const SQUARE_VERSION = '2025-05-21'
 // Settings key gating whether the operator has turned invoicing on.
 const ENABLED_KEY = 'square_invoicing_enabled'
+// Operator's invoice message (the Square "Message" box). Square replaces its own
+// saved default message with whatever an API-created invoice carries, so the
+// operator keeps theirs by saving it here.
+const MESSAGE_KEY = 'square_invoice_message'
+// Whether the plan manager's name + contact is added to the invoice message.
+// Defaults on (the original behaviour).
+const PLAN_MANAGER_KEY = 'square_invoice_plan_manager'
+// Square's own cap on an invoice description.
+const MAX_DESCRIPTION = 65536
 
 /** Square REST host for the configured environment. */
 function apiBase () {
@@ -103,6 +114,8 @@ export function status () {
     location_id: configuredLocationId(),
     location_name: getSetting('square_location_name', null),
     currency: currency(),
+    invoice_message: getSetting(MESSAGE_KEY, '') || '',
+    include_plan_manager: !!getSetting(PLAN_MANAGER_KEY, 1),
     last_invoice_at: getSetting('square_last_invoice_at', null),
     last_error: configured ? getSetting('square_last_error', null) : null,
     invoice_count: invoiceCount()
@@ -169,6 +182,27 @@ export function resolveLineItem (shift, code, customRate) {
   if (amountCents <= 0) throw new ApiError(422, 'ZERO_AMOUNT', 'Computed invoice amount is zero')
   const note = `${quantity} ${unitLabel(code.unit)} @ $${rate}/${code.unit} · ${shift.shift_date}`
   return { name: `${code.code} — ${code.name}`, note, quantity, rate, amountCents }
+}
+
+/**
+ * Build the invoice message (Square's `description`) from the operator's saved
+ * message plus, optionally, a `Plan Manager: <name> <contact>` line beneath it.
+ * Returns `undefined` when there's nothing to say, so the field is left off the
+ * request entirely rather than sent blank. Pure + exported for unit tests.
+ * @param {{plan_manager_name?:string|null, plan_manager_contact?:string|null}} client decrypted client record
+ * @param {{message?:string|null, includePlanManager?:boolean}} [opts]
+ * @returns {string|undefined}
+ */
+export function buildInvoiceDescription (client, opts = {}) {
+  const parts = []
+  const message = String(opts.message || '').trim()
+  if (message) parts.push(message)
+  if (opts.includePlanManager !== false) {
+    const planManager = [client.plan_manager_name, client.plan_manager_contact]
+      .map(v => String(v || '').trim()).filter(Boolean).join(' ')
+    if (planManager) parts.push(`Plan Manager: ${planManager}`)
+  }
+  return parts.length ? parts.join('\n\n').slice(0, MAX_DESCRIPTION) : undefined
 }
 
 /**
@@ -283,11 +317,15 @@ export async function createDraftInvoiceFromShift (shiftNoteId, userId) {
     })
     const orderId = orderRes.order.id
 
-    // Plan-manager can't be a true CC on a Square invoice, and invoice custom
-    // fields need a paid Square plan — so surface the plan manager in the (free)
-    // description for the operator to action before sending.
-    const planManager = [client.plan_manager_name, client.plan_manager_contact].filter(Boolean).join(' ')
-    const description = planManager ? `Plan Manager: ${planManager}` : undefined
+    // The description is the invoice's "Message" box. Setting it replaces the
+    // default message from the operator's Square invoice settings, so it carries
+    // the operator's own saved message first. The plan manager can't be a true CC
+    // on a Square invoice (and custom fields need a paid plan), so — unless the
+    // operator turned it off — they're added beneath it to action before sending.
+    const description = buildInvoiceDescription(client, {
+      message: getSetting(MESSAGE_KEY, ''),
+      includePlanManager: !!getSetting(PLAN_MANAGER_KEY, 1)
+    })
 
     // Payment term comes from the participant (defaulting to 45 days).
     const dueDays = client.invoice_due_days ?? 45

@@ -256,7 +256,11 @@ export const ntfySettingsSchema = z.object({
 export const squareSettingsSchema = z.object({
   enabled: bool01.optional(),
   location_id: z.string().trim().max(64).optional(),
-  currency: z.string().trim().length(3).optional()
+  currency: z.string().trim().length(3).optional(),
+  // The invoice "Message" box. Replaces Square's saved default, so the operator
+  // pastes theirs here. Line breaks are kept; only the ends are trimmed.
+  invoice_message: z.string().trim().max(4000).optional(),
+  include_plan_manager: bool01.optional()
 })
 
 export const reportSchema = z.object({

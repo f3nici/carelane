@@ -32,12 +32,14 @@ router.post('/square/clear-error', (req, res) => {
   res.json(ok(square.clearError()))
 })
 
-/** Update operator-facing Square settings (enable, location, currency). */
+/** Update operator-facing Square settings (enable, location, currency, invoice message). */
 router.put('/square/settings', validate(squareSettingsSchema), (req, res) => {
   const patch = {}
   if ('enabled' in req.body) patch.square_invoicing_enabled = req.body.enabled
   if ('location_id' in req.body) patch.square_location_id = req.body.location_id
   if ('currency' in req.body) patch.square_currency = req.body.currency
+  if ('invoice_message' in req.body) patch.square_invoice_message = req.body.invoice_message
+  if ('include_plan_manager' in req.body) patch.square_invoice_plan_manager = req.body.include_plan_manager
   updateSettings(patch)
   logActivity('square', null, req.session.userId, 'updated', { keys: Object.keys(patch) })
   res.json(ok(square.status()))

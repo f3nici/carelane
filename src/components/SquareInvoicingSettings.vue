@@ -34,7 +34,9 @@ async function saveSettings () {
     const res = await api.put('/invoices/square/settings', {
       enabled: status.value.enabled ? 1 : 0,
       location_id: status.value.location_id || '',
-      currency: status.value.currency || 'AUD'
+      currency: status.value.currency || 'AUD',
+      invoice_message: status.value.invoice_message || '',
+      include_plan_manager: status.value.include_plan_manager ? 1 : 0
     })
     status.value = res.data
     toast.push('Square settings saved', 'success')
@@ -101,6 +103,26 @@ async function clearError () {
         <div><label class="label">Location ID</label><input v-model="status.location_id" class="input font-mono text-xs" placeholder="auto-detected on test" /></div>
         <div><label class="label">Currency</label><input v-model="status.currency" class="input" placeholder="AUD" /></div>
       </div>
+      <div>
+        <label class="label" for="square-invoice-message">Invoice message</label>
+        <textarea
+          id="square-invoice-message"
+          v-model="status.invoice_message"
+          class="input"
+          rows="4"
+          maxlength="4000"
+          placeholder="e.g. Thank you for your business. Payment details…"
+        ></textarea>
+        <p class="text-xs text-mid mt-1">
+          The invoice's <strong>Message</strong> box. Anything CareLane adds there replaces the default message saved in your
+          Square invoice settings, so paste that default here to keep it. With this blank and the plan-manager option below
+          off, CareLane leaves the message alone.
+        </p>
+      </div>
+      <label class="flex items-center gap-2 text-sm">
+        <input v-model="status.include_plan_manager" type="checkbox" class="accent-accent" />
+        Add the participant's plan manager (name + contact) to the message
+      </label>
       <div class="flex flex-wrap gap-2">
         <button class="btn-primary" :disabled="busy" @click="saveSettings">Save</button>
         <button class="btn-ghost" :disabled="busy" @click="testConnection">Test connection</button>
