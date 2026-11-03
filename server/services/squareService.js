@@ -15,9 +15,9 @@ import { ApiError } from '../middleware/errorHandler.js'
  * present and the operator has enabled invoicing.
  *
  * Square's Invoices API supports only a single `primary_recipient`, so the
- * participant is set as that recipient (their email) and the plan manager can be
- * surfaced in the invoice message (description) for the operator to CC manually
- * before sending. Whatever CareLane writes to the description replaces the
+ * participant is set as that recipient (their email) and the plan manager's
+ * email can be put on the first line of the invoice message (description) for
+ * the operator to CC manually before sending. Whatever CareLane writes to the description replaces the
  * default message from the operator's Square invoice settings, so the operator
  * can keep that default by saving it as CareLane's invoice message.
  */
@@ -30,8 +30,8 @@ const ENABLED_KEY = 'square_invoicing_enabled'
 // saved default message with whatever an API-created invoice carries, so the
 // operator keeps theirs by saving it here.
 const MESSAGE_KEY = 'square_invoice_message'
-// Whether the plan manager's name + contact is added to the invoice message.
-// Defaults on (the original behaviour).
+// Whether the plan manager's email goes on the first line of the invoice
+// message. Defaults on.
 const PLAN_MANAGER_KEY = 'square_invoice_plan_manager'
 // Square's own cap on an invoice description.
 const MAX_DESCRIPTION = 65536
@@ -185,24 +185,38 @@ export function resolveLineItem (shift, code, customRate) {
 }
 
 /**
- * Build the invoice message (Square's `description`) from the operator's saved
- * message plus, optionally, a `Plan Manager: <name> <contact>` line beneath it.
- * Returns `undefined` when there's nothing to say, so the field is left off the
- * request entirely rather than sent blank. Pure + exported for unit tests.
- * @param {{plan_manager_name?:string|null, plan_manager_contact?:string|null}} client decrypted client record
+ * The plan manager's email, pulled from the free-text `plan_manager_contact`
+ * field (which may also hold a phone number or a name). Falls back to the whole
+ * contact as entered when it has no email in it, or null when it's empty.
+ * @param {{plan_manager_contact?:string|null}} client decrypted client record
+ * @returns {string|null}
+ */
+export function planManagerEmail (client) {
+  const contact = String(client.plan_manager_contact || '').trim()
+  if (!contact) return null
+  const match = contact.match(/[^\s<>(),;:"']+@[^\s<>(),;:"']+\.[^\s<>(),;:"']+/)
+  return match ? match[0].replace(/\.$/, '') : contact
+}
+
+/**
+ * Build the invoice message (Square's `description`): the plan manager's email
+ * on the first line (unless turned off), then the operator's saved message
+ * beneath it. Returns `undefined` when there's nothing to say, so the field is
+ * left off the request entirely rather than sent blank. Pure + exported for
+ * unit tests.
+ * @param {{plan_manager_contact?:string|null}} client decrypted client record
  * @param {{message?:string|null, includePlanManager?:boolean}} [opts]
  * @returns {string|undefined}
  */
 export function buildInvoiceDescription (client, opts = {}) {
-  const parts = []
-  const message = String(opts.message || '').trim()
-  if (message) parts.push(message)
+  const lines = []
   if (opts.includePlanManager !== false) {
-    const planManager = [client.plan_manager_name, client.plan_manager_contact]
-      .map(v => String(v || '').trim()).filter(Boolean).join(' ')
-    if (planManager) parts.push(`Plan Manager: ${planManager}`)
+    const email = planManagerEmail(client)
+    if (email) lines.push(email)
   }
-  return parts.length ? parts.join('\n\n').slice(0, MAX_DESCRIPTION) : undefined
+  const message = String(opts.message || '').trim()
+  if (message) lines.push(message)
+  return lines.length ? lines.join('\n').slice(0, MAX_DESCRIPTION) : undefined
 }
 
 /**
@@ -319,9 +333,9 @@ export async function createDraftInvoiceFromShift (shiftNoteId, userId) {
 
     // The description is the invoice's "Message" box. Setting it replaces the
     // default message from the operator's Square invoice settings, so it carries
-    // the operator's own saved message first. The plan manager can't be a true CC
-    // on a Square invoice (and custom fields need a paid plan), so — unless the
-    // operator turned it off — they're added beneath it to action before sending.
+    // the operator's own saved message. The plan manager can't be a true CC on a
+    // Square invoice (and custom fields need a paid plan), so — unless the
+    // operator turned it off — their email goes on the first line, above it.
     const description = buildInvoiceDescription(client, {
       message: getSetting(MESSAGE_KEY, ''),
       includePlanManager: !!getSetting(PLAN_MANAGER_KEY, 1)

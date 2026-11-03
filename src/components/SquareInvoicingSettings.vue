@@ -121,7 +121,7 @@ async function clearError () {
       </div>
       <label class="flex items-center gap-2 text-sm">
         <input v-model="status.include_plan_manager" type="checkbox" class="accent-accent" />
-        Add the participant's plan manager (name + contact) to the message
+        Put the plan manager's email on the first line of the message
       </label>
       <div class="flex flex-wrap gap-2">
         <button class="btn-primary" :disabled="busy" @click="saveSettings">Save</button>

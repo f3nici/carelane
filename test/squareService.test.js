@@ -67,22 +67,22 @@ describe('squareService.resolveLineItem', () => {
 describe('squareService.buildInvoiceDescription', () => {
   const pm = { plan_manager_name: 'Plan Partners', plan_manager_contact: 'invoices@planpartners.example' }
 
-  it('puts the operator message first and the plan manager beneath it', () => {
+  it('puts the plan manager email on the first line, then the operator message', () => {
     const d = square.buildInvoiceDescription(pm, { message: 'Thanks for your business.\nBSB 000-000', includePlanManager: true })
-    expect(d).toBe('Thanks for your business.\nBSB 000-000\n\nPlan Manager: Plan Partners invoices@planpartners.example')
+    expect(d).toBe('invoices@planpartners.example\nThanks for your business.\nBSB 000-000')
   })
 
   it('keeps the operator message alone when the plan manager is turned off', () => {
     expect(square.buildInvoiceDescription(pm, { message: 'Thanks!', includePlanManager: false })).toBe('Thanks!')
   })
 
-  it('keeps the original plan-manager-only message when no operator message is set', () => {
+  it('writes just the email when no operator message is set', () => {
     expect(square.buildInvoiceDescription(pm, { message: '', includePlanManager: true }))
-      .toBe('Plan Manager: Plan Partners invoices@planpartners.example')
+      .toBe('invoices@planpartners.example')
   })
 
-  it('includes the plan manager by default', () => {
-    expect(square.buildInvoiceDescription(pm)).toContain('Plan Manager:')
+  it('includes the plan manager email by default', () => {
+    expect(square.buildInvoiceDescription(pm)).toBe('invoices@planpartners.example')
   })
 
   it('returns undefined (field omitted) when there is nothing to write', () => {
@@ -94,5 +94,22 @@ describe('squareService.buildInvoiceDescription', () => {
     const s = square.status()
     expect(s.invoice_message).toBe('')
     expect(s.include_plan_manager).toBe(true)
+  })
+})
+
+describe('squareService.planManagerEmail', () => {
+  it('pulls the email out of a contact that also holds a phone or name', () => {
+    expect(square.planManagerEmail({ plan_manager_contact: '0400 000 000 / accounts@pm.example' })).toBe('accounts@pm.example')
+    expect(square.planManagerEmail({ plan_manager_contact: 'Jo Smith <jo.smith@pm.example.com.au>' })).toBe('jo.smith@pm.example.com.au')
+    expect(square.planManagerEmail({ plan_manager_contact: 'Email: invoices@pm.example.' })).toBe('invoices@pm.example')
+  })
+
+  it('falls back to the contact as entered when it has no email', () => {
+    expect(square.planManagerEmail({ plan_manager_contact: ' 02 9000 0000 ' })).toBe('02 9000 0000')
+  })
+
+  it('returns null when there is no contact', () => {
+    expect(square.planManagerEmail({ plan_manager_contact: '' })).toBeNull()
+    expect(square.planManagerEmail({})).toBeNull()
   })
 })
