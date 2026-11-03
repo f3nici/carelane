@@ -21,6 +21,14 @@ async function loginAgent (username, password) {
 /** Pull the token out of a subscribe URL like http://…/calendar/<token>.ics */
 const tokenOf = url => url.match(/\/calendar\/([^/]+)\.ics$/)[1]
 
+/**
+ * A YYYY-MM-DD date `n` days from today (UTC, matching the feed's window). The
+ * feed only serves a bounded window around today, so fixture shifts are dated
+ * relative to now rather than hard-coded — fixed dates silently fall out of the
+ * window as time passes.
+ */
+const daysFromNow = n => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10)
+
 beforeAll(async () => {
   await freshDb()
   const { seed } = await import('../server/db/seed.js')
@@ -43,9 +51,9 @@ beforeAll(async () => {
 
   // One shift rostered to the admin (default) and one to the worker.
   await admin.agent.post('/api/v1/schedule').set('x-csrf-token', admin.csrf)
-    .send({ client_id: adminClient.id, scheduled_date: '2026-09-01', start_time: '09:00', end_time: '11:00', location: 'Community Centre' })
+    .send({ client_id: adminClient.id, scheduled_date: daysFromNow(7), start_time: '09:00', end_time: '11:00', location: 'Community Centre' })
   await admin.agent.post('/api/v1/schedule').set('x-csrf-token', admin.csrf)
-    .send({ client_id: workerClient.id, worker_id: created.id, scheduled_date: '2026-09-02', start_time: '13:00', end_time: '15:00' })
+    .send({ client_id: workerClient.id, worker_id: created.id, scheduled_date: daysFromNow(8), start_time: '13:00', end_time: '15:00' })
 
   worker = await loginAgent('cfworker', 'worker-pass-123')
 })
@@ -94,14 +102,15 @@ describe('iCal calendar feed', () => {
     const c = (await admin.agent.post('/api/v1/clients').set('x-csrf-token', admin.csrf)
       .send({ first_name: 'Long', last_name: 'Name', preferred_name: longName, ndis_number: '431000003' })).body.data
     // No start/end time → an all-day event.
+    const day = daysFromNow(16)
     await admin.agent.post('/api/v1/schedule').set('x-csrf-token', admin.csrf)
-      .send({ client_id: c.id, scheduled_date: '2026-09-10' })
+      .send({ client_id: c.id, scheduled_date: day })
 
     const gen = await admin.agent.post('/api/v1/schedule/calendar-feed/rotate').set('x-csrf-token', admin.csrf)
     const feed = await request(app).get(`/calendar/${tokenOf(gen.body.data.url)}.ics`)
     expect(feed.status).toBe(200)
-    expect(feed.text).toContain('DTSTART;VALUE=DATE:20260910')
-    expect(feed.text).toContain('DTEND;VALUE=DATE:20260911')
+    expect(feed.text).toContain(`DTSTART;VALUE=DATE:${day.replace(/-/g, '')}`)
+    expect(feed.text).toContain(`DTEND;VALUE=DATE:${daysFromNow(17).replace(/-/g, '')}`)
     // A folded continuation line begins with CRLF + a single space.
     expect(feed.text).toMatch(/\r\n /)
   })
