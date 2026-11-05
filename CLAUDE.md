@@ -208,10 +208,17 @@ API docs at `/api/docs`, health at `/healthz`.
   item is priced at the per-participant rate (`client_billing_codes.custom_rate`,
   falling back to the code's standard cap). The participant is mirrored to a Square
   customer (id cached on `clients.square_customer_id`) and set as the invoice's
-  one `primary_recipient`; the plan-manager email is surfaced in the invoice
-  description (Square allows only one recipient, and invoice custom fields need a
-  paid Square plan). Each draft is tracked in `square_invoices` so a shift is
-  never invoiced twice.
+  one `primary_recipient`. The invoice description (Square's "Message" box) is
+  built by `buildInvoiceDescription`: unless turned off
+  (`square_invoice_plan_manager`, default on), the plan manager's email
+  (`planManagerEmail`, pulled from the free-text `plan_manager_contact`, falling
+  back to the contact as entered) on the first line — Square allows only one
+  recipient, and invoice custom fields need a paid Square plan — then the
+  operator's saved message (`square_invoice_message`) beneath it. Setting a
+  description replaces the default message from the operator's Square invoice
+  settings, so they keep it by saving it here. Nothing to write → the field is
+  omitted. Each draft is tracked in `square_invoices` so a shift is never
+  invoiced twice.
 - ntfy push notifications (optional): `ntfyService` turns the dashboard's
   "needs attention" counts into proactive phone nudges via an
   [ntfy](https://ntfy.sh) topic — **plan reviews due** (active agreements nearing

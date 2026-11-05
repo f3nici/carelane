@@ -133,14 +133,34 @@ bank-transfer instructions — in Square before sending.
 The shift is marked **billed** once a draft has been created, and the shift page
 shows the invoice status so you don't invoice the same shift twice.
 
+### Invoice message
+
+Whatever CareLane puts in the invoice's **Message** box (Square's `description`)
+**replaces** the default message saved in your Square invoice settings. To keep
+your usual message, paste it into **Settings → Square invoicing → Invoice
+message** and **Save**. CareLane then writes it onto every draft, and line
+breaks are kept.
+
 ### Plan-manager email
 
 Square's Invoices API allows only **one** recipient on an invoice, so CareLane
-sets the **participant** as the recipient and adds the **plan manager** (name +
-contact, taken from the participant's *Plan manager* fields) to the invoice
-**description** as `Plan Manager: <name> <contact>`. When you review the draft in
-Square, add the plan manager as an additional recipient there if your plan
-supports it, or forward the sent invoice to them.
+sets the **participant** as the recipient. By default it also puts the **plan
+manager's email** on the first line of the message, above your own message:
+
+```
+invoices@planmanager.example
+<your usual message>
+```
+
+The email comes from the participant's *Plan manager contact* field. If that
+field holds something else as well (a phone number or a name), CareLane picks out
+just the email. If there's no email in it, the contact is used as entered. When
+you review the draft in Square, add the plan manager as an additional recipient
+there if your plan supports it, or forward the sent invoice to them.
+
+Don't want the email on the invoice? Untick **Put the plan manager's email on the
+first line of the message** in **Settings → Square invoicing** and **Save**. If
+the message is also blank, CareLane leaves the Message box alone.
 
 ---
 
@@ -154,6 +174,7 @@ supports it, or forward the sent invoice to them.
 | Generate fails with **"No rate set…"** | The participant has no rate for that billing code and the code has no standard price-cap. Set a rate under the participant's billing codes. |
 | Generate fails with **"Shift note has no billing code"** | Add a billing code to the shift note first. |
 | Generate fails with **"already has a Square invoice"** | A draft already exists for this shift. Open Square to find it, or cancel it there before re-invoicing. |
+| Your default Square invoice message is missing | CareLane's message replaces Square's saved default. Paste your default into **Settings → Square invoicing → Invoice message**, then **Save**. |
 | Amounts look wrong | Money is sent to Square in the location's currency. Check the participant's rate and the shift duration. |
 
 ## Privacy note
